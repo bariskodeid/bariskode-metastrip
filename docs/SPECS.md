@@ -2,7 +2,7 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Platform:** Flutter (Android-first, iOS ready)  
-**Last Updated:** 2026-05-19
+**Last Updated:** 2026-08-06
 
 ---
 

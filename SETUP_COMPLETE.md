@@ -1,49 +1,86 @@
-# MetaStrip Phase 0 MVP Foundation Report
+# MetaStrip MVP Progress Report
 
-**Snapshot:** 2026-07-31  
-**Roadmap status:** 90.9% (10/11 Phase 0 tasks)  
-**Deferred task:** dev/prod flavors, deliberately deferred for the current single-binary MVP
+**Snapshot:** 2026-08-06  
+**Overall:** ~40% of total roadmap; Phases 0, 1, 3, 4 done; Phase 2 ~35%; Phases 5-6 not started  
+**Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
 
-## Current Foundation
+## Completed Phases
 
-- Flutter project targets Android and iOS using Clean Architecture with a feature-first layout.
-- The app has a real onboarding-to-viewer startup flow; the old temporary setup homepage no longer exists.
-- The composition root initializes the local-storage abstraction and wires repositories, use cases, and state objects with direct constructors.
-- Manual constructor DI and `MaterialApp`/`Navigator` routing are intentional MVP decisions. A DI container or declarative router should be introduced only when complexity justifies it.
-- Startup storage initialization can fail visibly and be retried instead of leaving the app on an unrecoverable loading screen.
-- SharedPreferences is behind the storage abstraction for onboarding state and output-folder persistence.
-- Output processing validates that the configured folder exists and is writable, reports failure rather than silently falling back, and reserves collision-free clean-copy paths safely. Originals are never mutated.
-- Platform file access uses system pickers/app-scoped grants. The app requests no broad storage or media permissions.
+### Phase 0: MVP Foundation — 90.9% (10/11 tasks)
+- Flutter project init, Clean Architecture feature-first layout, git setup
+- Theme system: 7 presets, typography, spacing, system font fallbacks
+- Shared widgets: PrimaryButton, SecondaryButton, StatusPanel
+- Storage abstraction: SharedPreferences wrapper, retryable bootstrap init
+- Platform access: system picker + SAF; no broad storage/media permissions
+- DI: direct constructor composition; router: MaterialApp/Navigator
+- Dev/prod flavors deliberately deferred for single-binary MVP
 
-## Phase 0 Checklist
+### Phase 1: Onboarding — Complete
+- 5-slide onboarding: Welcome, Viewer Feature, Remover Feature, Folder Setup, Permissions
+- OnboardingCubit manages slide navigation + state persistence
+- Output folder picker: `Saf().pickDirectory()` on Android, `file_selector` elsewhere
+- SAF tree URI validation via `Saf().stat()` instead of dart:io probe
+- "I UNDERSTAND" completes setup in one tap when valid folder is selected
+- Onboarding state persisted via SharedPreferences through storage abstraction
 
-| Status | Roadmap task | Notes |
-|--------|--------------|-------|
-| Done | Flutter project initialization | Android and iOS project initialized |
-| Done | Folder structure | Clean Architecture, feature-first modules |
-| Done | Git setup | Repository and ignore rules configured |
-| Done | Dependency setup | MVP dependencies resolved in `pubspec.yaml` |
-| Done | Theme system | Seven presets, typography, spacing, and system font fallbacks |
-| Done | Shared widgets | Reusable MVP controls and feedback widgets |
-| Done | DI setup | Direct constructor composition is intentional for MVP |
-| Done | Router setup | `MaterialApp`/`Navigator` is intentional for MVP |
-| Done | Storage setup | Abstract storage, SharedPreferences backend, retryable startup |
-| Done | Platform access setup | System picker/app-scoped model; no broad permissions |
-| Deferred | Dev/prod flavors | Add only when separate environments are required |
+### Phase 3: Viewer UI — MVP Complete
+- ViewerCubit: file add, mark/unmark, sort (name/size/type/newest), filter
+- Multi-file picker integration with dedup + extension filter
+- File list items with extension badge + privacy warning
+- Metadata detail screen: grouped accordion sections, selectable fields
+- Copy field value to clipboard
+- Mark visible / clear marks / send marked to Remover handoff
+- Empty state widget
+
+### Phase 4: Remover UI — MVP Complete + Security Hardening
+- RemoverBloc: sequential processing, queue cap, cancel, reset
+- RemoverScreen: file queue with mode selector, process button
+- ProcessingScreen: live progress bar + per-file status + cancel
+- ResultScreen: 4-tile stats grid + per-file output list + Done
+- **JPEG scrubber:** drops APP0/APP1/APP2/APP12/APP13/APP14/COM; EOI truncation
+- **PNG scrubber:** drops text chunks + tIME + eXIf
+- **PDF scrubber:** DocInfo blanking (best-effort)
+- Output: collision-safe naming (`_clean`, `_clean_1`, etc.)
+- SAF output writing for `content://` URIs via `Saf().writeFileBytes()`
+- Error sanitization (strips filesystem paths from messages)
+- Android package fix: `MainActivity.kt` → `com.bariskode.metastrip`
+
+## Partially Complete
+
+### Phase 2: Metadata Engine — ~35%
+**Done:**
+- Supported extension allowlist and MIME lookup
+- JPEG/TIFF EXIF extraction: GPS, camera, lens, timestamps, privacy flags
+- PNG tEXt + uncompressed iTXt extraction
+- SHA-256 hash computation (opt-in, size-guarded)
+- Privacy field detection for GPS, author, device info
+
+**Pending:**
+- Audio: ID3 (MP3), Vorbis Comments (FLAC/OGG), RIFF (WAV/AIFF)
+- Video: FFmpeg-based extraction for MP4, MKV, AVI, WebM, etc.
+- PDF: `syncfusion_flutter_pdf` DocInfo + XMP extraction
+- Office: DOCX/XLSX/PPTX via archive + XML parsing
+- Archives: ZIP/APK metadata parsing
+- GIF, WebP, BMP, HEIC extractors
+- Isolate-based background extraction
+
+## Not Started
+
+### Phase 5: Settings (empty scaffold)
+### Phase 6: Polish & Testing
 
 ## Verification
 
-- `flutter analyze`: clean.
-- `flutter test`: 65 passed, 1 skipped.
-- `flutter build apk --debug`: **not verified for this snapshot**. Gradle downloads from `dl.google.com` failed with TLS `bad_record_mac`/tag-mismatch errors; this is an external download failure, not a successful build result.
-- Release builds additionally require `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`.
+- `flutter analyze`: clean (0 issues)
+- `flutter test`: 66 passed, 1 skipped
+- Debug APK: builds and installs to Samsung SM M205G (Android 8.1)
+- Device serial: `3201fbb0c40a1615`
 
-## Scope And Residual Risk
+## Dependencies
 
-- Metadata removal is intentionally limited to the JPEG, PNG, and PDF MVP paths; it is not a broad all-format scrubber.
-- PDF removal is best-effort DocInfo blanking. XMP, object streams, JavaScript, embedded files, and other metadata may survive, so cleaned PDFs must not be described as comprehensively sanitized.
-- Custom font declarations remain disabled and asset folders remain empty; runtime typography uses system fallbacks.
-- Video/audio/share/notification work and dev/prod flavors remain deferred until their features require them.
+**Installed:** flutter_bloc, bloc, equatable, shared_preferences, path_provider, file_picker, path, mime, archive, exif, image, lucide_icons_flutter, flutter_colorpicker, shimmer, lottie, crypto, convert, intl, file_selector, saf, cupertino_icons
+
+**Planned:** sqflite, id3_codec, ffmpeg_kit_flutter_full_gpl, syncfusion_flutter_pdf, permission_handler, cached_network_image, logger, dartz, share_plus, receive_sharing_intent, flutter_local_notifications
 
 ## Commands
 
@@ -54,5 +91,3 @@ flutter test
 flutter run
 flutter build apk --debug
 ```
-
-The build command is retained as the intended verification step, not as evidence that the current snapshot produced an APK.
