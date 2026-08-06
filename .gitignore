@@ -52,3 +52,6 @@ app.*.map.json
 *.keystore
 key.properties
 upload-keystore.jks
+
+# Local tool data
+token-optimizer/

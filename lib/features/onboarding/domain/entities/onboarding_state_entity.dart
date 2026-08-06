@@ -1,18 +1,24 @@
 import 'package:equatable/equatable.dart';
 
+enum OnboardingStatus { loading, ready, failure }
+
 /// Entity representing onboarding state
 class OnboardingStateEntity extends Equatable {
+  const OnboardingStateEntity({
+    required this.currentSlideIndex,
+    required this.permissionsStatus,
+    required this.isCompleted,
+    required this.status,
+    this.outputFolderPath,
+    this.persistenceError,
+  });
+
   final int currentSlideIndex;
   final String? outputFolderPath;
   final Map<String, bool> permissionsStatus;
   final bool isCompleted;
-
-  const OnboardingStateEntity({
-    required this.currentSlideIndex,
-    this.outputFolderPath,
-    required this.permissionsStatus,
-    required this.isCompleted,
-  });
+  final OnboardingStatus status;
+  final String? persistenceError;
 
   /// Initial state
   factory OnboardingStateEntity.initial() {
@@ -21,6 +27,7 @@ class OnboardingStateEntity extends Equatable {
       outputFolderPath: null,
       permissionsStatus: {},
       isCompleted: false,
+      status: OnboardingStatus.loading,
     );
   }
 
@@ -30,12 +37,19 @@ class OnboardingStateEntity extends Equatable {
     String? outputFolderPath,
     Map<String, bool>? permissionsStatus,
     bool? isCompleted,
+    OnboardingStatus? status,
+    String? persistenceError,
+    bool clearPersistenceError = false,
   }) {
     return OnboardingStateEntity(
       currentSlideIndex: currentSlideIndex ?? this.currentSlideIndex,
       outputFolderPath: outputFolderPath ?? this.outputFolderPath,
       permissionsStatus: permissionsStatus ?? this.permissionsStatus,
       isCompleted: isCompleted ?? this.isCompleted,
+      status: status ?? this.status,
+      persistenceError: clearPersistenceError
+          ? null
+          : persistenceError ?? this.persistenceError,
     );
   }
 
@@ -45,5 +59,7 @@ class OnboardingStateEntity extends Equatable {
         outputFolderPath,
         permissionsStatus,
         isCompleted,
+        status,
+        persistenceError,
       ];
 }

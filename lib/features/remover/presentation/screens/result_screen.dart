@@ -13,8 +13,7 @@ class ResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final success = results.where((r) => r.success).length;
     final failure = results.length - success;
-    final totalBytes =
-        results.fold(0, (sum, r) => sum + r.bytesWritten);
+    final totalBytes = results.fold(0, (sum, r) => sum + r.bytesWritten);
 
     return Scaffold(
       appBar: AppBar(title: const Text('RESULTS')),
@@ -32,7 +31,7 @@ class ResultScreen extends StatelessWidget {
               childAspectRatio: 2.2,
               children: [
                 _StatTile(
-                  label: 'STRIPPED',
+                  label: 'COPIES CREATED',
                   value: '$success',
                   color: Colors.green,
                 ),
@@ -54,7 +53,14 @@ class ResultScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Text('OUTPUT FILES', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'JPEG/PNG metadata cleanup; PDF basic DocInfo only '
+              '(best effort).',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text('OUTPUT FILES',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             Expanded(
               child: results.isEmpty
@@ -65,9 +71,7 @@ class ResultScreen extends StatelessWidget {
                         final result = results[index];
                         return ListTile(
                           leading: Icon(
-                            result.success
-                                ? Icons.check_circle
-                                : Icons.error,
+                            result.success ? Icons.check_circle : Icons.error,
                             color: result.success ? Colors.green : Colors.red,
                             size: 20,
                           ),
@@ -90,8 +94,8 @@ class ResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             FilledButton.icon(
-              onPressed: () => Navigator.of(context)
-                  .popUntil((route) => route.isFirst),
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
               icon: const Icon(Icons.check),
               label: const Text('DONE'),
             ),

@@ -4,6 +4,6 @@ import 'package:metastrip/features/remover/domain/entities/processing_result_ent
 abstract class RemoverRepository {
   Future<ProcessingResultEntity> stripFile(
     String path, {
-    String? outputDirectory,
+    required String outputDirectory,
   });
 }

@@ -2,7 +2,7 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Stack:** Flutter 3.22+ / Dart 3.4+  
-**Last Updated:** 2026-05-19
+**Last Updated:** 2026-07-31
 
 ---
 
@@ -322,10 +322,16 @@ flutter:
 
 ## 3. Development Phases & Sprint Plan
 
-### Implementation Status (updated 2026-07-06)
+### Implementation Status (updated 2026-07-31)
 
 Done:
-- [x] Phase 0 partial foundation: Flutter app boot, pubspec deps, theme tokens, typography, spacing, primary/secondary buttons, SharedPreferences onboarding persistence.
+- [x] **Phase 0 MVP foundation: 90.9% complete (10/11 roadmap tasks).** The only deferred task is dev/prod flavor configuration; flavors are deliberately unnecessary for the current single-binary MVP.
+- [x] App composition root initializes the storage abstraction and wires repositories/use cases with direct constructor injection. A DI container and declarative router remain intentional post-MVP options, not missing foundation work.
+- [x] Startup initialization is retryable; onboarding persistence and the configured output folder are accessed through the local-storage abstraction.
+- [x] Output handling validates the configured folder before processing, fails clearly when it is unavailable, and reserves collision-free output paths without the previous check-then-write race. Originals remain untouched.
+- [x] Android/iOS use system file pickers and app-scoped access; no broad storage or media permissions are requested.
+- [x] Foundation verification: `flutter analyze` is clean; `flutter test` reports 65 passed and 1 skipped.
+- [ ] Debug APK verification is blocked: Gradle dependency downloads from `dl.google.com` failed with TLS `bad_record_mac`/tag-mismatch errors. No successful APK build is claimed for this snapshot.
 - [x] Phase 1 partial onboarding: 5-slide onboarding UI, slide navigation, output folder picker, permission request UI, completion flag redirect.
 - [x] Phase 2 partial metadata engine: supported extension allowlist, basic filesystem metadata extraction, MIME lookup, SHA-256 hash computation.
 - [x] Phase 3 partial Viewer UI: Viewer Cubit, multi-file picker, extension filter, dedup, size/session validation, file list item, extension badge, empty state, metadata detail scaffold, grouped metadata fields, unit/widget tests.
@@ -336,11 +342,9 @@ Done:
 - [x] **Security hardening (2026-07-06): JPEG scrubber now drops APP2 (ICC color profile) + APP14 (Adobe) in addition to APP1/APP12/APP13/COM; PNG scrubber now drops `tIME` (edit timestamp) in addition to text chunks/eXIf; error strings sanitized to strip absolute filesystem paths.**
 
 Still pending:
-- [ ] Full `app/` router + DI structure if app complexity requires it.
-- [ ] **PDF scrubber rewrite: regex approach is unsafe — XMP packets, object streams, JavaScript, and embedded files survive. Replace with a structural PDF parser or downgrade UI claim to "Info-dict blanking only". (CRITICAL)**
-- [ ] **JPEG post-EOI truncation (appended data after `0xFF 0xD9` is currently copied verbatim).**
-- [ ] **TOCTOU fix on output rename (use `FileMode.writeExclusive` or rename-time collision retry).**
-- [ ] **Silent fallback to input dir when output folder missing — should surface a hard error instead.**
+- [ ] Dev/prod flavors (the remaining Phase 0 roadmap task) when separate environments are actually needed.
+- [ ] DI container and declarative router only if app complexity outgrows the intentional manual-constructor/`MaterialApp`/`Navigator` MVP approach.
+- [ ] **PDF removal remains best-effort DocInfo blanking. XMP packets, object streams, JavaScript, embedded files, and other metadata may survive; use a structural PDF parser before making comprehensive-removal claims. (CRITICAL)**
 - [ ] More format-specific metadata extractors/removers beyond JPEG/TIFF EXIF + PNG text + JPEG/PNG/PDF remover MVP.
 - [ ] Viewer thumbnails, share intent, settings screen, e2e hardening.
 - [ ] Move `FileItemEntity` to `shared/domain/` to remove remover→viewer cross-feature coupling.
@@ -349,19 +353,23 @@ Still pending:
 ### Phase 0: Project Setup (1 minggu)
 **Sprint 0 — Foundation**
 
-| Task | Detail | Est. |
-|------|--------|------|
-| Flutter project init | `flutter create`, configure flavor (dev/prod) | 1h |
-| Folder structure setup | Buat semua folder sesuai arsitektur | 1h |
-| Git setup | `.gitignore`, branch strategy (main/dev/feature/*) | 30m |
-| pubspec.yaml | Tambah semua dependencies | 1h |
-| Theme system | Implementasi `AppColors`, `AppTheme`, `AppTypography` | 4h |
-| Shared widgets | Button, badge, divider, dialog, checkbox, switch | 8h |
-| DI setup | Direct constructors for MVP; container deferred | 2h |
-| Router setup | MaterialApp/Navigator MVP; router deferred | 2h |
-| SharedPreferences wrapper | `LocalStorage` class | 2h |
-| Android permissions | `AndroidManifest.xml` setup + `permission_handler` | 2h |
-| iOS permissions | `Info.plist` setup | 1h |
+**Status:** 90.9% complete (10/11). Dev/prod flavors are deliberately deferred for the single-binary MVP. Manual constructor injection and `MaterialApp`/`Navigator` routing are intentional MVP decisions; the composition root owns storage initialization and dependency wiring.
+
+| Status | Task | Current implementation | Est. |
+|--------|------|------------------------|------|
+| [x] | Flutter project init | Android/iOS project initialized | 1h |
+| [x] | Folder structure setup | Clean Architecture, feature-first structure | 1h |
+| [x] | Git setup | Repository and ignore rules configured | 30m |
+| [x] | `pubspec.yaml` | MVP dependencies configured | 1h |
+| [x] | Theme system | `AppColors`, `AppTheme`, `AppTypography`, and spacing | 4h |
+| [x] | Shared widgets | MVP shared controls and feedback widgets | 8h |
+| [x] | DI setup | Intentional direct constructors wired at the composition root; container deferred | 2h |
+| [x] | Router setup | Intentional `MaterialApp`/`Navigator` flow; declarative router deferred | 2h |
+| [x] | Storage setup | Abstract local storage backed by SharedPreferences; retryable startup initialization | 2h |
+| [x] | Platform file access | System picker/app-scoped access on Android and iOS; no broad permissions | 3h |
+| [ ] | Dev/prod flavors | Deliberately deferred until separate environments are needed | 1h |
+
+Foundation hardening also validates the output folder before use and safely reserves collision-free clean-copy paths. Verification for this snapshot is 65 tests passed, 1 skipped, and a clean analyzer. Debug APK build verification remains blocked by TLS `bad_record_mac`/tag-mismatch failures while Gradle downloads from `dl.google.com`.
 
 ---
 

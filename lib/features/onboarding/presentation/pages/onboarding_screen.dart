@@ -1,4 +1,6 @@
-import 'package:file_selector/file_selector.dart';
+import 'dart:io' show Platform;
+
+import 'package:file_selector/file_selector.dart' as fs;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
@@ -7,6 +9,7 @@ import 'package:metastrip/features/onboarding/domain/entities/onboarding_state_e
 import 'package:metastrip/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:metastrip/shared/widgets/primary_button.dart';
 import 'package:metastrip/shared/widgets/secondary_button.dart';
+import 'package:saf/saf.dart';
 
 /// First-run onboarding wizard.
 class OnboardingScreen extends StatelessWidget {
@@ -28,6 +31,15 @@ class OnboardingScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.md),
                   Expanded(child: _OnboardingSlide(index: index)),
                   _ProgressDots(index: index),
+                  if (state.persistenceError != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      state.persistenceError!,
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   Row(
                     children: [
@@ -154,7 +166,13 @@ class _FolderSlide extends StatelessWidget {
             SecondaryButton(
               label: 'CHOOSE FOLDER',
               onPressed: () async {
-                final directory = await getDirectoryPath();
+                String? directory;
+                if (Platform.isAndroid) {
+                  final result = await Saf().pickDirectory();
+                  directory = result?.uri;
+                } else {
+                  directory = await fs.getDirectoryPath();
+                }
                 if (directory != null &&
                     directory.trim().isNotEmpty &&
                     context.mounted) {
@@ -202,7 +220,10 @@ class _PermissionSlide extends StatelessWidget {
             ),
             SecondaryButton(
               label: 'I UNDERSTAND',
-              onPressed: cubit.requestPermissions,
+              onPressed: () async {
+                await cubit.requestPermissions();
+                await cubit.complete();
+              },
             ),
           ],
         );

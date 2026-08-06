@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_bloc.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_state.dart';
 import 'package:metastrip/features/remover/presentation/screens/result_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Full-screen processing view that streams per-file progress from the
 /// [RemoverBloc] and routes to [ResultScreen] on completion.
@@ -27,22 +25,19 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
   }
 
   Future<void> _startProcessing() async {
-    final prefs = await SharedPreferences.getInstance();
-    final outputDirectory =
-        prefs.getString(AppConstants.keyOutputFolderPath);
     if (!mounted) return;
-    context.read<RemoverBloc>().add(
-          RemoverProcessingStarted(outputDirectory: outputDirectory),
-        );
+    context.read<RemoverBloc>().add(const RemoverProcessingStarted());
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<RemoverBloc, RemoverState>(
       listenWhen: (prev, curr) =>
-          prev.status != curr.status &&
+          (prev.status != curr.status ||
+              prev.errorMessage != curr.errorMessage) &&
           (curr.status == RemoverStatus.completed ||
-              curr.status == RemoverStatus.cancelled),
+              curr.status == RemoverStatus.cancelled ||
+              curr.status == RemoverStatus.failure),
       listener: (context, state) {
         if (state.status == RemoverStatus.completed) {
           Navigator.of(context).pushReplacement(
@@ -51,7 +46,12 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
             ),
           );
         } else {
+          final messenger = ScaffoldMessenger.maybeOf(context);
+          final errorMessage = state.errorMessage;
           Navigator.of(context).pop();
+          if (state.status == RemoverStatus.failure && errorMessage != null) {
+            messenger?.showSnackBar(SnackBar(content: Text(errorMessage)));
+          }
         }
       },
       builder: (context, state) {
@@ -73,8 +73,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 OutlinedButton.icon(
                   onPressed: state.status == RemoverStatus.processing
-                      ? () =>
-                          context.read<RemoverBloc>().requestCancel()
+                      ? () => context.read<RemoverBloc>().requestCancel()
                       : null,
                   icon: const Icon(Icons.cancel_outlined),
                   label: const Text('CANCEL'),
@@ -112,9 +111,7 @@ class _ProgressCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              total == 0
-                  ? 'Queuing...'
-                  : '$done / $total · $current',
+              total == 0 ? 'Queuing...' : '$done / $total · $current',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.sm),

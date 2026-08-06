@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_bloc.dart';
@@ -27,7 +28,7 @@ class _FakeRemoverRepository implements RemoverRepository {
   @override
   Future<ProcessingResultEntity> stripFile(
     String path, {
-    String? outputDirectory,
+    required String outputDirectory,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 5));
     processedPaths.add(path);
@@ -46,6 +47,18 @@ class _FakeRemoverRepository implements RemoverRepository {
   }
 }
 
+class _FakeOutputFolderRepository implements OutputFolderRepository {
+  _FakeOutputFolderRepository({this.path = '/out'});
+
+  String? path;
+
+  @override
+  Future<String> getValidOutputFolder() async {
+    if (path == null) throw StateError('invalid output folder');
+    return path!;
+  }
+}
+
 /// Waits for the BLoC to emit a state matching [predicate].
 Future<RemoverState> _waitFor(
   RemoverBloc bloc,
@@ -57,7 +70,10 @@ Future<RemoverState> _waitFor(
 void main() {
   group('RemoverBloc', () {
     test('adds files and dedups by path', () async {
-      final bloc = RemoverBloc(repository: _FakeRemoverRepository());
+      final bloc = RemoverBloc(
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(
         RemoverFilesAdded([_file('a.jpg'), _file('a.jpg'), _file('b.png')]),
       );
@@ -68,7 +84,10 @@ void main() {
     });
 
     test('enforces session file cap', () async {
-      final bloc = RemoverBloc(repository: _FakeRemoverRepository());
+      final bloc = RemoverBloc(
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       final files = List.generate(
         AppConstants.maxFilesPerSession + 3,
         (i) => _file('file$i.jpg'),
@@ -85,7 +104,10 @@ void main() {
     });
 
     test('removes a single file from the queue', () async {
-      final bloc = RemoverBloc(repository: _FakeRemoverRepository());
+      final bloc = RemoverBloc(
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]));
       await _waitFor(bloc, (s) => s.files.length == 2);
 
@@ -97,7 +119,10 @@ void main() {
     });
 
     test('clear resets to idle', () async {
-      final bloc = RemoverBloc(repository: _FakeRemoverRepository());
+      final bloc = RemoverBloc(
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(RemoverFilesAdded([_file('a.jpg')]));
       await _waitFor(bloc, (s) => s.files.isNotEmpty);
 
@@ -111,11 +136,14 @@ void main() {
 
     test('processes files sequentially and reaches completed', () async {
       final repo = _FakeRemoverRepository();
-      final bloc = RemoverBloc(repository: repo);
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]));
       await _waitFor(bloc, (s) => s.files.length == 2);
 
-      bloc.add(const RemoverProcessingStarted(outputDirectory: '/out'));
+      bloc.add(const RemoverProcessingStarted());
       final state =
           await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
 
@@ -128,9 +156,65 @@ void main() {
       bloc.close();
     });
 
+    test('processes only strippable files and reports supported progress total',
+        () async {
+      final repo = _FakeRemoverRepository();
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
+      bloc.add(RemoverFilesAdded([
+        _file('unsupported.docx', ext: 'docx'),
+        _file('photo.jpg'),
+        _file('unsupported.mp4', ext: 'mp4'),
+        _file('document.pdf', ext: 'pdf'),
+      ]));
+      await _waitFor(bloc, (s) => s.files.length == 4);
+
+      bloc.add(const RemoverProcessingStarted());
+      final processing = await _waitFor(
+        bloc,
+        (s) => s.progress?.totalFiles == 2,
+      );
+      expect(processing.progress?.currentFile, 'photo.jpg');
+
+      final state =
+          await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
+      expect(repo.processedPaths, ['/tmp/photo.jpg', '/tmp/document.pdf']);
+      expect(state.results, hasLength(2));
+      expect(state.successCount, 2);
+      bloc.close();
+    });
+
+    test('only unsupported files fail clearly without processing', () async {
+      final repo = _FakeRemoverRepository();
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(path: null),
+      );
+      bloc.add(RemoverFilesAdded([
+        _file('spreadsheet.xlsx', ext: 'xlsx'),
+        _file('movie.mp4', ext: 'mp4'),
+      ]));
+      await _waitFor(bloc, (s) => s.files.length == 2);
+
+      bloc.add(const RemoverProcessingStarted());
+      final state =
+          await _waitFor(bloc, (s) => s.status == RemoverStatus.failure);
+
+      expect(state.errorMessage, 'No supported files in the queue to process.');
+      expect(state.progress, isNull);
+      expect(state.results, isEmpty);
+      expect(repo.processedPaths, isEmpty);
+      bloc.close();
+    });
+
     test('records failures without aborting the batch', () async {
       final repo = _FakeRemoverRepository(shouldFail: true);
-      final bloc = RemoverBloc(repository: repo);
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]));
       await _waitFor(bloc, (s) => s.files.length == 2);
 
@@ -143,9 +227,30 @@ void main() {
       bloc.close();
     });
 
+    test('invalid output folder stops before processing', () async {
+      final repo = _FakeRemoverRepository();
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(path: null),
+      );
+      bloc.add(RemoverFilesAdded([_file('a.jpg')]));
+      await _waitFor(bloc, (state) => state.files.isNotEmpty);
+
+      bloc.add(const RemoverProcessingStarted());
+      final state =
+          await _waitFor(bloc, (s) => s.status == RemoverStatus.failure);
+
+      expect(repo.processedPaths, isEmpty);
+      expect(state.errorMessage, contains('valid output folder'));
+      await bloc.close();
+    });
+
     test('requestCancel stops processing and marks cancelled', () async {
       final repo = _FakeRemoverRepository();
-      final bloc = RemoverBloc(repository: repo);
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(RemoverFilesAdded([
         _file('a.jpg'),
         _file('b.png'),
@@ -167,7 +272,10 @@ void main() {
 
     test('reset returns to idle after completion', () async {
       final repo = _FakeRemoverRepository();
-      final bloc = RemoverBloc(repository: repo);
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
       bloc.add(RemoverFilesAdded([_file('a.jpg')]));
       await _waitFor(bloc, (s) => s.files.length == 1);
 
@@ -175,8 +283,7 @@ void main() {
       await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
 
       bloc.add(const RemoverResetRequested());
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.idle);
+      final state = await _waitFor(bloc, (s) => s.status == RemoverStatus.idle);
 
       expect(state.status, RemoverStatus.idle);
       expect(state.files, isEmpty);

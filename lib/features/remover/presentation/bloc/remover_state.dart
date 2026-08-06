@@ -2,7 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 
-enum RemoverStatus { idle, processing, completed, cancelled }
+enum RemoverStatus { idle, processing, completed, cancelled, failure }
 
 /// Snapshot of progress for the currently processing batch.
 class ProcessingProgress extends Equatable {

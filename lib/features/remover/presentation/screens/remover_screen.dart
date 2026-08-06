@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/supported_extensions.dart';
+import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
-import 'package:metastrip/features/remover/data/repositories/remover_repository_impl.dart';
+import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_bloc.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_state.dart';
@@ -16,15 +17,24 @@ import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart'
 /// repository implementation and injects it into the BLoC so the BLoC only
 /// depends on the domain interface.
 class RemoverScreen extends StatelessWidget {
-  const RemoverScreen({required this.initialFiles, super.key});
+  const RemoverScreen({
+    required this.initialFiles,
+    required this.outputFolderRepository,
+    required this.removerRepository,
+    super.key,
+  });
 
   final List<FileItemEntity> initialFiles;
+  final OutputFolderRepository outputFolderRepository;
+  final RemoverRepository removerRepository;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => RemoverBloc(repository: RemoverRepositoryImpl())
-        ..add(RemoverFilesAdded(initialFiles)),
+      create: (_) => RemoverBloc(
+        repository: removerRepository,
+        outputFolderRepository: outputFolderRepository,
+      )..add(RemoverFilesAdded(initialFiles)),
       child: const _RemoverView(),
     );
   }
@@ -50,8 +60,7 @@ class _RemoverView extends StatelessWidget {
                 IconButton(
                   tooltip: 'Clear queue',
                   icon: const Icon(Icons.delete_sweep_outlined),
-                  onPressed: () =>
-                      bloc.add(const RemoverClearRequested()),
+                  onPressed: () => bloc.add(const RemoverClearRequested()),
                 ),
             ],
           ),
@@ -62,12 +71,12 @@ class _RemoverView extends StatelessWidget {
               children: [
                 Text(
                   '${state.files.length} FILE(S) QUEUED · '
-                  '$supported STRIPPABLE (JPEG/PNG/PDF)',
+                  '$supported SUPPORTED FOR CLEANUP',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'Mode: FULL STRIP (MVP)',
+                  'JPEG/PNG METADATA CLEANUP · PDF DOCINFO (BEST EFFORT)',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -85,24 +94,19 @@ class _RemoverView extends StatelessWidget {
                           itemCount: state.files.length,
                           itemBuilder: (context, index) {
                             final file = state.files[index];
-                            final isStrippable = RemoverStrippableExtensions
-                                .contains(file.extension);
+                            final isStrippable =
+                                RemoverStrippableExtensions.contains(
+                                    file.extension);
                             return ListTile(
                               leading: Icon(
-                                isStrippable
-                                    ? Icons.check_circle
-                                    : Icons.block,
-                                color: isStrippable
-                                    ? Colors.green
-                                    : Colors.grey,
+                                isStrippable ? Icons.check_circle : Icons.block,
+                                color:
+                                    isStrippable ? Colors.green : Colors.grey,
                                 size: 20,
                               ),
                               title: Text(file.name),
                               subtitle: Text(
-                                isStrippable
-                                    ? '${file.extension.toUpperCase()} '
-                                        'best-effort metadata strip ready'
-                                    : 'Unsupported by remover MVP',
+                                _supportDescription(file.extension),
                               ),
                               trailing: IconButton(
                                 tooltip: 'Remove from queue',
@@ -133,7 +137,7 @@ class _RemoverView extends StatelessWidget {
                           ),
                         ),
                 icon: const Icon(Icons.cleaning_services_outlined),
-                label: Text('STRIP $supported FILE(S)'),
+                label: Text('CLEAN $supported FILE(S)'),
               ),
             ),
           ),
@@ -141,4 +145,14 @@ class _RemoverView extends StatelessWidget {
       },
     );
   }
+}
+
+String _supportDescription(String extension) {
+  if (!RemoverStrippableExtensions.contains(extension)) {
+    return 'Unsupported by remover MVP';
+  }
+  if (extension == 'pdf') {
+    return 'PDF basic DocInfo cleanup only (best effort)';
+  }
+  return '${extension.toUpperCase()} supported metadata cleanup';
 }

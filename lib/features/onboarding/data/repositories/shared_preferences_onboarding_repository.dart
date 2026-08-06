@@ -1,16 +1,19 @@
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/storage/key_value_storage.dart';
 import 'package:metastrip/features/onboarding/domain/repositories/onboarding_repository.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// SharedPreferences-backed onboarding repository.
 class SharedPreferencesOnboardingRepository implements OnboardingRepository {
   const SharedPreferencesOnboardingRepository(this._preferences);
 
-  final SharedPreferences _preferences;
+  final KeyValueStorage _preferences;
 
   @override
   Future<void> completeOnboarding() async {
-    await _preferences.setBool(AppConstants.keyOnboardingCompleted, true);
+    await _preferences.setBool(
+      AppConstants.keyOnboardingCompleted,
+      value: true,
+    );
   }
 
   @override
@@ -31,6 +34,9 @@ class SharedPreferencesOnboardingRepository implements OnboardingRepository {
 
   @override
   Future<void> saveOutputFolderPath(String path) async {
-    await _preferences.setString(AppConstants.keyOutputFolderPath, path);
+    await _preferences.setString(
+      AppConstants.keyOutputFolderPath,
+      value: path,
+    );
   }
 }

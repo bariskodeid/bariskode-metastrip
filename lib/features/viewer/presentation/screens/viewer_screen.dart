@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
+import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/screens/remover_screen.dart';
 import 'package:metastrip/features/viewer/presentation/cubit/viewer_cubit.dart';
 import 'package:metastrip/features/viewer/presentation/cubit/viewer_state.dart';
@@ -10,19 +12,35 @@ import 'package:metastrip/features/viewer/presentation/widgets/empty_viewer_stat
 import 'package:metastrip/features/viewer/presentation/widgets/file_list_item.dart';
 
 class ViewerScreen extends StatelessWidget {
-  const ViewerScreen({super.key});
+  const ViewerScreen({
+    required this.outputFolderRepository,
+    required this.removerRepository,
+    super.key,
+  });
+
+  final OutputFolderRepository outputFolderRepository;
+  final RemoverRepository removerRepository;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => ViewerCubit(),
-      child: const _ViewerView(),
+      child: _ViewerView(
+        outputFolderRepository: outputFolderRepository,
+        removerRepository: removerRepository,
+      ),
     );
   }
 }
 
 class _ViewerView extends StatelessWidget {
-  const _ViewerView();
+  const _ViewerView({
+    required this.outputFolderRepository,
+    required this.removerRepository,
+  });
+
+  final OutputFolderRepository outputFolderRepository;
+  final RemoverRepository removerRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +188,9 @@ class _ViewerView extends StatelessWidget {
                                               (file) => file.isMarkedForRemoval,
                                             )
                                             .toList(),
+                                        outputFolderRepository:
+                                            outputFolderRepository,
+                                        removerRepository: removerRepository,
                                       ),
                                     ),
                                   ),

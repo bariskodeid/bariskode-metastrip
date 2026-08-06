@@ -33,12 +33,7 @@ class RemoverClearRequested extends RemoverEvent {
 
 /// Begins sequential processing of the queued files.
 class RemoverProcessingStarted extends RemoverEvent {
-  const RemoverProcessingStarted({this.outputDirectory});
-
-  final String? outputDirectory;
-
-  @override
-  List<Object?> get props => [outputDirectory];
+  const RemoverProcessingStarted();
 }
 
 /// Returns the BLoC to idle so a fresh batch can be queued.
