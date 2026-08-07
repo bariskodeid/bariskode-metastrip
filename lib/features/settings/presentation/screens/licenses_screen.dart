@@ -6,14 +6,9 @@ class LicensesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('LICENSES')),
-      body: const RawScrollbar(
-        child: LicensePage(
-          applicationName: 'MetaStrip',
-          applicationVersion: '1.0.0+1',
-        ),
-      ),
+    return const LicensePage(
+      applicationName: 'MetaStrip',
+      applicationVersion: '1.0.0+1',
     );
   }
 }

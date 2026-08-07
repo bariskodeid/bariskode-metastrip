@@ -145,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Verification (2026-08-07, Phase 2 + hardening + path-normalization)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: **245 passed, 1 skipped**
+- `flutter test`: **248 passed, 1 skipped**
 - Test coverage: not measured in this verification run
 - Debug APK: build verified (`build\app\outputs\flutter-apk\app-debug.apk`); no
   device-install verification is claimed here.

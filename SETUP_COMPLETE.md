@@ -127,7 +127,7 @@
 
 ## Verification (2026-08-07)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: **245 passed, 1 skipped**
+- `flutter test`: **248 passed, 1 skipped**
 - Test coverage: not measured in this verification run
 - Debug APK: builds (`build\app\outputs\flutter-apk\app-debug.apk`)
 
@@ -155,3 +155,7 @@ flutter test
 flutter run
 flutter build apk --debug
 ```
+
+Android release builds additionally require `KEYSTORE_PATH`,
+`KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` in the environment. Keep
+the keystore and credential values outside the repository.

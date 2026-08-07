@@ -23,7 +23,7 @@ class ThemePickerScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(title: const Text('COLOR THEME')),
-          body: Column(
+          body: ListView(
             children: [
               // Live preview area
               _ThemePreviewCard(
@@ -32,41 +32,36 @@ class ThemePickerScreen extends StatelessWidget {
               ),
 
               // Theme list
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    RadioGroup<String>(
-                      groupValue: currentTheme,
-                      onChanged: (value) {
-                        if (value != null) {
-                          context.read<SettingsCubit>().updateTheme(value);
-                        }
-                      },
-                      child: Column(
-                        children: AppColorScheme.allThemes.entries
-                            .map(
-                              (entry) => RadioListTile<String>(
-                                title: Text(entry.key),
-                                value: entry.key,
-                                activeColor:
-                                    Theme.of(context).colorScheme.primary,
-                                dense: true,
-                              ),
-                            )
-                            .toList(),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: RadioGroup<String>(
+                  groupValue: currentTheme,
+                  onChanged: (value) {
+                    if (value != null) {
+                      context.read<SettingsCubit>().updateTheme(value);
+                    }
+                  },
+                  child: Column(
+                    children: [
+                      ...AppColorScheme.allThemes.entries.map(
+                        (entry) => RadioListTile<String>(
+                          title: Text(entry.key),
+                          value: entry.key,
+                          activeColor: Theme.of(context).colorScheme.primary,
+                          dense: true,
+                        ),
                       ),
-                    ),
-                    const Divider(height: AppSpacing.lg),
-                    // Custom theme builder
-                    ListTile(
-                      leading: const Icon(Icons.palette_outlined),
-                      title: const Text('Custom Theme'),
-                      subtitle: const Text('Build your own color scheme'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _showCustomThemeBuilder(context),
-                    ),
-                  ],
+                      const Divider(height: AppSpacing.lg),
+                      // Custom theme builder
+                      ListTile(
+                        leading: const Icon(Icons.palette_outlined),
+                        title: const Text('Custom Theme'),
+                        subtitle: const Text('Build your own color scheme'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showCustomThemeBuilder(context),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -226,7 +221,7 @@ class _ThemePreviewCard extends StatelessWidget {
     );
 
     return Container(
-      height: 200,
+      constraints: const BoxConstraints(minHeight: 200),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         border: Border(
@@ -246,11 +241,12 @@ class _ThemePreviewCard extends StatelessWidget {
               children: [
                 Text('PREVIEW', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: AppSpacing.sm),
-                Row(
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
                   children: [
                     ElevatedButton(
                         onPressed: () {}, child: const Text('PRIMARY')),
-                    const SizedBox(width: AppSpacing.sm),
                     OutlinedButton(
                         onPressed: () {}, child: const Text('SECONDARY')),
                   ],
@@ -259,7 +255,7 @@ class _ThemePreviewCard extends StatelessWidget {
                 const TextField(
                   decoration: InputDecoration(hintText: 'Input field'),
                 ),
-                const Spacer(),
+                const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: [
                     Container(
