@@ -1,8 +1,14 @@
-# MetaStrip MVP Progress Report
+# MetaStrip Project Progress Report
 
 **Snapshot:** 2026-08-07  
-**Overall:** Phases 1-5 MVP done; Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain  
+**Overall:** Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain.
 **Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
+
+## Status Definitions
+
+- **Implemented-scope MVP:** the currently usable scope covering onboarding, Viewer functionality for registered extractors, clean-copy removal for the registered 18 extensions, and exposed Settings controls. Known format and workflow limitations remain.
+- **Full product-spec MVP:** the complete target described in `docs/SPECS.md`. It includes capabilities that are still planned, deferred, or unwired, so it is **not complete**.
+- **Release-ready product:** full product-spec MVP plus integration/device testing, performance and accessibility verification, release-build validation, and release hardening. It is **not complete**.
 
 ## Completed Phases
 
@@ -23,7 +29,7 @@
 - "I UNDERSTAND" completes setup in one tap when valid folder is selected
 - Onboarding state persisted via SharedPreferences through storage abstraction
 
-### Phase 2: Metadata Engine — MVP Complete for Implemented Formats (2026-08-07)
+### Phase 2: Metadata Engine — Implemented-scope MVP Complete (2026-08-07)
 **Done (extraction for the registered extractor formats):**
 - Supported extension allowlist and MIME lookup
 - JPEG/TIFF EXIF extraction: GPS, camera, lens, timestamps, privacy flags
@@ -68,7 +74,7 @@
   format-level property cleanup rather than per-property selection
 - PDF XMP packet stripping — Info-only removal today (best-effort)
 
-### Phase 3: Viewer UI — MVP Complete
+### Phase 3: Viewer UI — Implemented-scope MVP Complete
 - ViewerCubit: file add, mark/unmark, sort (name/size/type/newest), filter
 - Multi-file picker integration with dedup + extension filter
 - File list items with extension badge + privacy warning
@@ -77,7 +83,7 @@
 - Mark visible / clear marks / send marked to Remover handoff
 - Empty state widget
 
-### Phase 4: Remover UI — MVP Complete + Security Hardening
+### Phase 4: Remover UI — Implemented-scope MVP Complete + Security Hardening
 - RemoverBloc: sequential processing, queue cap, cancel, reset
 - RemoverScreen: file queue with supported-cleanup status, process button; the
   broader mode selector remains planned/unwired
@@ -91,7 +97,7 @@
 - Error sanitization (strips filesystem paths from messages)
 - Android package fix: `MainActivity.kt` → `com.bariskode.metastrip`
 
-### Phase 5: Settings — MVP Complete (2026-08-07)
+### Phase 5: Settings — Implemented-scope MVP Complete (2026-08-07)
 - App-level SettingsCubit with SharedPreferences-backed persistence and serialized operations
 - 7 preset themes plus a custom 16-token theme builder; theme changes apply live
 - Output-folder changes are validated and synchronized with onboarding/removal state
@@ -123,13 +129,14 @@
 
 ## Not Started
 
-### Phase 6: Polish & Testing
+### Phase 6: Polish & Testing — Release-readiness work
 
 ## Verification (2026-08-07)
 - `flutter analyze`: clean (0 issues)
 - `flutter test`: **248 passed, 1 skipped**
 - Test coverage: not measured in this verification run
 - Debug APK: builds (`build\app\outputs\flutter-apk\app-debug.apk`)
+- These checks do not establish full product-spec completion or release readiness; integration/device, performance, accessibility, and release-build verification remain outstanding.
 
 ## Dependencies
 

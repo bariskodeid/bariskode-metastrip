@@ -285,7 +285,13 @@ dev_dependencies:
 
 ### Implementation Status (updated 2026-08-07)
 
-**Overall: Phases 1-5 MVP done; Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain.**
+**Overall: Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain.**
+
+### Status terminology
+
+- **Implemented-scope MVP:** currently usable onboarding, Viewer, Remover, and Settings scope for registered formats and exposed controls.
+- **Full product-spec MVP:** all target capabilities in `docs/SPECS.md`; not complete while planned, deferred, or unwired items remain.
+- **Release-ready product:** full product-spec MVP plus integration/device, performance, accessibility, release-build, and release-hardening verification; not complete.
 
 Done:
 - [x] **Phase 0 MVP foundation: 90.9% complete (10/11 roadmap tasks).** The only deferred task is dev/prod flavor configuration; flavors are deliberately unnecessary for the current single-binary MVP.
@@ -297,7 +303,7 @@ Done:
 - [x] **Phase 3 Viewer UI (2026-07-31): ViewerCubit with multi-file picker, extension filter, dedup, sort/filter (name/size/type/newest), file list items with badges, metadata detail with grouped accordion sections, selectable fields, copy to clipboard, mark visible/clear/send to Remover handoff.**
 - [x] **Phase 4 Remover UI (2026-08-06): RemoverBloc with sequential processing, cancel, queue cap. ProcessingScreen with live progress + cancel. ResultScreen with stats grid. Security hardening: JPEG preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM + EOI truncation; PNG drops text chunks + tIME + eXIf; PDF DocInfo blanking. Error sanitization. SAF output writing. Android package fix.**
 - [x] **Phase 5 Settings (2026-08-07): app-level SettingsCubit persistence, 7 preset themes plus custom 16-token theme builder with live application, output-folder configuration synchronized with onboarding, cache status/action, portable JSON export/import, two-step reset back to onboarding, About, and Licenses.**
-- [x] **Phase 2 MVP complete for implemented formats (2026-08-07): registered image/audio/document/archive extractors, an 18-extension remover registry, SHA-256 computation, supported extension allowlist, and MIME lookup. Video, HEIC/HEIF, archive removal, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
+- [x] **Phase 2 implemented-scope MVP complete (2026-08-07): registered image/audio/document/archive extractors, an 18-extension remover registry, SHA-256 computation, supported extension allowlist, and MIME lookup. Video, HEIC/HEIF, archive removal, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
 - [x] Verification: `flutter analyze` clean; `flutter test` **248 passed, 1 skipped**; debug APK build verified. Test coverage was not measured in this verification.
 
 Still pending:
@@ -344,7 +350,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Task | Detail | Status |
 |------|--------|--------|
 | Onboarding Cubit | State: `slideIndex`, `folderPath`, `permissionsStatus` | ✅ |
-| Slide 1 — Welcome | Full UI, Bebas Neue title, animations | ✅ |
+| Slide 1 — Welcome | Full UI, display typography with system fallback, animations | ✅ |
 | Slide 2 — Viewer Feature | Ilustrasi SVG + description | ✅ |
 | Slide 3 — Remover Feature | Ilustrasi SVG + description | ✅ |
 | Slide 4 — Folder Setup | DirectoryPicker integration, path display — **SAF picker on Android** | ✅ |
@@ -358,13 +364,13 @@ Foundation hardening also validates the output folder before use and safely rese
 
 ### Phase 2: Core — Metadata Engine (2 minggu)
 **Sprint 2 — Metadata Extraction**
-**Status:** MVP complete for registered extractor formats (audio/PDF/Open XML/ODF/ZIP/APK/GIF/WebP/BMP and supported images); video, HEIC/HEIF, and formats without registered parsers are deferred or filesystem-only.
+**Status:** Implemented-scope MVP complete for registered extractor formats (audio/PDF/Open XML/ODF/ZIP/APK/GIF/WebP/BMP and supported images); video, HEIC/HEIF, and formats without registered parsers are deferred or filesystem-only. Full product-spec MVP remains incomplete.
 
 | Task | Detail | Status |
 |------|--------|--------|
 | File detection | MIME + extension → format category routing | ✅ |
-| Image EXIF extractor | `exif` package, GPS decode, datetime parse — **MVP done: raw JPEG/TIFF EXIF fields + privacy flags + size guard** | ✅ |
-| Image PNG/GIF/WebP extractor | `image` package, text chunks — **MVP done: PNG tEXt + uncompressed iTXt; GIF/WebP done via custom parsers; BMP status only** | ✅ |
+| Image EXIF extractor | `exif` package, GPS decode, datetime parse — **implemented-scope MVP done: raw JPEG/TIFF EXIF fields + privacy flags + size guard** | ✅ |
+| Image PNG/GIF/WebP extractor | `image` package, text chunks — **implemented-scope MVP done: PNG tEXt + uncompressed iTXt; GIF/WebP done via custom parsers; BMP status only** | ✅ |
 | Audio ID3 extractor | Manual parser, ID3v2.2/2.3/2.4 + ID3v1.1 | ✅ |
 | Audio FLAC/Vorbis extractor | Custom binary parser (VORBIS_COMMENT blocks) | ✅ |
 | Audio WAV/AIFF extractor | RIFF chunk parser (LIST INFO + AIFF chunks) | ✅ |
@@ -382,7 +388,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Unit tests — extractors | Test per format dengan inline byte fixtures | ✅ |
 
 **Sprint 3 — Metadata Removal**
-**Status:** MVP complete for the registered 18 remover extensions; video, archive removal, granular audio/Office removal, and the broader removal modes are deferred or unwired.
+**Status:** Implemented-scope MVP complete for the registered 18 remover extensions; video, archive removal, granular audio/Office removal, and the broader removal modes are deferred or unwired. Full product-spec MVP and release readiness remain incomplete.
 
 | Task | Detail | Status |
 |------|--------|--------|
@@ -410,7 +416,7 @@ Foundation hardening also validates the output folder before use and safely rese
 
 ### Phase 3: Viewer UI (1.5 minggu)
 **Sprint 4 — Viewer Screen**
-**Status:** ✅ MVP Complete
+**Status:** ✅ Implemented-scope MVP complete
 
 | Task | Detail | Status |
 |------|--------|--------|
@@ -426,7 +432,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Empty state | SVG illustration + CTA | ✅ |
 
 **Sprint 5 — Metadata Detail Screen**
-**Status:** ✅ MVP Complete
+**Status:** ✅ Implemented-scope MVP complete
 
 | Task | Detail | Status |
 |------|--------|--------|
@@ -444,7 +450,7 @@ Foundation hardening also validates the output folder before use and safely rese
 
 ### Phase 4: Remover UI (1 minggu)
 **Sprint 6 — Remover Screen & Processing**
-**Status:** ✅ MVP Complete + Security Hardening
+**Status:** ✅ Implemented-scope MVP complete + security hardening
 
 | Task | Detail | Status |
 |------|--------|--------|
@@ -465,7 +471,7 @@ Foundation hardening also validates the output folder before use and safely rese
 
 ### Phase 5: Settings (0.5 minggu)
 **Sprint 7 — Settings**
-**Status:** ✅ MVP Complete (advanced storage/processing controls remain follow-up)
+**Status:** ✅ Implemented-scope MVP complete (advanced storage/processing controls remain follow-up)
 
 | Task | Detail | Status |
 |------|--------|--------|

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Project status terminology
+
+- **Implemented-scope MVP:** usable and mostly complete for the registered Viewer extractors and 18 Remover extensions, with documented limitations such as best-effort PDF cleanup.
+- **Full product-spec MVP:** not complete; several capabilities in `docs/SPECS.md` remain planned, deferred, or unwired.
+- **Release-ready product:** not complete; integration/device testing, performance, accessibility, release-build validation, and release hardening remain pending.
+
 ### Phase 0: MVP Foundation — 90.9% (2026-07-31)
 **Status:** Done (10/11 tasks; dev/prod flavors deliberately deferred)
 
@@ -27,8 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "I UNDERSTAND" completes setup in one tap when valid folder is selected
 - Onboarding state persisted via SharedPreferences through storage abstraction
 
-### Phase 2: Metadata Engine — MVP Complete for Implemented Formats (2026-08-07)
-**Status:** MVP complete for the registered extractor/remover formats; video and additional format work remain deferred.
+### Phase 2: Metadata Engine — Implemented-scope MVP Complete (2026-08-07)
+**Status:** Implemented-scope MVP complete for the registered extractor/remover formats; video and additional format work remain deferred. This does not indicate full product-spec or release-ready completion.
 
 #### Done
 - Supported extension allowlist and MIME lookup
@@ -75,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strippers use format-level cleanup behavior.
 
 ### Phase 3: Viewer UI — Done (2026-07-31)
-**Status:** MVP complete
+**Status:** Implemented-scope MVP complete
 
 - ViewerCubit: file add, mark/unmark, sort (name/size/type/newest), filter
 - Multi-file picker integration with dedup + extension filter
@@ -86,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Empty state widget
 
 ### Phase 4: Remover UI — Done (2026-08-06)
-**Status:** MVP complete with security hardening
+**Status:** Implemented-scope MVP complete with security hardening
 
 - RemoverBloc: sequential processing, queue cap, cancel, reset
 - RemoverScreen: file queue with supported-cleanup status, process button; the
@@ -127,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with exact-or-suffix matching; closes silent strip-failure for
   `a/docProps/core.xml` / `docProps//core.xml` / `docProps\core.xml`
 
-### Phase 5: Settings — MVP Complete (2026-08-07)
+### Phase 5: Settings — Implemented-scope MVP Complete (2026-08-07)
 **Status:** Complete for exposed MVP controls; advanced storage/processing controls remain follow-up
 
 - App-level SettingsCubit with serialized SharedPreferences-backed load/save and live theme application
@@ -139,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Naming template, folder structure, keep-original, JPEG quality, concurrency, and auto-confirm remain persistence/import fields only; their controls are not exposed or wired to processing
 
 ### Phase 6: Polish & Testing — Not Started
-**Status:** Pending after Phases 1-5 MVP completion
+**Status:** Pending after implemented-scope MVP completion; this phase covers release-readiness work and does not imply that the full product-spec MVP is complete.
 
 ---
 

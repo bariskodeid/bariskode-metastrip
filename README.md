@@ -6,11 +6,17 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 
 ## 🚀 Project Status
 
-**Current Phase:** Phases 1-5 MVP ✅ **DONE** for the implemented scope · Phase 2 follow-ups / Phase 6 pending
+**Current Phase:** Implemented-scope MVP ✅ **usable / mostly complete** · Full product-spec MVP and release-readiness work remain pending
 
 Implemented now: onboarding, system file picker, file validation, format-specific metadata extraction where a parser is registered, small-file SHA-256, detail screen, an 18-extension remover registry with RemoverBloc + ProcessingScreen + ResultScreen, and Settings for themes, output folder, maintenance, portable import/export, and reset.
 
 Planned next: deeper PDF stripping, video/HEIC support, share intent, unexposed processing controls, and e2e hardening.
+
+### Status terminology
+
+- **Implemented-scope MVP:** the currently usable feature set for the registered Viewer extractors and 18 Remover extensions. This scope is substantially implemented, but still has known limitations such as best-effort PDF cleanup.
+- **Full product-spec MVP:** all capabilities described in [SPECS.md](docs/SPECS.md), including broader format support, removal modes, sharing, background processing, and the remaining Viewer features. This is **not complete**.
+- **Release-ready product:** full product-spec scope plus integration/device testing, performance and accessibility verification, release-build validation, and release hardening. This is **not complete**.
 
 ## 📋 Quick Start
 
@@ -70,10 +76,8 @@ lib/
 - **Cobalt** - Dark blue with cobalt
 
 ### Typography
-- Display: Bebas Neue 48sp
-- Headings: Space Mono Bold
-- Body: IBM Plex Mono
-- Monospace data: IBM Plex Mono
+- Design target: Bebas Neue display, Space Mono headings, and IBM Plex Mono body/data
+- Runtime: custom font assets are not currently bundled; system fallbacks are used
 
 ### Spacing
 - Base unit: 4dp
@@ -89,7 +93,7 @@ lib/
 
 ## 🎯 Features
 
-### ✅ Implemented MVP
+### ✅ Implemented-scope MVP
 - Onboarding wizard
 - Output folder selection stored locally on-device
 - System-picker scoped file access; users explicitly choose files and no broad OS storage permission is requested
@@ -194,22 +198,22 @@ flutter build apk --release
 - Folder setup
 - System-picker scoped access explanation; no broad OS storage permission request
 
-### ✅ Phase 2: Core - Metadata Engine (MVP COMPLETE FOR IMPLEMENTED FORMATS; follow-ups remain)
+### ✅ Phase 2: Core - Metadata Engine (implemented-scope MVP complete; follow-ups remain)
 - Metadata extraction for registered formats; filesystem metadata for other allowlisted files
 - Metadata removal engine for the current registered remover formats
 - Isolate-based extraction and processing helpers (foreground app flow; background processing is planned)
 
-### ✅ Phase 3: Viewer UI (MVP COMPLETE; follow-ups remain)
+### ✅ Phase 3: Viewer UI (implemented-scope MVP complete; follow-ups remain)
 - File list screen
 - Metadata detail screen
 - Mark for removal
 
-### ✅ Phase 4: Remover UI (MVP COMPLETE; follow-ups remain)
+### ✅ Phase 4: Remover UI (implemented-scope MVP complete; follow-ups remain)
 - Remover queue
 - Processing screen
 - Result screen
 
-### ✅ Phase 5: Settings (MVP COMPLETE)
+### ✅ Phase 5: Settings (implemented-scope MVP complete)
 - Settings screen and live theme application
 - 7 preset themes plus 16-token custom theme builder
 - Output-folder configuration synchronized with onboarding

@@ -5,7 +5,7 @@
 
 MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang diterima Viewer dan membuat clean copy untuk format yang didukung Remover, sepenuhnya offline di perangkat.
 
-> Status implementasi saat ini: **MVP Phases 1-5 selesai** untuk onboarding, viewer, remover, dan Settings. Video/HEIC, GPS map, share intent, pemrosesan background, serta kontrol storage/processing lanjutan masih **planned**.
+> Status implementasi saat ini: **Implemented-scope MVP** sudah dapat digunakan dan sebagian besar selesai untuk onboarding, Viewer, Remover, dan Settings. **Full product-spec MVP belum selesai**; dukungan video/HEIC, GPS map, share intent, pemrosesan background, mode removal lanjutan, serta kontrol storage/processing lanjutan masih direncanakan, ditunda, atau belum terhubung ke alur aplikasi. **Release-ready product** berarti Full product-spec MVP ditambah verifikasi integrasi/perangkat, performa, aksesibilitas, release build, dan hardening rilis. Seluruh pekerjaan tersebut masih tertunda.
 
 ---
 
@@ -37,9 +37,9 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 
 ---
 
-## Fitur Target (Planned)
+## Status dan Fitur
 
-### ✅ Implemented MVP
+### ✅ Implemented-scope MVP
 - Onboarding dasar + output folder setup
 - System file picker tanpa broad storage permission
 - Extension allowlist, dedup, size/session cap
@@ -47,7 +47,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 - Remover dengan progress/cancel/result flow dan clean copy ke output folder tanpa mengubah file asli
 - Settings: 7 preset tema + 16-token custom theme, output folder, cache status, portable export/import, reset, About, dan Licenses
 
-### 📅 Planned Full Feature Set
+### 📅 Full product-spec MVP (planned/follow-up)
 
 ### 🔍 Viewer
 - Pilih multiple file sekaligus dari file manager atau galeri
@@ -107,7 +107,7 @@ HEIC/HEIF, RAW, M4V, legacy Office, GZ/BZ2, video, archives, granular audio remo
 
 MetaStrip menggunakan bahasa desain **Industrial Minimalism**:
 - Latar belakang gelap mendominasi (near-black charcoal)
-- Font monospace teknis: **Bebas Neue** (display) + **Space Mono** (heading) + **IBM Plex Mono** (body)
+- Tipografi target: **Bebas Neue** (display) + **Space Mono** (heading) + **IBM Plex Mono** (body); asset font custom belum dibundel sehingga runtime menggunakan system fallback
 - Palet warna diambil dari material industri: besi, karat, beton
 - Border radius minimal — sudut tajam, angular
 - Aksen warna sparingly untuk signaling, bukan dekorasi
