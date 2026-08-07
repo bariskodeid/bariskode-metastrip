@@ -76,7 +76,7 @@ class _RemoverView extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'JPEG/PNG METADATA CLEANUP · PDF DOCINFO (BEST EFFORT)',
+                  'AUDIO · IMAGE · OFFICE · PDF METADATA CLEANUP',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -147,12 +147,22 @@ class _RemoverView extends StatelessWidget {
   }
 }
 
+/// Per-format support copy shown under each queued file.
 String _supportDescription(String extension) {
   if (!RemoverStrippableExtensions.contains(extension)) {
-    return 'Unsupported by remover MVP';
+    return 'Unsupported by remover';
   }
-  if (extension == 'pdf') {
-    return 'PDF basic DocInfo cleanup only (best effort)';
-  }
-  return '${extension.toUpperCase()} supported metadata cleanup';
+  return switch (extension.toLowerCase()) {
+    'jpg' || 'jpeg' => 'JPEG EXIF/comment segment cleanup',
+    'png' => 'PNG text/tEXt/iTXt/eXIf chunk cleanup',
+    'pdf' => 'PDF basic DocInfo cleanup only (best effort)',
+    'mp3' => 'MP3 ID3 tag cleanup',
+    'flac' || 'ogg' || 'opus' => 'Vorbis/FLAC comment cleanup',
+    'wav' || 'aiff' => 'RIFF INFO chunk cleanup',
+    'docx' || 'xlsx' || 'pptx' => 'Office core properties cleanup',
+    'odt' || 'ods' || 'odp' => 'ODF metadata cleanup',
+    'gif' => 'GIF comment cleanup',
+    'webp' => 'WebP EXIF/XMP cleanup',
+    _ => '${extension.toUpperCase()} supported metadata cleanup',
+  };
 }

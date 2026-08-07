@@ -21,11 +21,13 @@ class RemoverRepositoryImpl implements RemoverRepository {
   Future<ProcessingResultEntity> stripFile(
     String path, {
     required String outputDirectory,
+    Set<String>? selectiveLabels,
   }) async {
     try {
       final output = await _datasource.stripMetadata(
         path,
         outputDirectory: outputDirectory,
+        selectiveLabels: selectiveLabels,
       );
       final bytesWritten = output.path.startsWith('content://')
           ? await _safOutputLength(output.path)

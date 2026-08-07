@@ -5,6 +5,7 @@ import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/screens/remover_screen.dart';
+import 'package:metastrip/features/settings/presentation/screens/settings_screen.dart';
 import 'package:metastrip/features/viewer/presentation/cubit/viewer_cubit.dart';
 import 'package:metastrip/features/viewer/presentation/cubit/viewer_state.dart';
 import 'package:metastrip/features/viewer/presentation/screens/metadata_detail_screen.dart';
@@ -76,6 +77,15 @@ class _ViewerView extends StatelessWidget {
                       )
                     : const Icon(Icons.add),
                 onPressed: state.isPicking ? null : cubit.pickFiles,
+              ),
+              IconButton(
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SettingsScreen(),
+                  ),
+                ),
               ),
             ],
           ),

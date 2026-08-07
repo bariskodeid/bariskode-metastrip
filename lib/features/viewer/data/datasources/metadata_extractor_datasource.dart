@@ -1,20 +1,27 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:exif/exif.dart';
 import 'package:intl/intl.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/processing/isolate_runner.dart';
 import 'package:metastrip/core/utils/file_utils.dart';
+import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
+import 'package:metastrip/features/viewer/data/datasources/extractors/format_registry.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_entity.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
 import 'package:mime/mime.dart';
 
+/// Datasource that extracts basic file metadata plus inline format fields.
+///
+/// Acts as a slim facade: it owns filesystem reads, hashing, MIME lookup and
+/// per-format routing/caps, and delegates format parsing to the extractors
+/// under `extractors/`. Routing is driven by the format registry so every
+/// supported extension is handled with the same bounded/full read strategy.
 class MetadataExtractorDatasource {
   static final _hashCache = <String, String>{};
+  static const int _maxHashCacheEntries = 512;
 
   Future<MetadataEntity> extractBasic(
     FileItemEntity file, {
@@ -22,14 +29,56 @@ class MetadataExtractorDatasource {
   }) async {
     final ioFile = File(file.path);
     final stat = await ioFile.stat();
-    final length = stat.size < 512 ? stat.size : 512;
-    final randomAccessFile = await ioFile.open();
-    final headerBytes = await randomAccessFile.read(length);
-    await randomAccessFile.close();
+    final headerLength = stat.size < 512 ? stat.size : 512;
+    final headerBytes = await _readRange(ioFile, 0, headerLength);
     final mimeType =
         lookupMimeType(file.path, headerBytes: headerBytes) ?? 'unknown';
-    final hashValue = await _hashValue(ioFile, stat, computeHash);
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+    final extension = file.extension.trim().toLowerCase();
+    final fileSize = stat.size;
+
+    final spec = formatSpecFor(extension);
+    final payload = spec?.extractor != null
+        ? await _readExtractionPayload(ioFile, extension, fileSize)
+        : null;
+
+    List<MetadataFieldEntity> formatFields;
+    String? isolateHash;
+    if (payload != null) {
+      try {
+        final result = await runOnWorker(
+          () => _parseAll(payload, file.path, extension, fileSize, computeHash),
+        );
+        formatFields = result.fields;
+        isolateHash = result.hash;
+      } catch (_) {
+        formatFields = [
+          statusField(
+            spec?.skipSection ?? 'Contents',
+            'Status',
+            'Unable to parse metadata',
+          ),
+        ];
+      }
+    } else if (spec?.extractor != null) {
+      formatFields = [
+        statusField(
+          spec!.skipSection,
+          spec.skipLabel,
+          'Skipped for files larger than '
+              '${FileUtils.formatBytes(spec.maxBytes)}',
+        ),
+      ];
+    } else {
+      formatFields = const [];
+    }
+
+    final hashValue = await _resolveHash(
+      file: ioFile,
+      stat: stat,
+      computeHash: computeHash,
+      isolateHash: isolateHash,
+    );
 
     return MetadataEntity(
       fields: [
@@ -41,7 +90,7 @@ class MetadataExtractorDatasource {
         MetadataFieldEntity(
           section: 'File',
           label: 'Extension',
-          value: file.extension.toUpperCase(),
+          value: extension.toUpperCase(),
         ),
         MetadataFieldEntity(
           section: 'File',
@@ -70,242 +119,141 @@ class MetadataExtractorDatasource {
           label: 'SHA-256',
           value: hashValue,
         ),
-        ...await _extractExifFields(ioFile, file.extension, stat.size),
-        ...await _extractPngTextFields(ioFile, file.extension, stat.size),
+        ...formatFields,
       ],
     );
   }
 
-  Future<String> _hashValue(File file, FileStat stat, bool computeHash) async {
+  /// Reads the byte payload handed to the format extractor for [extension].
+  ///
+  /// Returns null when the extension is not registered, when the full-read
+  /// payload exceeds the spec cap (the caller adds a skip field instead), or
+  /// when there is nothing to parse. Bounded formats only read the first
+  /// [AppConstants.maxAudioScanBytes] bytes; MP3 additionally pulls the
+  /// trailing 128 bytes so the ID3v1 tag survives for larger files.
+  Future<Uint8List?> _readExtractionPayload(
+    File file,
+    String extension,
+    int fileSize,
+  ) async {
+    final spec = formatSpecFor(extension);
+    if (spec?.extractor == null) return null;
+    if (spec!.boundedRead) {
+      return _readBoundedPayload(file, extension, fileSize);
+    }
+    if (fileSize > spec.maxBytes) return null;
+    return file.readAsBytes();
+  }
+
+  /// Reads up to [AppConstants.maxAudioScanBytes] from the start of [file].
+  ///
+  /// For MP3 files larger than the prefix, the final 128 bytes are appended
+  /// so ID3v1.1 tags are still detected.
+  Future<Uint8List> _readBoundedPayload(
+    File file,
+    String extension,
+    int fileSize,
+  ) async {
+    final prefixLength = fileSize < AppConstants.maxAudioScanBytes
+        ? fileSize
+        : AppConstants.maxAudioScanBytes;
+    final prefix = await _readRange(file, 0, prefixLength);
+    if (extension == 'mp3' && fileSize > prefixLength) {
+      final tail = await _readRange(file, fileSize - 128, 128);
+      final builder = BytesBuilder(copy: false);
+      builder.add(prefix);
+      builder.add(tail);
+      return builder.takeBytes();
+    }
+    return prefix;
+  }
+
+  /// Reads exactly [length] bytes starting at byte [start] of [file].
+  Future<Uint8List> _readRange(File file, int start, int length) async {
+    if (length <= 0) return Uint8List(0);
+    final randomAccessFile = await file.open();
+    try {
+      if (start > 0) await randomAccessFile.setPosition(start);
+      return Uint8List.fromList(await randomAccessFile.read(length));
+    } finally {
+      await randomAccessFile.close();
+    }
+  }
+
+  /// Resolves the final SHA-256 display value using the registry routing.
+  ///
+  /// When the parse isolate already hashed the payload (full or bounded read)
+  /// that digest is reused and cached. Otherwise the whole file is read and
+  /// hashed, matching the original filesystem-only behavior.
+  Future<String> _resolveHash({
+    required File file,
+    required FileStat stat,
+    required bool computeHash,
+    required String? isolateHash,
+  }) async {
     if (!computeHash) return 'Not computed';
     if (stat.size > AppConstants.maxInlineHashSizeBytes) {
-      return 'Skipped for files larger than ${FileUtils.formatBytes(AppConstants.maxInlineHashSizeBytes)}';
+      return 'Skipped for files larger than '
+          '${FileUtils.formatBytes(AppConstants.maxInlineHashSizeBytes)}';
     }
 
     final key =
         '${file.path}|${stat.modified.millisecondsSinceEpoch}|${stat.size}';
     final cached = _hashCache[key];
     if (cached != null) return cached;
+    if (isolateHash != null) {
+      _storeCachedHash(key, isolateHash);
+      return isolateHash;
+    }
 
     final bytes = await file.readAsBytes();
     final digest = await runOnWorker(() => _sha256Hex(bytes));
-    _hashCache[key] = digest;
+    _storeCachedHash(key, digest);
     return digest;
   }
 
-  Future<List<MetadataFieldEntity>> _extractPngTextFields(
-    File file,
-    String extension,
-    int sizeBytes,
-  ) async {
-    if (extension.toLowerCase() != 'png') return const [];
-
-    if (sizeBytes > AppConstants.maxInlineExifSizeBytes) {
-      return [
-        MetadataFieldEntity(
-          section: 'PNG Text',
-          label: 'PNG Text Scan',
-          value:
-              'Skipped for files larger than ${FileUtils.formatBytes(AppConstants.maxInlineExifSizeBytes)}',
-        ),
-      ];
-    }
-
-    try {
-      final bytes = await file.readAsBytes();
-      if (!_hasPngSignature(bytes)) {
-        return const [
-          MetadataFieldEntity(
-            section: 'PNG Text',
-            label: 'Status',
-            value: 'Invalid PNG signature',
-          ),
-        ];
-      }
-
-      final fields = <MetadataFieldEntity>[];
-      var offset = 8;
-      while (offset + 8 <= bytes.length) {
-        final length =
-            ByteData.sublistView(bytes, offset, offset + 4).getUint32(0);
-        final type =
-            String.fromCharCodes(bytes.sublist(offset + 4, offset + 8));
-        final dataStart = offset + 8;
-        if (length > bytes.length - dataStart - 4) break;
-        final dataEnd = dataStart + length;
-
-        if (type == 'tEXt') {
-          fields.addAll(_parseTextChunk(bytes.sublist(dataStart, dataEnd)));
-        } else if (type == 'iTXt') {
-          fields.addAll(
-            _parseInternationalTextChunk(bytes.sublist(dataStart, dataEnd)),
-          );
-        }
-
-        if (fields.length >= AppConstants.maxPngTextChunks) break;
-
-        offset = dataEnd + 4;
-        if (type == 'IEND') break;
-      }
-
-      if (fields.isEmpty) {
-        return const [
-          MetadataFieldEntity(
-            section: 'PNG Text',
-            label: 'Status',
-            value: 'No PNG text metadata found',
-          ),
-        ];
-      }
-
-      return fields;
-    } catch (_) {
-      return const [
-        MetadataFieldEntity(
-          section: 'PNG Text',
-          label: 'Status',
-          value: 'Unable to parse PNG text metadata',
-        ),
-      ];
+  /// Stores [value] for [key] in the bounded in-memory hash cache.
+  ///
+  /// The cache is capped at [_maxHashCacheEntries]; when the cap is reached
+  /// the whole cache is dropped so a long session cannot leak memory.
+  static void _storeCachedHash(String key, String value) {
+    _hashCache[key] = value;
+    if (_hashCache.length > _maxHashCacheEntries) {
+      _hashCache.clear();
     }
   }
+}
 
-  bool _hasPngSignature(Uint8List bytes) {
-    const signature = [137, 80, 78, 71, 13, 10, 26, 10];
-    if (bytes.length < signature.length) return false;
-    for (var i = 0; i < signature.length; i++) {
-      if (bytes[i] != signature[i]) return false;
-    }
-    return true;
+/// Parses [bytes] into format fields and optionally hashes the source file.
+///
+/// Kept as a top-level function so `Isolate.run` only captures sendable
+/// parameters. For bounded-read formats (mp3/flac/ogg/opus) the payload is
+/// only a prefix, so when a hash is requested the entire [filePath] is read
+/// and hashed inside the isolate; the reported SHA-256 is then honest for the
+/// whole file. Full-read formats hash the already-loaded [bytes], which are
+/// the complete file.
+Future<({List<MetadataFieldEntity> fields, String? hash})> _parseAll(
+  Uint8List bytes,
+  String filePath,
+  String extension,
+  int sizeBytes,
+  bool computeHash,
+) async {
+  final spec = formatSpecFor(extension);
+  final fields = <MetadataFieldEntity>[];
+  final extractor = spec?.extractor;
+  if (extractor != null) {
+    fields.addAll(await extractor(bytes));
   }
-
-  List<MetadataFieldEntity> _parseTextChunk(Uint8List data) {
-    final separator = data.indexOf(0);
-    if (separator <= 0) return const [];
-    final keyword = String.fromCharCodes(data.sublist(0, separator));
-    final value = String.fromCharCodes(data.sublist(separator + 1));
-    return [
-      MetadataFieldEntity(
-        section: 'PNG Text',
-        label: keyword,
-        value: _truncateMetadataValue(value),
-        isPrivacySensitive: _isTextPrivacySensitive(keyword),
-      ),
-    ];
-  }
-
-  List<MetadataFieldEntity> _parseInternationalTextChunk(Uint8List data) {
-    final keywordEnd = data.indexOf(0);
-    if (keywordEnd <= 0 || keywordEnd + 2 >= data.length) return const [];
-    if (data[keywordEnd + 1] != 0) return const []; // compressed text skipped
-
-    var cursor = keywordEnd + 3;
-    final languageEnd = data.indexOf(0, cursor);
-    if (languageEnd < 0) return const [];
-    cursor = languageEnd + 1;
-    final translatedEnd = data.indexOf(0, cursor);
-    if (translatedEnd < 0) return const [];
-    cursor = translatedEnd + 1;
-
-    final keyword = String.fromCharCodes(data.sublist(0, keywordEnd));
-    final value = utf8.decode(data.sublist(cursor), allowMalformed: true);
-    return [
-      MetadataFieldEntity(
-        section: 'PNG Text',
-        label: keyword,
-        value: _truncateMetadataValue(value),
-        isPrivacySensitive: _isTextPrivacySensitive(keyword),
-      ),
-    ];
-  }
-
-  Future<List<MetadataFieldEntity>> _extractExifFields(
-    File file,
-    String extension,
-    int sizeBytes,
-  ) async {
-    if (!{'jpg', 'jpeg', 'tif', 'tiff'}.contains(extension.toLowerCase())) {
-      return const [];
-    }
-
-    if (sizeBytes > AppConstants.maxInlineExifSizeBytes) {
-      return [
-        MetadataFieldEntity(
-          section: 'Image EXIF',
-          label: 'EXIF Scan',
-          value:
-              'Skipped for files larger than ${FileUtils.formatBytes(AppConstants.maxInlineExifSizeBytes)}',
-        ),
-      ];
-    }
-
-    try {
-      final tags = await readExifFromBytes(await file.readAsBytes());
-      if (tags.isEmpty) {
-        return const [
-          MetadataFieldEntity(
-            section: 'Image EXIF',
-            label: 'Status',
-            value: 'No EXIF metadata found',
-          ),
-        ];
-      }
-
-      return tags.entries
-          .map(
-            (entry) => MetadataFieldEntity(
-              section: 'Image EXIF',
-              label: entry.key,
-              value: entry.value.printable,
-              isPrivacySensitive: _isExifPrivacySensitive(entry.key),
-            ),
-          )
-          .toList()
-        ..sort((a, b) => a.label.compareTo(b.label));
-    } catch (_) {
-      return const [
-        MetadataFieldEntity(
-          section: 'Image EXIF',
-          label: 'Status',
-          value: 'Unable to parse EXIF metadata',
-        ),
-      ];
+  String? hash;
+  if (computeHash && sizeBytes <= AppConstants.maxInlineHashSizeBytes) {
+    if (spec?.boundedRead == true) {
+      hash = _sha256Hex(await File(filePath).readAsBytes());
+    } else {
+      hash = _sha256Hex(bytes);
     }
   }
-
-  bool _isExifPrivacySensitive(String key) {
-    final normalized = key.toLowerCase();
-    return normalized.contains('gps') ||
-        normalized.contains('artist') ||
-        normalized.contains('copyright') ||
-        normalized.contains('owner') ||
-        normalized.contains('serial') ||
-        normalized.contains('datetime') ||
-        normalized.contains('make') ||
-        normalized.contains('model') ||
-        normalized.contains('usercomment') ||
-        normalized.contains('imagedescription') ||
-        normalized.contains('xp') ||
-        normalized.contains('software') ||
-        normalized.contains('hostcomputer') ||
-        normalized.contains('lens');
-  }
-
-  bool _isTextPrivacySensitive(String key) {
-    final normalized = key.toLowerCase();
-    return normalized.contains('author') ||
-        normalized.contains('creator') ||
-        normalized.contains('comment') ||
-        normalized.contains('copyright') ||
-        normalized.contains('description') ||
-        normalized.contains('software') ||
-        normalized.contains('source');
-  }
-
-  String _truncateMetadataValue(String value) {
-    if (value.length <= AppConstants.maxMetadataFieldChars) return value;
-    return '${value.substring(0, AppConstants.maxMetadataFieldChars)}… [truncated]';
-  }
+  return (fields: fields, hash: hash);
 }
 
 String _sha256Hex(Uint8List bytes) => sha256.convert(bytes).toString();

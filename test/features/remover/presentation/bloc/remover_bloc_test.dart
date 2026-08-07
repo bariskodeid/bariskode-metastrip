@@ -24,15 +24,18 @@ class _FakeRemoverRepository implements RemoverRepository {
   final bool shouldFail;
   final List<String> processedPaths = [];
   String? lastOutputDirectory;
+  Set<String>? lastSelectiveLabels;
 
   @override
   Future<ProcessingResultEntity> stripFile(
     String path, {
     required String outputDirectory,
+    Set<String>? selectiveLabels,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 5));
     processedPaths.add(path);
     lastOutputDirectory = outputDirectory;
+    lastSelectiveLabels = selectiveLabels;
     if (shouldFail) {
       return ProcessingResultEntity.failure(
         inputPath: path,
@@ -164,7 +167,7 @@ void main() {
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
       bloc.add(RemoverFilesAdded([
-        _file('unsupported.docx', ext: 'docx'),
+        _file('unsupported.bmp', ext: 'bmp'),
         _file('photo.jpg'),
         _file('unsupported.mp4', ext: 'mp4'),
         _file('document.pdf', ext: 'pdf'),
@@ -193,7 +196,7 @@ void main() {
         outputFolderRepository: _FakeOutputFolderRepository(path: null),
       );
       bloc.add(RemoverFilesAdded([
-        _file('spreadsheet.xlsx', ext: 'xlsx'),
+        _file('audio.aac', ext: 'aac'),
         _file('movie.mp4', ext: 'mp4'),
       ]));
       await _waitFor(bloc, (s) => s.files.length == 2);

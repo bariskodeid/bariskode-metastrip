@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:metastrip/core/errors/app_exceptions.dart';
 import 'package:saf/saf.dart';
 
+/// Validates that a folder exists and is writable.
+typedef OutputFolderValidator = Future<String> Function(String path);
+
 /// Verifies that an output path is a directory that accepts new entries.
 ///
 /// Android system pickers return Storage Access Framework tree URIs

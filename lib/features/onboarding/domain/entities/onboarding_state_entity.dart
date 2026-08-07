@@ -40,10 +40,13 @@ class OnboardingStateEntity extends Equatable {
     OnboardingStatus? status,
     String? persistenceError,
     bool clearPersistenceError = false,
+    bool clearOutputFolderPath = false,
   }) {
     return OnboardingStateEntity(
       currentSlideIndex: currentSlideIndex ?? this.currentSlideIndex,
-      outputFolderPath: outputFolderPath ?? this.outputFolderPath,
+      outputFolderPath: clearOutputFolderPath
+          ? null
+          : outputFolderPath ?? this.outputFolderPath,
       permissionsStatus: permissionsStatus ?? this.permissionsStatus,
       isCompleted: isCompleted ?? this.isCompleted,
       status: status ?? this.status,

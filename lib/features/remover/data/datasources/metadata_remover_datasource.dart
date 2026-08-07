@@ -1,9 +1,17 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/processing/isolate_runner.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/gif_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/id3_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/odf_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/openxml_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/riff_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/webp_stripper.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 import 'package:saf/saf.dart';
@@ -15,9 +23,17 @@ class MetadataRemoverDatasource {
 
   final Future<void> Function(File claim) _claimCleanup;
 
+  /// Strips metadata from [inputPath] into the configured output folder.
+  ///
+  /// [selectiveLabels] (extractor `label` values) requests field-level
+  /// stripping: only the matching fields are removed for formats that support
+  /// it (PNG text chunks and PDF Info keys). Formats without granular support
+  /// always perform a full strip, ignoring the labels. Null or empty labels
+  /// keep the current full-strip behavior everywhere.
   Future<File> stripMetadata(
     String inputPath, {
     String? outputDirectory,
+    Set<String>? selectiveLabels,
   }) async {
     final ext = p.extension(inputPath).toLowerCase().replaceFirst('.', '');
     return switch (ext) {
@@ -25,8 +41,35 @@ class MetadataRemoverDatasource {
           inputPath,
           outputDirectory: outputDirectory,
         ),
-      'png' => stripPngMetadata(inputPath, outputDirectory: outputDirectory),
-      'pdf' => stripPdfMetadata(inputPath, outputDirectory: outputDirectory),
+      'png' => stripPngMetadata(
+          inputPath,
+          outputDirectory: outputDirectory,
+          selectiveLabels: selectiveLabels,
+        ),
+      'pdf' => stripPdfMetadata(
+          inputPath,
+          outputDirectory: outputDirectory,
+          selectiveLabels: selectiveLabels,
+        ),
+      'mp3' => stripMp3Metadata(inputPath, outputDirectory: outputDirectory),
+      'flac' => stripFlacMetadata(inputPath, outputDirectory: outputDirectory),
+      'ogg' => stripOggMetadata(inputPath, outputDirectory: outputDirectory),
+      'opus' => stripOpusMetadata(inputPath, outputDirectory: outputDirectory),
+      'wav' => stripWavMetadata(inputPath, outputDirectory: outputDirectory),
+      'aiff' || 'aif' => stripAiffMetadata(
+          inputPath,
+          outputDirectory: outputDirectory,
+        ),
+      'docx' || 'xlsx' || 'pptx' => stripOpenXmlMetadata(
+          inputPath,
+          outputDirectory: outputDirectory,
+        ),
+      'odt' || 'ods' || 'odp' => stripOdfMetadata(
+          inputPath,
+          outputDirectory: outputDirectory,
+        ),
+      'gif' => stripGifMetadata(inputPath, outputDirectory: outputDirectory),
+      'webp' => stripWebpMetadata(inputPath, outputDirectory: outputDirectory),
       _ => throw FileSystemException('Unsupported remover format: $ext'),
     };
   }
@@ -49,9 +92,18 @@ class MetadataRemoverDatasource {
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
 
+  /// Writes a PNG clean copy, removing text metadata chunks.
+  ///
+  /// A null or empty [selectiveLabels] keeps the current full-strip behavior:
+  /// tEXt/zTXt/iTXt text chunks plus the eXIf and tIME chunks are removed.
+  /// When [selectiveLabels] is non-empty only text chunks whose keyword
+  /// matches a label are removed; every other chunk (image data plus any
+  /// unselected metadata, including eXIf and tIME) is preserved. Labels use
+  /// the PNG text keyword produced by the viewer's extractor.
   Future<File> stripPngMetadata(
     String inputPath, {
     String? outputDirectory,
+    Set<String>? selectiveLabels,
   }) async {
     final input = File(inputPath);
     final stat = await input.stat();
@@ -63,13 +115,22 @@ class MetadataRemoverDatasource {
     }
 
     final bytes = await input.readAsBytes();
-    final outputBytes = await runOnWorker(() => _stripPngBytes(bytes));
+    final outputBytes = await runOnWorker(
+      () => _stripPngBytes(bytes, selectiveLabels: selectiveLabels),
+    );
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
 
+  /// Writes a clean PDF copy, blanking document Info values.
+  ///
+  /// A null or empty [selectiveLabels] blanks all nine Info keys as before.
+  /// When [selectiveLabels] is non-empty only the keys present in the set are
+  /// blanked; the other Info entries keep their values. Labels use the PDF
+  /// Info key names produced by the extractor (for example `Title`).
   Future<File> stripPdfMetadata(
     String inputPath, {
     String? outputDirectory,
+    Set<String>? selectiveLabels,
   }) async {
     final input = File(inputPath);
     final stat = await input.stat();
@@ -81,7 +142,160 @@ class MetadataRemoverDatasource {
     }
 
     final bytes = await input.readAsBytes();
-    final outputBytes = await runOnWorker(() => _stripPdfInfoBytes(bytes));
+    final outputBytes = await runOnWorker(
+      () => _stripPdfInfoBytes(bytes, selectiveLabels: selectiveLabels),
+    );
+    return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
+  }
+
+  Future<File> stripMp3Metadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      stripId3,
+      inputPath,
+      'MP3 too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripFlacMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      (bytes) => stripVorbisComments(bytes, extension: 'flac'),
+      inputPath,
+      'FLAC too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripOggMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      (bytes) => stripVorbisComments(bytes, extension: 'ogg'),
+      inputPath,
+      'OGG too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripOpusMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      (bytes) => stripVorbisComments(bytes, extension: 'ogg'),
+      inputPath,
+      'Opus too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripWavMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      (bytes) => stripRiff(bytes, extension: 'wav'),
+      inputPath,
+      'WAV too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripAiffMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      (bytes) => stripRiff(bytes, extension: 'aiff'),
+      inputPath,
+      'AIFF too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripOpenXmlMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      stripOpenXml,
+      inputPath,
+      'Office document too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripOdfMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      stripOdf,
+      inputPath,
+      'ODF document too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripGifMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      stripGif,
+      inputPath,
+      'GIF too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  Future<File> stripWebpMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) {
+    return _stripWithBytes(
+      stripWebp,
+      inputPath,
+      'WebP too large for remover MVP',
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  /// Shared pipeline for the newer strip*Metadata methods: stat + size cap +
+  /// worker scrub + clean-copy install. Same behavior as [stripPdfMetadata].
+  ///
+  /// [selectiveLabels] is accepted for signature consistency but is ignored:
+  /// formats routed through this helper have no granular fields yet, so any
+  /// request still lands on the full-strip fallback (safe default for a
+  /// privacy tool).
+  Future<File> _stripWithBytes(
+    Uint8List Function(Uint8List) stripper,
+    String inputPath,
+    String errorMessage, {
+    String? outputDirectory,
+    // Parameter is part of the uniform facade contract; the formats routed
+    // here have no granular fields, so it is deliberately left unread.
+    // ignore: unused_element_parameter
+    Set<String>? selectiveLabels,
+  }) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxJpegRemovalSizeBytes) {
+      throw FileSystemException(errorMessage);
+    }
+
+    final bytes = await input.readAsBytes();
+    final outputBytes = await runOnWorker(() => stripper(bytes));
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
 
@@ -271,7 +485,15 @@ Uint8List _stripJpegBytes(Uint8List bytes) {
   }
 }
 
-Uint8List _stripPngBytes(Uint8List bytes) {
+/// Strips a PNG clean copy from [bytes].
+///
+/// With a null or empty [selectiveLabels] the full-strip set applies and
+/// every tEXt/zTXt/iTXt chunk plus the eXIf and tIME chunks are removed.
+/// With a non-empty [selectiveLabels] only text chunks whose keyword equals
+/// one of the labels are removed; unselected text chunks and the eXIf/tIME
+/// chunks are preserved because the caller asked to delete just the
+/// selected fields.
+Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
   const signature = [137, 80, 78, 71, 13, 10, 26, 10];
   if (bytes.length < signature.length) {
     throw const FormatException('Not a valid PNG file');
@@ -281,6 +503,7 @@ Uint8List _stripPngBytes(Uint8List bytes) {
       throw const FormatException('Not a valid PNG file');
     }
   }
+  final isSelective = selectiveLabels != null && selectiveLabels.isNotEmpty;
   final output = BytesBuilder(copy: false)..add(signature);
   var offset = 8;
   while (true) {
@@ -308,14 +531,46 @@ Uint8List _stripPngBytes(Uint8List bytes) {
     if (type == 'IEND' && length != 0) {
       throw const FormatException('Invalid PNG IEND chunk');
     }
-    // Drop text chunks, EXIF, and last-modified timestamp (tIME leaks
-    // edit history; pHYs/pHYs carry physical pixel dimensions).
-    if (!{'tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME'}.contains(type)) {
+    final shouldKeep = isSelective
+        ? !_matchesSelectivePngText(
+            type,
+            bytes,
+            offset + 8,
+            chunkEnd - 4,
+            selectiveLabels,
+          )
+        // Full strip drops text chunks, EXIF, and the last-modified
+        // timestamp (tIME leaks edit history; pHYs carry pixel dimensions).
+        : !{'tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME'}.contains(type);
+    if (shouldKeep) {
       output.add(bytes.sublist(offset, chunkEnd));
     }
     offset = chunkEnd;
     if (type == 'IEND') return output.toBytes();
   }
+}
+
+/// Returns true when [type] is a text chunk whose keyword (the extractor
+/// `label`) exactly matches one of [selectiveLabels].
+///
+/// Non-text chunks never match: in selective mode eXIf/tIME are preserved
+/// unless the label set names one (the extractor never does today; it only
+/// outputs text keyword labels).
+bool _matchesSelectivePngText(
+  String type,
+  Uint8List bytes,
+  int dataStart,
+  int dataEnd,
+  Set<String> selectiveLabels,
+) {
+  if (type != 'tEXt' && type != 'zTXt' && type != 'iTXt') return false;
+  var separator = dataStart;
+  while (separator < dataEnd && bytes[separator] != 0) {
+    separator++;
+  }
+  if (separator == dataStart || separator == dataEnd) return false;
+  final label = String.fromCharCodes(bytes.sublist(dataStart, separator));
+  return selectiveLabels.contains(label);
 }
 
 int _pngCrc32(Uint8List bytes, int start, int end) {
@@ -329,29 +584,183 @@ int _pngCrc32(Uint8List bytes, int start, int end) {
   return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF;
 }
 
-Uint8List _stripPdfInfoBytes(Uint8List bytes) {
+/// Blanks PDF document Info values in [bytes] with same-length spaces.
+///
+/// With a null or empty [selectiveLabels] all nine known Info keys are
+/// blanked (full strip). With a non-empty [selectiveLabels] only the keys
+/// present in the set are blanked; unselected Info entries keep their
+/// original values. Labels use the PDF Info key names surfaced by the
+/// extractor (for example `Title`, `Author`, or `Trapped`).
+///
+/// The scan is a single linear pass using plain `String.indexOf` searches
+/// with no regular expressions, so hostile input (for example an unterminated
+/// literal packed with backslashes) is walked once instead of triggering the
+/// exponential backtracking of the previous regex search. Output keeps the
+/// input byte length: literal `(...)` values, hex `<...>` values, and value
+/// tokens are replaced with an equal number of spaces while their delimiters
+/// and the `/Key` markers survive.
+///
+/// Values inside page content streams that happen to match `/Key (...)` are
+/// blanked too; this is the same best-effort MVP behavior as the previous
+/// implementation and is documented as a known limitation.
+Uint8List _stripPdfInfoBytes(
+  Uint8List bytes, {
+  Set<String>? selectiveLabels,
+}) {
   if (bytes.length < 5 || String.fromCharCodes(bytes.take(5)) != '%PDF-') {
     throw const FormatException('Not a valid PDF file');
   }
-  var text = String.fromCharCodes(bytes);
-  for (final key in [
-    'Title',
-    'Author',
-    'Subject',
-    'Keywords',
-    'Creator',
-    'Producer',
-    'CreationDate',
-    'ModDate',
-  ]) {
-    text = text.replaceAllMapped(
-      RegExp('/$key(\\s*)\\(((?:\\\\.|[^\\)])*)\\)'),
-      (match) => '/$key${match[1]}(${''.padRight(match[2]!.length)})',
-    );
-    text = text.replaceAllMapped(
-      RegExp('/$key(\\s*)<([^>]*)>'),
-      (match) => '/$key${match[1]}<${''.padRight(match[2]!.length)}>',
-    );
+  final text = latin1.decode(bytes);
+  final outBytes = Uint8List.fromList(bytes);
+  for (final key in _pdfInfoKeysToBlank(selectiveLabels)) {
+    _blankPdfInfoKey(text, outBytes, key);
   }
-  return Uint8List.fromList(text.codeUnits);
+  return outBytes;
+}
+
+/// Blanks the value of every `/Key` marker for [key] in [text] within
+/// [outBytes].
+///
+/// Positions align between [text] and [outBytes] because [text] is decoded as
+/// latin-1 (one code unit per byte). Each occurrence is visited once and the
+/// caller's search offset always moves forward, so the whole scan is linear
+/// and never backtracks.
+void _blankPdfInfoKey(String text, Uint8List outBytes, String key) {
+  final marker = '/$key';
+  var searchFrom = 0;
+  while (true) {
+    final pos = text.indexOf(marker, searchFrom);
+    if (pos < 0) break;
+    final keyEnd = pos + marker.length;
+    // A name character directly after `/Key` means this slash belongs to a
+    // longer name such as `/TitleFoo`; skip it instead of blanking a suffix.
+    if (keyEnd < text.length && _isPdfNameChar(text.codeUnitAt(keyEnd))) {
+      searchFrom = keyEnd + 1;
+      continue;
+    }
+    var valueStart = keyEnd;
+    while (valueStart < text.length &&
+        _isPdfWhitespace(text.codeUnitAt(valueStart))) {
+      valueStart++;
+    }
+    if (valueStart >= text.length) break;
+    final valueUnit = text.codeUnitAt(valueStart);
+    if (valueUnit == 0x28) {
+      // Literal string: '(' ... ')' with backslash-escaped pairs.
+      var end = valueStart + 1;
+      while (end < text.length) {
+        final unit = text.codeUnitAt(end);
+        if (unit == 0x5C) {
+          end += 2; // skip the escape pair (for example `\\(` or `\\)`).
+        } else if (unit == 0x29) {
+          break;
+        } else {
+          end++;
+        }
+      }
+      if (end >= text.length) {
+        // No closing paren: leave the rest of the file untouched.
+        searchFrom = valueStart + 1;
+        continue;
+      }
+      _blankRange(outBytes, valueStart + 1, end);
+      searchFrom = end + 1;
+    } else if (valueUnit == 0x3C) {
+      // Hex string: '<' ... '>'.
+      final end = text.indexOf('>', valueStart + 1);
+      if (end < 0) {
+        searchFrom = valueStart + 1;
+        continue;
+      }
+      _blankRange(outBytes, valueStart + 1, end);
+      searchFrom = end + 1;
+    } else if (_isPdfTokenChar(valueUnit)) {
+      // A name token (`/True`) or a bare token (`true`) value.
+      var end = valueStart;
+      while (end < text.length && _isPdfTokenChar(text.codeUnitAt(end))) {
+        end++;
+      }
+      _blankRange(outBytes, valueStart, end);
+      searchFrom = end + 1;
+    } else {
+      // An `[` array, a `>>` terminator, or another non-value marker.
+      searchFrom = keyEnd + 1;
+    }
+  }
+}
+
+/// Whether [unit] is a PDF whitespace byte (NUL, tab, line feed, form feed,
+/// carriage return, or space).
+bool _isPdfWhitespace(int unit) {
+  return unit == 0x00 ||
+      unit == 0x09 ||
+      unit == 0x0A ||
+      unit == 0x0C ||
+      unit == 0x0D ||
+      unit == 0x20;
+}
+
+/// Whether [unit] can extend a PDF name written immediately after `/key`.
+///
+/// Only ASCII letters, digits, and common punctuation: a longer key like
+/// `/TitleFoo` is then skipped instead of being treated as `/Title` followed
+/// by a bare value.
+bool _isPdfNameChar(int unit) {
+  final isLetter = (unit >= 0x41 && unit <= 0x5A) ||
+      (unit >= 0x61 && unit <= 0x7A);
+  final isDigit = unit >= 0x30 && unit <= 0x39;
+  return isLetter ||
+      isDigit ||
+      unit == 0x2D || // -
+      unit == 0x2E || // .
+      unit == 0x5F; // _
+}
+
+/// Whether [unit] can belong to a PDF value token: any byte that is not
+/// whitespace and not a structural delimiter (`()[]<>{}`).
+bool _isPdfTokenChar(int unit) {
+  if (_isPdfWhitespace(unit)) return false;
+  switch (unit) {
+    case 0x28: // (
+    case 0x29: // )
+    case 0x3C: // <
+    case 0x3E: // >
+    case 0x5B: // [
+    case 0x5D: // ]
+    case 0x7B: // {
+    case 0x7D: // }
+      return false;
+    default:
+      return true;
+  }
+}
+
+/// Overwrites [outBytes] in the half-open range `[start, end)` with spaces,
+/// preserving the total output length.
+void _blankRange(Uint8List outBytes, int start, int end) {
+  for (var index = start; index < end; index++) {
+    outBytes[index] = 0x20;
+  }
+}
+
+/// The known PDF Info dictionary keys blanked in full-strip mode.
+const List<String> _pdfInfoKeys = [
+  'Title',
+  'Author',
+  'Subject',
+  'Keywords',
+  'Creator',
+  'Producer',
+  'CreationDate',
+  'ModDate',
+  'Trapped',
+];
+
+/// Returns the Info keys to blank for the requested [selectiveLabels].
+///
+/// Null or empty labels return every known key (full strip); otherwise only
+/// keys also present in the label set are returned.
+List<String> _pdfInfoKeysToBlank(Set<String>? selectiveLabels) {
+  if (selectiveLabels == null || selectiveLabels.isEmpty) return _pdfInfoKeys;
+  return _pdfInfoKeys.where(selectiveLabels.contains).toList();
 }

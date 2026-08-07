@@ -24,6 +24,7 @@ class _ThrowingDatasource extends MetadataRemoverDatasource {
   Future<File> stripMetadata(
     String inputPath, {
     String? outputDirectory,
+    Set<String>? selectiveLabels,
   }) {
     throw StateError('secret at /private/input.jpg');
   }

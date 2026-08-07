@@ -198,9 +198,17 @@ class AppColorScheme {
     overlay: Color(0xCC000D1A),
   );
 
-  /// Get theme by name
-  static AppColorScheme fromName(String name) {
-    switch (name.toLowerCase()) {
+  /// Gets a preset or custom theme by name.
+  static AppColorScheme fromName(
+    String name, {
+    Map<String, int>? customColors,
+  }) {
+    final normalizedName = name.toLowerCase().replaceAll(' ', '_');
+    if (normalizedName == 'custom' && customColors != null) {
+      return _customFrom(customColors);
+    }
+
+    switch (normalizedName) {
       case 'dark_industrial':
       case 'darkindustrial':
         return darkIndustrial;
@@ -222,6 +230,34 @@ class AppColorScheme {
       default:
         return darkIndustrial;
     }
+  }
+
+  static AppColorScheme _customFrom(Map<String, int> colors) {
+    Color get(String key, Color fallback) {
+      final value = colors[key];
+      return value == null ? fallback : Color(value);
+    }
+
+    const base = darkIndustrial;
+    return AppColorScheme(
+      brightness: base.brightness,
+      backgroundPrimary: get('backgroundPrimary', base.backgroundPrimary),
+      backgroundSecondary: get('backgroundSecondary', base.backgroundSecondary),
+      backgroundTertiary: get('backgroundTertiary', base.backgroundTertiary),
+      border: get('border', base.border),
+      borderEmphasis: get('borderEmphasis', base.borderEmphasis),
+      textPrimary: get('textPrimary', base.textPrimary),
+      textSecondary: get('textSecondary', base.textSecondary),
+      textTertiary: get('textTertiary', base.textTertiary),
+      textInverse: get('textInverse', base.textInverse),
+      accentPrimary: get('accentPrimary', base.accentPrimary),
+      accentSecondary: get('accentSecondary', base.accentSecondary),
+      accentSuccess: get('accentSuccess', base.accentSuccess),
+      accentDanger: get('accentDanger', base.accentDanger),
+      accentInfo: get('accentInfo', base.accentInfo),
+      privacyWarning: get('privacyWarning', base.privacyWarning),
+      overlay: get('overlay', base.overlay),
+    );
   }
 
   /// Get all available themes

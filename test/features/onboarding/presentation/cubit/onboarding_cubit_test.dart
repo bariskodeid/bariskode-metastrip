@@ -31,6 +31,19 @@ void main() {
     await cubit.close();
   });
 
+  test('load clears an output folder removed from storage', () async {
+    final repository = _FakeOnboardingRepository(outputFolder: '/old');
+    final cubit = OnboardingCubit(repository, validator: _validFolder);
+    await cubit.load();
+    expect(cubit.state.outputFolderPath, '/old');
+    repository.outputFolder = null;
+
+    await cubit.load();
+
+    expect(cubit.state.outputFolderPath, isNull);
+    await cubit.close();
+  });
+
   test('load exposes retryable storage failure', () async {
     final repository = _FakeOnboardingRepository(shouldFail: true);
     final cubit = OnboardingCubit(repository);
@@ -131,7 +144,7 @@ class _FakeOnboardingRepository implements OnboardingRepository {
   });
 
   bool completed;
-  final String? outputFolder;
+  String? outputFolder;
   bool shouldFail;
   final bool shouldFailSave;
   final bool shouldFailComplete;

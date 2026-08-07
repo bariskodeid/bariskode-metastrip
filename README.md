@@ -2,15 +2,15 @@
 
 > **Strip the invisible. Own your files.**
 
-MetaStrip adalah aplikasi mobile Flutter untuk melihat dan menghapus metadata dari hampir semua jenis file — foto, video, audio, dan dokumen — sepenuhnya offline, langsung di perangkatmu.
+MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang diterima Viewer dan membuat clean copy untuk format yang didukung Remover, sepenuhnya offline di perangkat.
 
 ## 🚀 Project Status
 
-**Current Phase:** Phase 4 Remover UI ✅ **DONE** · Phase 2/5/6 pending
+**Current Phase:** Phases 1-5 MVP ✅ **DONE** for the implemented scope · Phase 2 follow-ups / Phase 6 pending
 
-Implemented now: onboarding, system file picker, file validation, basic file metadata, MIME lookup, small-file SHA-256, detail screen, JPEG/PNG/PDF remover MVP with full RemoverBloc + ProcessingScreen (live progress + cancel) + ResultScreen (stats grid).
+Implemented now: onboarding, system file picker, file validation, format-specific metadata extraction where a parser is registered, small-file SHA-256, detail screen, an 18-extension remover registry with RemoverBloc + ProcessingScreen + ResultScreen, and Settings for themes, output folder, maintenance, portable import/export, and reset.
 
-Planned next: PDF scrubber rewrite (critical — regex is unsafe), deeper format-specific extraction, share intent, settings, e2e hardening.
+Planned next: deeper PDF stripping, video/HEIC support, share intent, unexposed processing controls, and e2e hardening.
 
 ## 📋 Quick Start
 
@@ -92,58 +92,53 @@ lib/
 ### ✅ Implemented MVP
 - Onboarding wizard
 - Output folder selection stored locally on-device
-- System picker based file import
+- System-picker scoped file access; users explicitly choose files and no broad OS storage permission is requested
 - Extension allowlist, duplicate/size/session validation
 - Basic file metadata detail screen
 - MIME lookup and SHA-256 for files up to 100MB
-- Best-effort remover MVP for JPEG, PNG text chunks, and basic PDF DocInfo entries
+- Best-effort remover MVP for the registered 18 formats: JPEG, PNG, PDF, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP
 - Clean copies are written to configured output folder when writable; originals are preserved
 - Full Remover UI: RemoverBloc with sequential processing + cancel, ProcessingScreen with live progress bar + result log, ResultScreen with stats grid (stripped/failed/total/bytes)
 - Security hardening: JPEG ICC (APP2) + Adobe (APP14) stripping, PNG `tIME` stripping, error message path sanitization, queue cap enforcement
+- Settings: 7 preset themes plus a persisted 16-token custom theme builder, output-folder changes synchronized with onboarding/removal, cache status, About/Licenses, portable JSON import/export, and two-step reset
+- Settings export excludes the device-local output folder; import preserves and validates the current device folder
+- Reset clears app settings, theme/output-folder configuration, and onboarding state, then returns to onboarding; generated clean copies are not deleted
 
-### 📅 Planned
+### 📅 Planned / Follow-up
 
 #### 🔍 Viewer
-- View metadata from 40+ file formats
+- Planned: view metadata from 40+ file formats; current support is limited to the Viewer allowlist and registered extractors described above
 - GPS location with map preview
 - Camera/device info
 - Timestamps and technical metadata
 - Mark files/fields for removal
 
 #### 🗑️ Remover
-- MVP: JPEG/PNG/PDF clean-copy stripping
-- 4 removal modes: Full Strip, Selective, Anonymize, Preserve Technical
-- Batch processing
-- Background processing with notifications
-- Progress tracking with logs
+- Current MVP: registered-format clean-copy stripping; PDF removal is best-effort DocInfo only
+- Planned/unwired removal modes: Full Strip, Selective, Anonymize, Preserve Technical (current pipeline uses the supported-cleanup behavior)
+- Batch processing with the current sequential queue, progress, cancellation, and result log
+- Planned: background processing with notifications
 
 #### ⚙️ Settings
-- 8 color themes + custom
-- Output folder configuration
-- JPEG quality control
-- Processing options
+- Storage naming/folder-structure controls and processing controls (JPEG quality, concurrency, auto-confirm) exist in the persisted settings model but are not exposed or wired to processing in the current UI
 
 #### 🚀 Onboarding
 - Interactive wizard
 - Folder setup
-- Permission requests
+- System-picker scoped access explanation; no broad OS storage permission request
 
 ## 📱 Supported File Types
 
-### Images
-JPG, PNG, WebP, GIF, BMP, TIFF, HEIC, RAW formats
+### Viewer allowlist
+The Viewer accepts these extensions for file selection and filesystem metadata:
 
-### Videos
-MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV
+JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC, MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV, MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF, AIF, AIFC, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT, ZIP, TAR, APK, EPUB.
 
-### Audio
-MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF
+The Viewer has registered payload extractors for: JPG/JPEG, TIFF/TIF, PNG, GIF, WebP, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, ZIP, APK, and EPUB. Other allowlisted formats currently surface filesystem fields only. HEIC is allowlisted but filesystem-only; HEIF, RAW, M4V, legacy Office, GZ, and BZ2 are omitted from the current allowlist and parser registry.
 
-### Documents
-PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT
+### Remover registry
+The Remover can currently create clean copies for: JPG/JPEG, PNG, PDF, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP. Video, archives, HEIC/HEIF, RAW, legacy Office, and granular audio removal remain deferred.
 
-### Archives
-ZIP, TAR, APK, EPUB
 
 ## 🔒 Privacy
 
@@ -159,7 +154,7 @@ ZIP, TAR, APK, EPUB
 - [SPECS.md](docs/SPECS.md) - Product specification
 - [DESIGN.md](docs/DESIGN.md) - Design system
 - [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) - Technical implementation plan
-- [SETUP_COMPLETE.md](SETUP_COMPLETE.md) - Phase 0 completion report
+- [SETUP_COMPLETE.md](SETUP_COMPLETE.md) - MVP progress and verification report
 
 ## 🛠️ Development
 
@@ -184,39 +179,42 @@ flutter build apk --release
 
 ## 📈 Development Roadmap
 
-### ✅ Phase 0: Project Setup (COMPLETE)
+### 🟡 Phase 0: Project Setup (10/11, 90.9% complete; flavors deferred)
 - Flutter project initialization
 - Folder structure
 - Dependencies configuration
 - Theme system
 - Shared widgets
 - Basic tests
+- Deferred: Android/iOS flavor configuration
 
-### 🔄 Phase 1: Onboarding (Next - 1 week)
+### ✅ Phase 1: Onboarding (COMPLETE)
 - Onboarding wizard
 - 5 slides with animations
 - Folder setup
-- Permission requests
+- System-picker scoped access explanation; no broad OS storage permission request
 
-### 📅 Phase 2: Core - Metadata Engine (2 weeks)
-- Metadata extraction for all formats
-- Metadata removal engine
-- Isolate-based processing
+### ✅ Phase 2: Core - Metadata Engine (MVP COMPLETE FOR IMPLEMENTED FORMATS; follow-ups remain)
+- Metadata extraction for registered formats; filesystem metadata for other allowlisted files
+- Metadata removal engine for the current registered remover formats
+- Isolate-based extraction and processing helpers (foreground app flow; background processing is planned)
 
-### 📅 Phase 3: Viewer UI (1.5 weeks)
+### ✅ Phase 3: Viewer UI (MVP COMPLETE; follow-ups remain)
 - File list screen
 - Metadata detail screen
 - Mark for removal
 
-### 📅 Phase 4: Remover UI (1 week)
+### ✅ Phase 4: Remover UI (MVP COMPLETE; follow-ups remain)
 - Remover queue
 - Processing screen
 - Result screen
 
-### 📅 Phase 5: Settings (0.5 week)
-- Settings screen
-- Theme picker
-- App management
+### ✅ Phase 5: Settings (MVP COMPLETE)
+- Settings screen and live theme application
+- 7 preset themes plus 16-token custom theme builder
+- Output-folder configuration synchronized with onboarding
+- Portable settings import/export, cache status, reset, About, and Licenses
+- Advanced storage/processing controls remain unexposed and unwired
 
 ### 📅 Phase 6: Polish & Testing (1 week)
 - Unit tests
@@ -234,7 +232,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Credits
 
-- [FFmpeg](https://ffmpeg.org/) - Video & audio processing
 - PDF DocInfo scrub uses an MVP custom byte-level sanitizer; deep XMP scrub is pending.
 - [Lucide Icons](https://lucide.dev/) - Icon set
 - Flutter BLoC pattern by Felix Angelov

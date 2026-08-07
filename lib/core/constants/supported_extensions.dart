@@ -9,6 +9,7 @@ class SupportedExtensions {
     'mp4', 'mov', 'avi', 'mkv', 'webm', '3gp', 'flv', 'wmv',
     // Audio
     'mp3', 'flac', 'aac', 'ogg', 'wav', 'm4a', 'opus', 'wma', 'aiff',
+    'aif', 'aifc',
     // Documents
     'pdf', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'txt',
     // Archives
@@ -25,12 +26,17 @@ class SupportedExtensions {
 /// Extensions the Remover MVP can actually strip.
 ///
 /// This is the single source of truth — consumed by both the datasource
-/// format switch and the queue UI gate. Deep format support (video/audio/
-/// office) is pending and intentionally excluded.
+/// format switch and the queue UI gate. Audio, image and office formats are
+/// covered; video and archive formats are intentionally excluded.
 class RemoverStrippableExtensions {
   RemoverStrippableExtensions._();
 
-  static const values = <String>{'jpg', 'jpeg', 'png', 'pdf'};
+  static const values = <String>{
+    'jpg', 'jpeg', 'png', 'pdf',
+    'mp3', 'flac', 'ogg', 'opus', 'wav', 'aiff',
+    'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp',
+    'gif', 'webp',
+  };
 
   static bool contains(String extension) =>
       values.contains(extension.toLowerCase());

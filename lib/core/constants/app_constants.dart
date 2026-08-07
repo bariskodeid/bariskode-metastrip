@@ -14,7 +14,13 @@ class AppConstants {
   static const int maxFileSizeBytes = 2 * 1024 * 1024 * 1024; // 2GB
   static const int maxInlineHashSizeBytes = 100 * 1024 * 1024; // 100MB
   static const int maxInlineExifSizeBytes = 10 * 1024 * 1024; // 10MB
+  static const int maxArchiveAndDocumentSizeBytes = 50 * 1024 * 1024; // 50MB
+  static const int maxAudioScanBytes = 1024 * 1024; // 1MB prefix untuk LP3/FLAC/OGG
+  static const int maxPdfExtractionSizeBytes = 10 * 1024 * 1024; // 10MB
   static const int maxJpegRemovalSizeBytes = 50 * 1024 * 1024; // 50MB
+  static const int maxZipEntryDecompressBytes = 64 * 1024 * 1024; // 64MB per entry
+  static const int maxZipCumulativeDecompressBytes =
+      128 * 1024 * 1024; // 128MB per archive
   static const int maxPngTextChunks = 32;
   static const int maxMetadataFieldChars = 4096;
   static const int defaultJpegQuality = 95;

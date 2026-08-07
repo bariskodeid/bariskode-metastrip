@@ -40,6 +40,7 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
         state.copyWith(
           isCompleted: completed,
           outputFolderPath: folderPath,
+          clearOutputFolderPath: folderPath == null,
           persistenceError: persistenceError,
           status: OnboardingStatus.ready,
         ),
