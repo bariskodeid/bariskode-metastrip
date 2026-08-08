@@ -236,7 +236,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Credits
 
-- PDF DocInfo scrub uses an MVP custom byte-level sanitizer; deep XMP scrub is pending.
+- PDF DocInfo scrub uses an MVP custom byte-level sanitizer with bounded
+  generated-byte mutation validation. Recognized Info-key candidates are
+  bounded, and malformed supported Info values fail closed. This does not read persisted output back or
+  claim PDF structure, rendering, or comprehensive metadata removal. Deep XMP
+  scrub remains pending.
 - [Lucide Icons](https://lucide.dev/) - Icon set
 - Flutter BLoC pattern by Felix Angelov
 

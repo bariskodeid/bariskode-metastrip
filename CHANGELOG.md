@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SAF BMP persisted readback remains unverified and scheduled; Android/iOS
   device validation is pending.
 
+### PDF technology-spike safety hardening (2026-08-08)
+
+- Added bounded generated-byte mutation validation for PDF Info cleanup, using
+  the shared balanced literal/hex/token parser and a recognized-occurrence cap.
+- Malformed supported values after recognized Info keys and key-candidate cap
+  breaches fail closed across all PDF entry points; no unverified output is
+  produced for those inputs.
+- PDF reports remain `attemptedUnverified` with `outputValidated: false`.
+  The implementation does not read persisted output back or claim PDF
+  structural validity, rendering preservation, or comprehensive metadata
+  removal. Phase 3 structural cleanup remains pending.
+
 ### Gap closure Phases 0-1 (2026-08-08)
 
 - Added a shared declarative capability registry covering all 41 Viewer

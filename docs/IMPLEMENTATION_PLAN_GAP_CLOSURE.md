@@ -1,6 +1,6 @@
 # MetaStrip — Gap Closure Implementation Plan
 
-**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled and TIFF remains deferred
+**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled, TIFF remains deferred, and the Phase 3 PDF safety spike is hardened while structural cleanup remains pending
 **Version:** 1.1
 **Created:** 2026-08-08
 **Related plan:** [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
@@ -69,14 +69,18 @@ gif, webp
 
 The current PDF implementation is best-effort Info dictionary cleanup. Stable-ID
 selective removal is implemented end to end for PNG text and PDF Info fields;
-PDF results remain attempted/unverified. BMP removal is enabled only for strict
+PDF results remain attempted/unverified. The narrowed PDF technology spike now
+validates bounded generated-byte mutations, uses a shared balanced literal
+parser, caps recognized key candidates, and fails closed on malformed supported
+Info values and cap breaches. It does not read persisted output back or claim PDF structural
+validity. BMP removal is enabled only for strict
 canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB, positive dimensions, and
 `bfOffBits == 54` inputs. Video, HEIC/HEIF, archive removal, TIFF removal,
 legacy Office removal, and broader selective-mode behavior are not yet complete.
 
 ### Final host verification (2026-08-08)
 
-- `flutter test`: 337 passed, 1 skipped.
+- `flutter test`: 378 tests discovered; 377 passed, 1 skipped.
 - `flutter analyze`: clean (0 issues).
 - Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`).
 - Diff check: passed.
@@ -431,6 +435,14 @@ The first target should be Level 2. Level 3 should be a separate, destructive
 feature with its own product and security review.
 
 ### Technology spike
+
+**Safety hardening status:** The narrowed spike is complete for the current
+byte-level Info mutation scope. Scrubbing and generated-byte validation share
+the balanced literal/hex/token parser and a 4,096 recognized-key-candidate cap;
+malformed supported Info values and cap breaches fail closed across every PDF entry point.
+Reports remain `attemptedUnverified` with `outputValidated: false`. No
+persisted-output readback or structural, rendering, or comprehensive-removal
+claim is made. This does not complete Phase 3.
 
 Compare:
 

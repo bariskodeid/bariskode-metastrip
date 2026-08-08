@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/remover/data/datasources/metadata_remover_datasource.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_value_parser.dart';
 import 'package:metastrip/features/remover/data/repositories/remover_repository_impl.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
@@ -147,6 +148,45 @@ void main() {
     expect(text, contains('Author (Jane Doe)'));
   });
 
+  test('stripPdfMetadata fully blanks balanced nested literal values',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_nested_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+    const value = r'Outer (Inner \(literal\) (Deep\\Path)) End';
+    await input.writeAsString('%PDF-1.4\n/Title ($value)\n%%EOF');
+
+    final output = await MetadataRemoverDatasource().stripPdfMetadata(
+      input.path,
+      outputDirectory: dir.path,
+    );
+
+    expect(
+      await output.readAsString(),
+      '%PDF-1.4\n/Title (${List.filled(value.length, ' ').join()})\n%%EOF',
+    );
+  });
+
+  test('stripPdfMetadata handles deeply nested literal values', () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_deep_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+    const depth = 10000;
+    final value =
+        '${List.filled(depth, '(').join()}Secret${List.filled(depth, ')').join()}';
+    await input.writeAsString('%PDF-1.4\n/Author ($value)\n%%EOF');
+
+    final output = await MetadataRemoverDatasource().stripPdfMetadata(
+      input.path,
+      outputDirectory: dir.path,
+    );
+
+    expect(
+      await output.readAsString(),
+      '%PDF-1.4\n/Author (${List.filled(value.length, ' ').join()})\n%%EOF',
+    );
+  });
+
   test('stripMetadata rejects empty selective labels for PDF', () async {
     final dir = await Directory.systemTemp.createTemp('remap_pdf_full_');
     addTearDown(() => dir.delete(recursive: true));
@@ -167,7 +207,7 @@ void main() {
   });
 
   test(
-      'stripPdfMetadata survives an unterminated literal with many '
+      'stripPdfMetadata fails closed on an unterminated literal with many '
       'backslashes (ReDoS regression)', () async {
     final dir = await Directory.systemTemp.createTemp('metastrip_pdf_redos_');
     addTearDown(() => dir.delete(recursive: true));
@@ -181,14 +221,132 @@ void main() {
     );
 
     final stopwatch = Stopwatch()..start();
-    final output = await MetadataRemoverDatasource().stripPdfMetadata(
-      input.path,
-      outputDirectory: dir.path,
+    await expectLater(
+      MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      ),
+      throwsFormatException,
     );
     stopwatch.stop();
 
     expect(stopwatch.elapsedMilliseconds, lessThan(2000));
-    expect(await output.readAsString(), contains('/Title ('));
+    expect(
+      dir.listSync().where((entity) => entity.path.contains('_clean')),
+      isEmpty,
+    );
+  });
+
+  test('stripPdfMetadata bounds repeated malformed literal markers', () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_lit_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}hostile.pdf');
+    await input.writeAsString(
+      '%PDF-1.4\n${List.filled(25000, '/Title (').join()}',
+    );
+
+    final stopwatch = Stopwatch()..start();
+    await expectLater(
+      MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      ),
+      throwsFormatException,
+    );
+    stopwatch.stop();
+
+    expect(stopwatch.elapsedMilliseconds, lessThan(2000));
+  });
+
+  test('stripPdfMetadata bounds repeated malformed hex markers', () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_hex_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}hostile.pdf');
+    await input.writeAsString(
+      '%PDF-1.4\n${List.filled(25000, '/Subject <').join()}',
+    );
+
+    final stopwatch = Stopwatch()..start();
+    await expectLater(
+      MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      ),
+      throwsFormatException,
+    );
+    stopwatch.stop();
+
+    expect(stopwatch.elapsedMilliseconds, lessThan(2000));
+  });
+
+  test('stripPdfMetadata rejects dense valid markers above the shared cap',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_dense_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}dense.pdf');
+    await input.writeAsString(
+      '%PDF-1.4\n'
+      '${List.filled(maxPdfInfoValueOccurrences + 1, '/Title (x)').join()}'
+      '\n%%EOF',
+    );
+
+    await expectLater(
+      MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      ),
+      throwsFormatException,
+    );
+    expect(
+      dir.listSync().where((entity) => entity.path.contains('_clean')),
+      isEmpty,
+    );
+  });
+
+  test('stripPdfMetadata counts longer-name candidates against the cap',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_names_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}dense.pdf');
+    await input.writeAsString(
+      '%PDF-1.4\n'
+      '${List.filled(maxPdfInfoValueOccurrences + 1, '/TitleFoo (x)').join()}'
+      '\n%%EOF',
+    );
+
+    await expectLater(
+      MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      ),
+      throwsFormatException,
+    );
+    expect(
+      dir.listSync().where((entity) => entity.path.contains('_clean')),
+      isEmpty,
+    );
+  });
+
+  test('stripPdfMetadata preserves longer names and blanks name tokens',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_pdf_bounds_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+    await input.writeAsString(
+      '%PDF-1.4\n/Title+Private (keep)/Title#46oo (also keep)'
+      '/Title (remove)/Trapped /True\n%%EOF',
+    );
+
+    final output = await MetadataRemoverDatasource().stripPdfMetadata(
+      input.path,
+      outputDirectory: dir.path,
+    );
+    final text = await output.readAsString();
+
+    expect(text, contains('/Title+Private (keep)'));
+    expect(text, contains('/Title#46oo (also keep)'));
+    expect(text, contains('/Title (      )'));
+    expect(text, contains('/Trapped /X   '));
   });
 
   test('stripPdfMetadata selective Trapped blanks a name-token value',

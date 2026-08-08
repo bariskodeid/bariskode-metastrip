@@ -11,6 +11,8 @@ import 'package:metastrip/features/remover/data/datasources/strippers/gif_stripp
 import 'package:metastrip/features/remover/data/datasources/strippers/id3_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/odf_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/openxml_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_validator.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_value_parser.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/riff_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/webp_stripper.dart';
@@ -113,6 +115,12 @@ class MetadataRemoverDatasource {
     if (policy.mode == StripPolicyMode.supportedCleanup) {
       if (extension == 'bmp') {
         return _stripBmpWithReport(
+          inputPath,
+          outputDirectory: outputDirectory,
+        );
+      }
+      if (extension == 'pdf') {
+        return _stripPdfWithReport(
           inputPath,
           outputDirectory: outputDirectory,
         );
@@ -243,32 +251,28 @@ class MetadataRemoverDatasource {
     String outputDirectory,
     Set<MetadataFieldId> requestedIds,
   ) async {
-    final input = File(inputPath);
-    final stat = await input.stat();
-    if (stat.type != FileSystemEntityType.file) {
-      throw const FileSystemException('Input is not a file');
-    }
-    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
-      throw const FileSystemException('PDF too large for remover MVP');
-    }
-    final bytes = await _readBoundedBytes(
-      input,
-      AppConstants.maxRemoverFileSizeBytes + 1,
-    );
-    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
-      throw const FileSystemException('PDF too large for remover MVP');
-    }
     final labels = requestedIds.map((id) => id.pdfInfoKey!).toSet();
-    final outputBytes = await runOnWorker(
-      () => _stripPdfInfoBytes(bytes, selectiveLabels: labels),
-    );
-    final file = await _writeCleanCopy(
+    return _stripPdfWithReport(
       inputPath,
-      outputBytes,
-      outputDirectory,
+      outputDirectory: outputDirectory,
+      requestedIds: requestedIds,
+      selectedKeys: labels,
+    );
+  }
+
+  Future<MetadataRemovalOutput> _stripPdfWithReport(
+    String inputPath, {
+    required String outputDirectory,
+    Set<MetadataFieldId> requestedIds = const {},
+    Set<String>? selectedKeys,
+  }) async {
+    final output = await stripPdfMetadata(
+      inputPath,
+      outputDirectory: outputDirectory,
+      selectiveLabels: selectedKeys,
     );
     return MetadataRemovalOutput(
-      file: file,
+      file: output,
       report: StripReport.snapshot(
         requestedFieldIds: requestedIds,
         warnings: const [_pdfBestEffortWarning],
@@ -434,6 +438,9 @@ class MetadataRemoverDatasource {
     String? outputDirectory,
     Set<String>? selectiveLabels,
   }) async {
+    if (selectiveLabels != null && selectiveLabels.isEmpty) {
+      throw const FormatException('Selective PDF fields cannot be empty');
+    }
     final input = File(inputPath);
     final stat = await input.stat();
     if (stat.type != FileSystemEntityType.file) {
@@ -452,6 +459,11 @@ class MetadataRemoverDatasource {
     }
     final outputBytes = await runOnWorker(
       () => _stripPdfInfoBytes(bytes, selectiveLabels: selectiveLabels),
+    );
+    validateGeneratedPdfInfoMutation(
+      bytes,
+      outputBytes,
+      selectedKeys: selectiveLabels,
     );
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
@@ -1111,8 +1123,9 @@ Uint8List _stripPdfInfoBytes(
   }
   final text = latin1.decode(bytes);
   final outBytes = Uint8List.fromList(bytes);
+  final occurrenceBudget = PdfInfoOccurrenceBudget();
   for (final key in _pdfInfoKeysToBlank(selectiveLabels)) {
-    _blankPdfInfoKey(text, outBytes, key);
+    _blankPdfInfoKey(text, outBytes, key, occurrenceBudget);
   }
   return outBytes;
 }
@@ -1124,113 +1137,34 @@ Uint8List _stripPdfInfoBytes(
 /// latin-1 (one code unit per byte). Each occurrence is visited once and the
 /// caller's search offset always moves forward, so the whole scan is linear
 /// and never backtracks.
-void _blankPdfInfoKey(String text, Uint8List outBytes, String key) {
+void _blankPdfInfoKey(
+  String text,
+  Uint8List outBytes,
+  String key,
+  PdfInfoOccurrenceBudget occurrenceBudget,
+) {
   final marker = '/$key';
   var searchFrom = 0;
   while (true) {
     final pos = text.indexOf(marker, searchFrom);
     if (pos < 0) break;
+    occurrenceBudget.record();
     final keyEnd = pos + marker.length;
     // A name character directly after `/Key` means this slash belongs to a
     // longer name such as `/TitleFoo`; skip it instead of blanking a suffix.
-    if (keyEnd < text.length && _isPdfNameChar(text.codeUnitAt(keyEnd))) {
+    if (keyEnd < text.length && isPdfInfoNameChar(text.codeUnitAt(keyEnd))) {
       searchFrom = keyEnd + 1;
       continue;
     }
-    var valueStart = keyEnd;
-    while (valueStart < text.length &&
-        _isPdfWhitespace(text.codeUnitAt(valueStart))) {
-      valueStart++;
+    final range = parsePdfInfoValueRange(text, keyEnd);
+    if (range == null) {
+      throw const FormatException('Malformed PDF Info value');
     }
-    if (valueStart >= text.length) break;
-    final valueUnit = text.codeUnitAt(valueStart);
-    if (valueUnit == 0x28) {
-      // Literal string: '(' ... ')' with backslash-escaped pairs.
-      var end = valueStart + 1;
-      while (end < text.length) {
-        final unit = text.codeUnitAt(end);
-        if (unit == 0x5C) {
-          end += 2; // skip the escape pair (for example `\\(` or `\\)`).
-        } else if (unit == 0x29) {
-          break;
-        } else {
-          end++;
-        }
-      }
-      if (end >= text.length) {
-        // No closing paren: leave the rest of the file untouched.
-        searchFrom = valueStart + 1;
-        continue;
-      }
-      _blankRange(outBytes, valueStart + 1, end);
-      searchFrom = end + 1;
-    } else if (valueUnit == 0x3C) {
-      // Hex string: '<' ... '>'.
-      final end = text.indexOf('>', valueStart + 1);
-      if (end < 0) {
-        searchFrom = valueStart + 1;
-        continue;
-      }
-      _blankRange(outBytes, valueStart + 1, end);
-      searchFrom = end + 1;
-    } else if (_isPdfTokenChar(valueUnit)) {
-      // A name token (`/True`) or a bare token (`true`) value.
-      var end = valueStart;
-      while (end < text.length && _isPdfTokenChar(text.codeUnitAt(end))) {
-        end++;
-      }
-      _blankRange(outBytes, valueStart, end);
-      searchFrom = end + 1;
-    } else {
-      // An `[` array, a `>>` terminator, or another non-value marker.
-      searchFrom = keyEnd + 1;
+    _blankRange(outBytes, range.start, range.end);
+    if (range.replacementAtStart case final replacement?) {
+      outBytes[range.start] = replacement;
     }
-  }
-}
-
-/// Whether [unit] is a PDF whitespace byte (NUL, tab, line feed, form feed,
-/// carriage return, or space).
-bool _isPdfWhitespace(int unit) {
-  return unit == 0x00 ||
-      unit == 0x09 ||
-      unit == 0x0A ||
-      unit == 0x0C ||
-      unit == 0x0D ||
-      unit == 0x20;
-}
-
-/// Whether [unit] can extend a PDF name written immediately after `/key`.
-///
-/// Only ASCII letters, digits, and common punctuation: a longer key like
-/// `/TitleFoo` is then skipped instead of being treated as `/Title` followed
-/// by a bare value.
-bool _isPdfNameChar(int unit) {
-  final isLetter =
-      (unit >= 0x41 && unit <= 0x5A) || (unit >= 0x61 && unit <= 0x7A);
-  final isDigit = unit >= 0x30 && unit <= 0x39;
-  return isLetter ||
-      isDigit ||
-      unit == 0x2D || // -
-      unit == 0x2E || // .
-      unit == 0x5F; // _
-}
-
-/// Whether [unit] can belong to a PDF value token: any byte that is not
-/// whitespace and not a structural delimiter (`()[]<>{}`).
-bool _isPdfTokenChar(int unit) {
-  if (_isPdfWhitespace(unit)) return false;
-  switch (unit) {
-    case 0x28: // (
-    case 0x29: // )
-    case 0x3C: // <
-    case 0x3E: // >
-    case 0x5B: // [
-    case 0x5D: // ]
-    case 0x7B: // {
-    case 0x7D: // }
-      return false;
-    default:
-      return true;
+    searchFrom = range.nextSearchOffset;
   }
 }
 
@@ -1256,8 +1190,9 @@ const List<String> _pdfInfoKeys = [
 ];
 
 const _pdfBestEffortWarning =
-    'PDF cleanup was attempted using a best-effort byte scan; field removal '
-    'and document structure were not verified.';
+    'Generated PDF byte mutation passed bounded integrity validation, but the '
+    'persisted artifact, PDF structure, and other metadata surfaces remain '
+    'unverified.';
 
 const _safBmpValidationWarning =
     'Generated BMP bytes were validated, but the persisted SAF artifact was '

@@ -119,8 +119,7 @@ void main() {
     );
   });
 
-  test('oversized selective PNG is rejected without creating output',
-      () async {
+  test('oversized selective PNG is rejected without creating output', () async {
     final directory = await Directory.systemTemp.createTemp('phase1_png_big_');
     addTearDown(() => directory.delete(recursive: true));
     final input = File('${directory.path}${Platform.pathSeparator}large.png');
@@ -153,8 +152,7 @@ void main() {
     );
   });
 
-  test('PDF repository reports best-effort attempt without verified removal',
-      () async {
+  test('PDF repository keeps local field claims unverified', () async {
     final directory = await Directory.systemTemp.createTemp('phase1_pdf_');
     addTearDown(() => directory.delete(recursive: true));
     final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
@@ -184,10 +182,105 @@ void main() {
       result.report?.verificationOutcome,
       StripVerificationOutcome.attemptedUnverified,
     );
-    expect(result.report?.warnings.single, contains('not verified'));
+    expect(result.report?.warnings.single, contains('persisted artifact'));
     expect(await input.readAsString(), contains('Ada'));
     expect(
         await File(result.outputPath!).readAsString(), isNot(contains('Ada')));
+  });
+
+  test('full PDF policy does not claim removed or absent Info fields',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('phase1_pdf_full_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
+    await input.writeAsString('%PDF-1.4\n/Author (Ada)\n%%EOF');
+
+    final result = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: directory.path,
+      policy: const StripPolicy.supportedCleanup(),
+    );
+
+    expect(result.report.outputValidated, isFalse);
+    expect(
+      result.report.verificationOutcome,
+      StripVerificationOutcome.attemptedUnverified,
+    );
+    expect(result.report.removedFieldIds, isEmpty);
+    expect(result.report.alreadyAbsentFieldIds, isEmpty);
+  });
+
+  test('PDF stream-like key cannot produce field-level claims', () async {
+    final directory = await Directory.systemTemp.createTemp('phase1_pdf_ctx_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
+    await input.writeAsString(
+      '%PDF-1.4\n1 0 obj<</Length 13>>stream\n/Author (Ada)\n'
+      'endstream\nendobj\n%%EOF',
+    );
+
+    final result = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: directory.path,
+      policy: StripPolicy.selective(
+        fieldIds: const {MetadataFieldId.pdfInfoAuthor},
+      ),
+    );
+
+    expect(result.report.outputValidated, isFalse);
+    expect(
+      result.report.verificationOutcome,
+      StripVerificationOutcome.attemptedUnverified,
+    );
+    expect(result.report.removedFieldIds, isEmpty);
+    expect(result.report.alreadyAbsentFieldIds, isEmpty);
+  });
+
+  test('all policy PDF entry points fail closed on malformed Info values',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('phase1_pdf_bad_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
+    await input.writeAsString('%PDF-1.4\n/Author (unterminated');
+    final datasource = MetadataRemoverDatasource();
+
+    await expectLater(
+      datasource.stripPdfMetadata(
+        input.path,
+        outputDirectory: directory.path,
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      datasource.stripMetadata(
+        input.path,
+        outputDirectory: directory.path,
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      datasource.stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: directory.path,
+        policy: const StripPolicy.supportedCleanup(),
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      datasource.stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: directory.path,
+        policy: StripPolicy.selective(
+          fieldIds: const {MetadataFieldId.pdfInfoAuthor},
+        ),
+      ),
+      throwsFormatException,
+    );
+
+    expect(
+      directory.listSync().where((entity) => entity.path.contains('_clean')),
+      isEmpty,
+    );
   });
 
   test('oversized selective PDF is rejected without creating output', () async {
