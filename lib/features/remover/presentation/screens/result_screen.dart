@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_report.dart';
 import 'package:path/path.dart' as p;
 
 /// Shows batch stats and per-file outcomes after processing completes.
@@ -82,9 +83,9 @@ class ResultScreen extends StatelessWidget {
                           ),
                           subtitle: Text(
                             result.success
-                                ? p.basename(result.outputPath!)
+                                ? _successSummary(result)
                                 : result.error ?? 'Unknown error',
-                            maxLines: 2,
+                            maxLines: 4,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
@@ -109,6 +110,50 @@ class ResultScreen extends StatelessWidget {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _successSummary(ProcessingResultEntity result) {
+    final report = result.report;
+    final lines = <String>[p.basename(result.outputPath!)];
+    if (report != null) {
+      if (report.verificationOutcome == StripVerificationOutcome.verified &&
+          report.removedFieldIds.isNotEmpty) {
+        lines.add('${report.removedFieldIds.length} selected field(s) removed');
+      }
+      switch (report.verificationOutcome) {
+        case StripVerificationOutcome.verified:
+          lines.add('Local persisted artifact verified');
+        case StripVerificationOutcome.attemptedUnverified:
+          if (report.removedFieldIds.isNotEmpty) {
+            lines.add(
+              'Generated clean bytes passed validation; persisted output '
+              'unverified',
+            );
+          } else if (report.requestedFieldIds.isNotEmpty) {
+            lines.add(
+              '${report.requestedFieldIds.length} selected field(s) '
+              'best-effort attempted',
+            );
+          } else {
+            lines.add('Cleanup best-effort attempted');
+          }
+        case StripVerificationOutcome.notAttempted:
+          break;
+      }
+      if (report.alreadyAbsentFieldIds.isNotEmpty) {
+        lines.add(
+          '${report.alreadyAbsentFieldIds.length} selected field(s) already absent',
+        );
+      }
+      if (report.unsupportedFieldIds.isNotEmpty) {
+        lines.add(
+          '${report.unsupportedFieldIds.length} selected field(s) unsupported',
+        );
+      }
+      if (report.reencoded) lines.add('Output was reencoded');
+      lines.addAll(report.warnings);
+    }
+    return lines.join('\n');
   }
 }
 

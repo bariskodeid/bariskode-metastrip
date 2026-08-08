@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 
 enum RemoverStatus { idle, processing, completed, cancelled, failure }
@@ -28,19 +29,23 @@ class ProcessingProgress extends Equatable {
 }
 
 class RemoverState extends Equatable {
-  const RemoverState({
-    required this.files,
+  RemoverState({
+    required List<FileItemEntity> files,
     required this.status,
+    Map<String, StripPolicy> policiesByPath = const <String, StripPolicy>{},
     this.progress,
-    this.results = const [],
+    List<ProcessingResultEntity> results = const [],
     this.errorMessage,
-  });
+  })  : files = List.unmodifiable(files),
+        policiesByPath = Map.unmodifiable(policiesByPath),
+        results = List.unmodifiable(results);
 
   factory RemoverState.initial() =>
-      const RemoverState(files: [], status: RemoverStatus.idle);
+      RemoverState(files: const [], status: RemoverStatus.idle);
 
   final List<FileItemEntity> files;
   final RemoverStatus status;
+  final Map<String, StripPolicy> policiesByPath;
   final ProcessingProgress? progress;
   final List<ProcessingResultEntity> results;
   final String? errorMessage;
@@ -53,6 +58,7 @@ class RemoverState extends Equatable {
   RemoverState copyWith({
     List<FileItemEntity>? files,
     RemoverStatus? status,
+    Map<String, StripPolicy>? policiesByPath,
     ProcessingProgress? progress,
     bool clearProgress = false,
     List<ProcessingResultEntity>? results,
@@ -62,6 +68,7 @@ class RemoverState extends Equatable {
     return RemoverState(
       files: files ?? this.files,
       status: status ?? this.status,
+      policiesByPath: policiesByPath ?? this.policiesByPath,
       progress: clearProgress ? null : progress ?? this.progress,
       results: results ?? this.results,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
@@ -69,5 +76,12 @@ class RemoverState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [files, status, progress, results, errorMessage];
+  List<Object?> get props => [
+        files,
+        status,
+        policiesByPath,
+        progress,
+        results,
+        errorMessage,
+      ];
 }

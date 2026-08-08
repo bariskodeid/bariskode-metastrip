@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/viewer/data/datasources/metadata_extractor_datasource.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_entity.dart';
@@ -13,15 +15,21 @@ typedef MetadataLoader = Future<MetadataEntity> Function(
   required bool computeHash,
 });
 
+typedef SelectiveCleanupCallback = Future<void> Function(
+  Set<MetadataFieldId> fieldIds,
+);
+
 class MetadataDetailScreen extends StatefulWidget {
   const MetadataDetailScreen({
     required this.file,
     this.metadataLoader,
+    this.onSelectiveCleanup,
     super.key,
   });
 
   final FileItemEntity file;
   final MetadataLoader? metadataLoader;
+  final SelectiveCleanupCallback? onSelectiveCleanup;
 
   @override
   State<MetadataDetailScreen> createState() => _MetadataDetailScreenState();
@@ -30,6 +38,8 @@ class MetadataDetailScreen extends StatefulWidget {
 class _MetadataDetailScreenState extends State<MetadataDetailScreen> {
   bool _computeHash = false;
   late Future<MetadataEntity> _metadataFuture;
+  final Set<MetadataFieldId> _selectedFieldIds = {};
+  bool _handoffInProgress = false;
 
   @override
   void initState() {
@@ -89,22 +99,78 @@ class _MetadataDetailScreenState extends State<MetadataDetailScreen> {
             );
           }
 
-          return ListView(
-            padding: const EdgeInsets.all(AppSpacing.md),
+          final canSelect = FormatRegistry.standard
+                  .lookup(widget.file.extension)
+                  ?.supportsSelectiveRemoval ==
+              true;
+          return Column(
             children: [
-              _HeaderCard(file: widget.file),
-              const SizedBox(height: AppSpacing.md),
-              ...snapshot.data!.fieldsBySection.entries.map(
-                (entry) => _SectionCard(
-                  title: entry.key,
-                  fields: entry.value,
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  children: [
+                    _HeaderCard(file: widget.file),
+                    const SizedBox(height: AppSpacing.md),
+                    ...snapshot.data!.fieldsBySection.entries.map(
+                      (entry) => _SectionCard(
+                        title: entry.key,
+                        fields: entry.value,
+                        selectable: canSelect,
+                        selectedFieldIds: _selectedFieldIds,
+                        onSelectionChanged: (id, selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedFieldIds.add(id);
+                            } else {
+                              _selectedFieldIds.remove(id);
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (canSelect && widget.onSelectiveCleanup != null)
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed:
+                            _selectedFieldIds.isEmpty || _handoffInProgress
+                                ? null
+                                : _startSelectiveCleanup,
+                        icon: const Icon(Icons.cleaning_services_outlined),
+                        label: Text(
+                          'CLEAN ${_selectedFieldIds.length} SELECTED',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         },
       ),
     );
+  }
+
+  Future<void> _startSelectiveCleanup() async {
+    if (_handoffInProgress || _selectedFieldIds.isEmpty) return;
+    setState(() => _handoffInProgress = true);
+    try {
+      await widget.onSelectiveCleanup!(Set.unmodifiable(_selectedFieldIds));
+    } finally {
+      if (mounted) setState(() => _handoffInProgress = false);
+    }
   }
 }
 
@@ -138,10 +204,19 @@ class _HeaderCard extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.fields});
+  const _SectionCard({
+    required this.title,
+    required this.fields,
+    required this.selectable,
+    required this.selectedFieldIds,
+    required this.onSelectionChanged,
+  });
 
   final String title;
   final List<MetadataFieldEntity> fields;
+  final bool selectable;
+  final Set<MetadataFieldId> selectedFieldIds;
+  final void Function(MetadataFieldId id, bool selected) onSelectionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +230,13 @@ class _SectionCard extends StatelessWidget {
             .map(
               (field) => ListTile(
                 dense: true,
+                leading: selectable && field.id != null
+                    ? Checkbox(
+                        value: selectedFieldIds.contains(field.id),
+                        onChanged: (value) =>
+                            onSelectionChanged(field.id!, value ?? false),
+                      )
+                    : null,
                 title: Text(field.label),
                 subtitle: Text(field.value),
                 trailing: Wrap(

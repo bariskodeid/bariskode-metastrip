@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 
 abstract class RemoverEvent extends Equatable {
@@ -10,12 +11,17 @@ abstract class RemoverEvent extends Equatable {
 
 /// Files handed off from the Viewer or picked directly in the Remover.
 class RemoverFilesAdded extends RemoverEvent {
-  const RemoverFilesAdded(this.files);
+  RemoverFilesAdded(
+    List<FileItemEntity> files, {
+    Map<String, StripPolicy> policiesByPath = const <String, StripPolicy>{},
+  })  : files = List.unmodifiable(files),
+        policiesByPath = Map.unmodifiable(policiesByPath);
 
   final List<FileItemEntity> files;
+  final Map<String, StripPolicy> policiesByPath;
 
   @override
-  List<Object?> get props => [files];
+  List<Object?> get props => [files, policiesByPath];
 }
 
 class RemoverFileRemoved extends RemoverEvent {

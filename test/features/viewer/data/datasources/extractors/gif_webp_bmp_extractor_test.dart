@@ -81,8 +81,7 @@ void main() {
       expect(fields.single.value, contains('Jane Doe'));
     });
 
-    test('returns a status field when a WebP has no metadata chunks',
-        () async {
+    test('returns a status field when a WebP has no metadata chunks', () async {
       final bytes = _webpBytes([
         _webpChunk('VP8 ', Uint8List.fromList([0x9D, 0x01, 0x2A])),
       ]);
@@ -109,7 +108,7 @@ void main() {
   });
 
   group('extractBmp', () {
-    test('reports that a valid BMP has no metadata container', () async {
+    test('reports the scoped BMP metadata status', () async {
       final builder = BytesBuilder(copy: false);
       builder.add(latin1.encode('BM'));
       builder.add(Uint8List(12 + 40)); // file header + BITMAPINFOHEADER
@@ -119,7 +118,7 @@ void main() {
       expect(fields, hasLength(1));
       expect(fields.single.section, 'BMP');
       expect(fields.single.label, 'Status');
-      expect(fields.single.value, 'BMP has no metadata container');
+      expect(fields.single.value, 'No supported BMP metadata detected');
     });
 
     test('returns a status field for non-BMP bytes', () async {

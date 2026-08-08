@@ -5,6 +5,7 @@ import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/core/utils/file_utils.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_bloc.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart';
@@ -23,6 +24,7 @@ class RemoverScreen extends StatelessWidget {
     required this.initialFiles,
     required this.outputFolderRepository,
     required this.removerRepository,
+    this.initialPoliciesByPath = const <String, StripPolicy>{},
     this.pickFiles = _pickRemoverFiles,
     super.key,
   });
@@ -30,6 +32,7 @@ class RemoverScreen extends StatelessWidget {
   final List<FileItemEntity> initialFiles;
   final OutputFolderRepository outputFolderRepository;
   final RemoverRepository removerRepository;
+  final Map<String, StripPolicy> initialPoliciesByPath;
   final Future<List<PlatformFile>?> Function() pickFiles;
 
   @override
@@ -39,7 +42,12 @@ class RemoverScreen extends StatelessWidget {
         repository: removerRepository,
         outputFolderRepository: outputFolderRepository,
         validateInputs: true,
-      )..add(RemoverFilesAdded(initialFiles)),
+      )..add(
+          RemoverFilesAdded(
+            initialFiles,
+            policiesByPath: initialPoliciesByPath,
+          ),
+        ),
       child: _RemoverView(pickFiles: pickFiles),
     );
   }
@@ -128,7 +136,10 @@ class _RemoverView extends StatelessWidget {
                                 ),
                                 title: Text(file.name),
                                 subtitle: Text(
-                                  _supportDescription(file.extension),
+                                  _supportDescription(
+                                    file.extension,
+                                    state.policiesByPath[file.path],
+                                  ),
                                 ),
                                 trailing: IconButton(
                                   tooltip: 'Remove from queue',
@@ -212,7 +223,10 @@ Future<List<PlatformFile>?> _pickRemoverFiles() async {
 }
 
 /// Per-format support copy shown under each queued file.
-String _supportDescription(String extension) {
+String _supportDescription(String extension, StripPolicy? policy) {
+  if (policy?.mode == StripPolicyMode.selective) {
+    return '${policy!.selectedFieldIds.length} metadata field(s) selected';
+  }
   final capability = FormatRegistry.standard.lookup(extension);
   if (capability?.supportsFullRemoval != true) {
     return 'Unsupported by remover';

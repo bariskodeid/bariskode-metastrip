@@ -2,7 +2,7 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Stack:** Flutter 3.22+ / Dart 3.4+  
-**Last Updated:** 2026-08-07
+**Last Updated:** 2026-08-08
 
 ---
 
@@ -303,7 +303,7 @@ Done:
 - [x] **Phase 3 Viewer UI (2026-07-31): ViewerCubit with multi-file picker, extension filter, dedup, sort/filter (name/size/type/newest), file list items with badges, metadata detail with grouped accordion sections, selectable fields, copy to clipboard, mark visible/clear/send to Remover handoff.**
 - [x] **Phase 4 Remover UI (2026-08-06): RemoverBloc with sequential processing, cancel, queue cap. ProcessingScreen with live progress + cancel. ResultScreen with stats grid. Security hardening: JPEG preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM + EOI truncation; PNG drops text chunks + tIME + eXIf; PDF DocInfo blanking. Error sanitization. SAF output writing. Android package fix.**
 - [x] **Phase 5 Settings (2026-08-07): app-level SettingsCubit persistence, 7 preset themes plus custom 16-token theme builder with live application, output-folder configuration synchronized with onboarding, cache status/action, portable JSON export/import, two-step reset back to onboarding, About, and Licenses.**
-- [x] **Phase 2 implemented-scope MVP complete (2026-08-07): registered image/audio/document/archive extractors, an 18-extension remover registry, SHA-256 computation, supported extension allowlist, and MIME lookup. Video, HEIC/HEIF, archive removal, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
+- [x] **Phase 2 implemented-scope MVP complete (2026-08-08): registered image/audio/document/archive extractors, a 19-extension remover registry including narrow canonical BMP removal, SHA-256 computation, supported extension allowlist, and MIME lookup. TIFF removal, video, HEIC/HEIF, archive removal, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
 - [x] Verification: `flutter analyze` clean; `flutter test` **304 passed, 1 skipped**; debug APK build verified. Test coverage was not measured in this verification.
 
 Still pending:
@@ -314,6 +314,8 @@ Still pending:
 - [ ] Phase 2 HEIC/HEIF extraction: requires a HEIF container parser, deferred.
 - [ ] Phase 2 selective strip for audio (MP3 frame-level, Vorbis per-key) and Office (per XML property): parameter plumbing shipped, stripper implementation pending.
 - [ ] Phase 2 archive removal (ZIP/APK): out of MVP strip scope; APK stripping would invalidate the signing block.
+- [x] Phase 2 BMP subset removal: strict canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB, positive dimensions, and `bfOffBits == 54`; preserves header/pixel payload bytes, zeroes reserved fields, normalizes size fields, and discards trailing bytes. This is not comprehensive BMP sanitization.
+- [ ] Phase 2 TIFF/TIF removal: disabled pending a future structural writer/POC.
 - [ ] Phase 3 remaining: thumbnails, thumbnail cache, share intent receiver, GPS map preview, per-field selective mark in UI, share metadata.
 - [ ] Phase 5 follow-up: expose and wire naming template, folder structure, keep-original, JPEG quality, concurrency, and auto-confirm controls. These fields are persisted/imported but intentionally absent from the current UI and processing pipeline.
 - [ ] Phase 5 follow-up: implement real cache deletion when thumbnail/temp caches are introduced; current action reports 0 bytes.
@@ -364,13 +366,13 @@ Foundation hardening also validates the output folder before use and safely rese
 
 ### Phase 2: Core — Metadata Engine (2 minggu)
 **Sprint 2 — Metadata Extraction**
-**Status:** Implemented-scope MVP complete for registered extractor formats (audio/PDF/Open XML/ODF/ZIP/APK/GIF/WebP/BMP and supported images); video, HEIC/HEIF, and formats without registered parsers are deferred or filesystem-only. Full product-spec MVP remains incomplete.
+**Status:** Implemented-scope MVP complete for registered extractor formats (audio/PDF/Open XML/ODF/ZIP/APK/GIF/WebP/BMP and supported images); narrow canonical BMP removal is enabled, while TIFF/TIF removal, video, HEIC/HEIF, and formats without registered parsers are deferred or filesystem-only. Full product-spec MVP remains incomplete.
 
 | Task | Detail | Status |
 |------|--------|--------|
 | File detection | MIME + extension → format category routing | ✅ |
 | Image EXIF extractor | `exif` package, GPS decode, datetime parse — **implemented-scope MVP done: raw JPEG/TIFF EXIF fields + privacy flags + size guard** | ✅ |
-| Image PNG/GIF/WebP extractor | `image` package, text chunks — **implemented-scope MVP done: PNG tEXt + uncompressed iTXt; GIF/WebP done via custom parsers; BMP status only** | ✅ |
+| Image PNG/GIF/WebP/BMP extractor | `image` package, text chunks — **implemented-scope MVP done: PNG tEXt + uncompressed iTXt; GIF/WebP/BMP done via custom parsers; narrow canonical BMP removal enabled** | ✅ |
 | Audio ID3 extractor | Manual parser, ID3v2.2/2.3/2.4 + ID3v1.1 | ✅ |
 | Audio FLAC/Vorbis extractor | Custom binary parser (VORBIS_COMMENT blocks) | ✅ |
 | Audio WAV/AIFF extractor | RIFF chunk parser (LIST INFO + AIFF chunks) | ✅ |
@@ -388,7 +390,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Unit tests — extractors | Test per format dengan inline byte fixtures | ✅ |
 
 **Sprint 3 — Metadata Removal**
-**Status:** Implemented-scope MVP complete for the registered 18 remover extensions; video, archive removal, granular audio/Office removal, and the broader removal modes are deferred or unwired. Full product-spec MVP and release readiness remain incomplete.
+**Status:** Implemented-scope MVP complete for 19 registered remover extensions, including the narrow canonical BMP subset; video, archive removal, granular audio/Office removal, and the broader removal modes are deferred or unwired. Full product-spec MVP and release readiness remain incomplete.
 
 | Task | Detail | Status |
 |------|--------|--------|

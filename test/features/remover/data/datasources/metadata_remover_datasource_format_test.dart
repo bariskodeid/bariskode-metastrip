@@ -138,11 +138,12 @@ void main() {
     expect(bytes.sublist(bytes.length - 100), List<int>.filled(100, 0xAB));
   });
 
-  test('stripMetadata rejects an unsupported bmp extension', () async {
-    final dir = await Directory.systemTemp.createTemp('metastrip_bmp_test_');
+  test('stripMetadata keeps TIFF removal disabled and installs no output',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_tiff_test_');
     addTearDown(() => dir.delete(recursive: true));
-    final input = File('${dir.path}${Platform.pathSeparator}image.bmp');
-    await input.writeAsBytes([0x42, 0x4D, 0x00, 0x00]);
+    final input = File('${dir.path}${Platform.pathSeparator}image.tiff');
+    await input.writeAsBytes([0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00]);
 
     await expectLater(
       MetadataRemoverDatasource().stripMetadata(
@@ -151,6 +152,7 @@ void main() {
       ),
       throwsA(isA<FileSystemException>()),
     );
+    expect(dir.listSync().map((entity) => entity.path), [input.path]);
   });
 
   test('stripMetadata rejects an unsupported zip extension', () async {

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/screens/remover_screen.dart';
 import 'package:metastrip/features/settings/presentation/screens/settings_screen.dart';
@@ -155,6 +156,24 @@ class _ViewerView extends StatelessWidget {
                                 MaterialPageRoute<void>(
                                   builder: (_) => MetadataDetailScreen(
                                     file: file,
+                                    onSelectiveCleanup: (fieldIds) {
+                                      return Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => RemoverScreen(
+                                            initialFiles: [file],
+                                            initialPoliciesByPath: {
+                                              file.path: StripPolicy.selective(
+                                                fieldIds: fieldIds,
+                                              ),
+                                            },
+                                            outputFolderRepository:
+                                                outputFolderRepository,
+                                            removerRepository:
+                                                removerRepository,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),

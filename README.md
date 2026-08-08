@@ -8,13 +8,13 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 
 **Current Phase:** Implemented-scope MVP ✅ **usable / mostly complete** · Full product-spec MVP and release-readiness work remain pending
 
-Implemented now: onboarding, system file picker, file validation, format-specific metadata extraction where a parser is registered, small-file SHA-256, detail screen, an 18-extension remover registry with RemoverBloc + ProcessingScreen + ResultScreen, and Settings for themes, output folder, maintenance, portable import/export, and reset.
+Implemented now: onboarding, system file picker, file validation, format-specific metadata extraction where a parser is registered, small-file SHA-256, a 19-extension remover registry with RemoverBloc + ProcessingScreen + ResultScreen, and Settings for themes, output folder, maintenance, portable import/export, and reset.
 
 Planned next: deeper PDF stripping, video/HEIC support, share intent, unexposed processing controls, and e2e hardening.
 
 ### Status terminology
 
-- **Implemented-scope MVP:** the currently usable feature set for the registered Viewer extractors and 18 Remover extensions. This scope is substantially implemented, but still has known limitations such as best-effort PDF cleanup.
+- **Implemented-scope MVP:** the currently usable feature set for the registered Viewer extractors and 19 Remover extensions. This scope is substantially implemented, but still has known limitations such as best-effort PDF cleanup.
 - **Full product-spec MVP:** all capabilities described in [SPECS.md](docs/SPECS.md), including broader format support, removal modes, sharing, background processing, and the remaining Viewer features. This is **not complete**.
 - **Release-ready product:** full product-spec scope plus integration/device testing, performance and accessibility verification, release-build validation, and release hardening. This is **not complete**.
 
@@ -100,7 +100,7 @@ lib/
 - Extension allowlist, duplicate/size/session validation
 - Basic file metadata detail screen
 - MIME lookup and SHA-256 for files up to 100MB
-- Best-effort remover MVP for the registered 18 formats: JPEG, PNG, PDF, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP
+- Best-effort remover MVP for 19 registered extensions: JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP
 - Clean copies are written to configured output folder when writable; originals are preserved
 - Full Remover UI: RemoverBloc with sequential processing + cancel, ProcessingScreen with live progress bar + result log, ResultScreen with stats grid (stripped/failed/total/bytes)
 - Security hardening: JPEG ICC (APP2) + Adobe (APP14) stripping, PNG `tIME` stripping, error message path sanitization, queue cap enforcement
@@ -141,7 +141,7 @@ JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC, MP4, MOV, AVI, MKV, WebM, 3GP, 
 The Viewer has registered payload extractors for: JPG/JPEG, TIFF/TIF, PNG, GIF, WebP, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, ZIP, APK, and EPUB. Other allowlisted formats currently surface filesystem fields only. HEIC is allowlisted but filesystem-only; HEIF, RAW, M4V, legacy Office, GZ, and BZ2 are omitted from the current allowlist and parser registry.
 
 ### Remover registry
-The Remover can currently create clean copies for: JPG/JPEG, PNG, PDF, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP. Video, archives, HEIC/HEIF, RAW, legacy Office, and granular audio removal remain deferred.
+The Remover can currently create clean copies for: JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP. Video, archives, HEIC/HEIF, RAW, legacy Office, and granular audio removal remain deferred.
 
 
 ## 🔒 Privacy

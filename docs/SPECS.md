@@ -2,9 +2,9 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Platform:** Flutter (Android-first, iOS ready)  
-**Last Updated:** 2026-08-07  
+**Last Updated:** 2026-08-08
 
-> **Implementation status:** This file describes the product target. Current code accepts a narrower Viewer allowlist, has registered extractors for only some allowlisted formats, and has an 18-extension Remover registry. Full Strip, Selective, Anonymize, Preserve Technical, share intent, and background processing are planned unless explicitly marked implemented in the progress reports.
+> **Implementation status:** This file describes the product target. Current code accepts a narrower Viewer allowlist, has registered extractors for only some allowlisted formats, and has a 19-extension Remover registry. Full Strip, Selective, Anonymize, Preserve Technical, share intent, and background processing are planned unless explicitly marked implemented in the progress reports.
 
 ---
 
@@ -27,7 +27,7 @@ Target pengguna: jurnalis, fotografer, aktivis privasi, developer, dan pengguna 
 | `.png` | `image` package | tEXt/zTXt chunks (author, creation time, software, comment), iTXt chunks |
 | `.webp` | `image` package | EXIF embedded, XMP |
 | `.gif` | `image` package | Comment extension, Netscape extension |
-| `.bmp` | Custom parser | Header metadata (color depth, resolution) |
+| `.bmp` | Custom parser | Header metadata (color depth, resolution); removal is enabled only for strict canonical 24/32-bit Windows `BITMAPINFOHEADER`, `BI_RGB`, positive dimensions, and `bfOffBits == 54`. It preserves header/pixel payload bytes, zeroes reserved fields, normalizes size fields, and discards trailing bytes; this is not comprehensive BMP sanitization. SAF persisted readback and device validation remain pending. |
 | `.tiff` / `.tif` | `exif` package | Full EXIF, IPTC, GPS, thumbnail embedded |
 | `.heic` / `.heif` | Planned HEIF parser | `.heic` is currently Viewer-allowlisted but filesystem-only; `.heif` is omitted from the current allowlist/parser |
 | RAW/CR2/NEF/ARW/DNG | Planned RAW parser | Planned; not in current Viewer allowlist/parser |
@@ -81,8 +81,8 @@ Target pengguna: jurnalis, fotografer, aktivis privasi, developer, dan pengguna 
 
 - **Viewer allowlist:** JPG/JPEG, PNG, WebP, GIF, BMP, TIFF/TIF, HEIC; MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV; MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF/AIF/AIFC; PDF, DOCX, XLSX, PPTX, ODT/ODS/ODP, RTF, TXT; ZIP, TAR, APK, EPUB.
 - **Registered payload extractors:** JPG/JPEG, TIFF/TIF, PNG, GIF, WebP, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, PDF, DOCX/XLSX/PPTX, ODT/ODS/ODP, ZIP/APK/EPUB. Other allowlisted extensions receive filesystem metadata only.
-- **Remover registry:** JPG/JPEG, PNG, PDF, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX/XLSX/PPTX, ODT/ODS/ODP, GIF, WebP.
-- **Not current support:** HEIF, RAW, M4V, legacy Office, GZ/BZ2. HEIC is allowlisted but has no format extractor. Video and archive removal, granular audio removal, and per-property Office removal are deferred.
+- **Remover registry:** JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX/XLSX/PPTX, ODT/ODS/ODP, GIF, WebP.
+- **Not current support:** TIFF/TIF removal, HEIF, RAW, M4V, legacy Office, GZ/BZ2. TIFF/TIF extraction remains available, but removal is disabled pending a future structural writer/POC. HEIC is allowlisted but has no format extractor. Video and archive removal, granular audio removal, and per-property Office removal are deferred.
 
 ### 2.7 File System Metadata (Universal — semua allowlisted file)
 Selalu ditampilkan untuk setiap file terlepas dari formatnya:

@@ -158,7 +158,7 @@ const List<FormatCapability> _standardCapabilities = [
     removalHandlerFactory: _handlerDeclaration,
     extractionSizeLimitBytes: AppConstants.maxInlineExifSizeBytes,
     removalSizeLimitBytes: _memoryLimit,
-    outputValidationStrategy: OutputValidationStrategy.signature,
+    outputValidationStrategy: OutputValidationStrategy.containerStructure,
     knownLimitations: [
       'Removal covers JPEG metadata segments handled by the current stripper.',
     ],
@@ -215,13 +215,18 @@ const List<FormatCapability> _standardCapabilities = [
     mimeTypes: {'image/bmp'},
     category: FormatCategory.image,
     supportsExtraction: true,
-    supportsFullRemoval: false,
+    supportsFullRemoval: true,
     supportsSelectiveRemoval: false,
     processingStrategy: ProcessingStrategy.inMemory,
     extractionHandlerFactory: _handlerDeclaration,
-    removalHandlerFactory: null,
+    removalHandlerFactory: _handlerDeclaration,
     extractionSizeLimitBytes: AppConstants.maxInlineExifSizeBytes,
-    knownLimitations: ['Metadata removal is not implemented.'],
+    removalSizeLimitBytes: _memoryLimit,
+    outputValidationStrategy: OutputValidationStrategy.containerStructure,
+    removalCoverage: RemovalCoverage.verifiedSupportedScope,
+    knownLimitations: [
+      'Only canonical 24/32-bit BITMAPINFOHEADER BMPs are supported.'
+    ],
   ),
   FormatCapability(
     extensions: {'tiff', 'tif'},
@@ -361,6 +366,7 @@ const List<FormatCapability> _standardCapabilities = [
     extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.containerStructure,
+    removalCoverage: RemovalCoverage.verifiedSupportedScope,
     knownLimitations: ['Removal covers known package metadata parts.'],
   ),
   FormatCapability(

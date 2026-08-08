@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
 
 /// Keys extracted from the PDF document Info dictionary.
@@ -134,6 +135,7 @@ List<MetadataFieldEntity> _parseInfoDictionary(String dictionaryBody) {
         section: 'PDF Document',
         label: key,
         value: truncateMetadataValue(value),
+        id: MetadataFieldId.pdfInfoIdsByKey[key],
         isPrivacySensitive: isTextPrivacySensitive(key),
       ),
     );

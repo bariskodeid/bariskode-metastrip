@@ -66,6 +66,7 @@ void main() {
     'odp',
     'gif',
     'webp',
+    'bmp',
   };
 
   group('shared format capability registry', () {
@@ -82,9 +83,9 @@ void main() {
       }
     });
 
-    test('preserves exactly the current 18 removable extensions', () {
+    test('advertises exactly the Phase 2 removable extensions', () {
       expect(FormatRegistry.standard.removableExtensions, removerExtensions);
-      expect(FormatRegistry.standard.removableExtensions, hasLength(18));
+      expect(FormatRegistry.standard.removableExtensions, hasLength(19));
     });
 
     test('normalizes case, whitespace, and any leading dots', () {
@@ -119,8 +120,15 @@ void main() {
 
       final bmp = registry.lookup('bmp')!;
       expect(bmp.supportsExtraction, isTrue);
-      expect(bmp.supportsFullRemoval, isFalse);
+      expect(bmp.supportsFullRemoval, isTrue);
       expect(bmp.supportsSelectiveRemoval, isFalse);
+
+      for (final extension in ['tiff', 'tif']) {
+        final tiff = registry.lookup(extension)!;
+        expect(tiff.supportsExtraction, isTrue);
+        expect(tiff.supportsFullRemoval, isFalse);
+        expect(tiff.supportsSelectiveRemoval, isFalse);
+      }
 
       final mp4 = registry.lookup('mp4')!;
       expect(mp4.supportsExtraction, isFalse);

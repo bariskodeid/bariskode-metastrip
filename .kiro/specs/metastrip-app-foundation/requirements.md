@@ -2,7 +2,7 @@
 
 ## Introduction
 
-MetaStrip is a Flutter mobile application (Android 7.0+, iOS 13.0+) that is planned to view and remove metadata from various file types completely offline. These are target requirements, not a statement of current implementation: the current Viewer allowlist, extractor registry, and 18-extension Remover registry are narrower, and the four removal modes are planned/unwired.
+MetaStrip is a Flutter mobile application (Android 7.0+, iOS 13.0+) that is planned to view and remove metadata from various file types completely offline. These are target requirements, not a statement of current implementation: the current Viewer allowlist, extractor registry, and 19-extension Remover registry are narrower, and the four removal modes are planned/unwired.
 
 The application follows an Industrial Minimalism design language with dark themes, monospace typography, and high contrast interfaces. All processing occurs on-device with no server communication, ensuring complete user privacy.
 

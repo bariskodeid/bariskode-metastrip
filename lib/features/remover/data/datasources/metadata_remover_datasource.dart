@@ -6,6 +6,7 @@ import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/processing/isolate_runner.dart';
 import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/bmp_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/gif_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/id3_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/odf_stripper.dart';
@@ -13,6 +14,9 @@ import 'package:metastrip/features/remover/data/datasources/strippers/openxml_st
 import 'package:metastrip/features/remover/data/datasources/strippers/riff_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/webp_stripper.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_report.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 import 'package:saf/saf.dart';
@@ -31,14 +35,26 @@ enum _RemovalRoute {
   odf,
   gif,
   webp,
+  bmp,
+}
+
+/// Successful datasource output with value-free cleanup facts.
+class MetadataRemovalOutput {
+  const MetadataRemovalOutput({required this.file, required this.report});
+
+  final File file;
+  final StripReport report;
 }
 
 class MetadataRemoverDatasource {
   MetadataRemoverDatasource({
     Future<void> Function(File claim)? claimCleanup,
-  }) : _claimCleanup = claimCleanup ?? _deleteClaim;
+    Future<Uint8List> Function(File output)? persistedOutputReader,
+  })  : _claimCleanup = claimCleanup ?? _deleteClaim,
+        _persistedOutputReader = persistedOutputReader ?? _readPersistedOutput;
 
   final Future<void> Function(File claim) _claimCleanup;
+  final Future<Uint8List> Function(File output) _persistedOutputReader;
 
   /// Returns whether this datasource has a remover route for [extension].
   static bool supportsExtension(String extension) {
@@ -67,6 +83,7 @@ class MetadataRemoverDatasource {
     'odp': _RemovalRoute.odf,
     'gif': _RemovalRoute.gif,
     'webp': _RemovalRoute.webp,
+    'bmp': _RemovalRoute.bmp,
   };
 
   static Set<String> get handlerExtensions => Set.unmodifiable(_routes.keys);
@@ -75,6 +92,200 @@ class MetadataRemoverDatasource {
       FormatRegistry.standard.handlerMapConsistencyIssues(
         removalHandlerExtensions: _routes.keys,
       );
+
+  /// Applies an explicit [policy] and returns the clean copy plus its report.
+  Future<MetadataRemovalOutput> stripMetadataWithPolicy(
+    String inputPath, {
+    required String outputDirectory,
+    required StripPolicy policy,
+  }) async {
+    final extension = FormatRegistry.normalizeExtension(p.extension(inputPath));
+    final capability = FormatRegistry.standard.lookup(extension);
+    if (policy.mode == StripPolicyMode.selective) {
+      if (capability?.supportsSelectiveRemoval != true) {
+        throw const FormatException(
+          'Selective cleanup is unavailable for this format',
+        );
+      }
+      _validateFieldIdsForExtension(extension, policy.selectedFieldIds);
+    }
+
+    if (policy.mode == StripPolicyMode.supportedCleanup) {
+      if (extension == 'bmp') {
+        return _stripBmpWithReport(
+          inputPath,
+          outputDirectory: outputDirectory,
+        );
+      }
+      final file = await stripMetadata(
+        inputPath,
+        outputDirectory: outputDirectory,
+      );
+      return MetadataRemovalOutput(
+        file: file,
+        report: StripReport.snapshot(
+          warnings:
+              extension == 'pdf' ? const [_pdfBestEffortWarning] : const [],
+          verificationOutcome: extension == 'pdf'
+              ? StripVerificationOutcome.attemptedUnverified
+              : StripVerificationOutcome.notAttempted,
+        ),
+      );
+    }
+
+    return switch (extension) {
+      'png' => _stripSelectivePng(
+          inputPath,
+          outputDirectory,
+          policy.selectedFieldIds,
+        ),
+      'pdf' => _stripSelectivePdf(
+          inputPath,
+          outputDirectory,
+          policy.selectedFieldIds,
+        ),
+      _ => throw const FormatException(
+          'Selective cleanup is unavailable for this format',
+        ),
+    };
+  }
+
+  void _validateFieldIdsForExtension(
+    String extension,
+    Set<MetadataFieldId> fieldIds,
+  ) {
+    if (fieldIds.isEmpty) {
+      throw const FormatException('No metadata fields selected');
+    }
+    final valid = switch (extension) {
+      'png' => fieldIds.every((id) => id.isPngText),
+      'pdf' => fieldIds.every((id) => id.isPdfInfo),
+      _ => false,
+    };
+    if (!valid) {
+      throw const FormatException('Metadata field does not match file format');
+    }
+  }
+
+  Future<MetadataRemovalOutput> _stripSelectivePng(
+    String inputPath,
+    String outputDirectory,
+    Set<MetadataFieldId> requestedIds,
+  ) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('PNG too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('PNG too large for remover MVP');
+    }
+    final labels = requestedIds.map((id) => id.pngKeyword!).toSet();
+    final stripped = await runOnWorker(
+      () => _stripPngBytesWithReport(
+        inputBytes,
+        selectiveLabels: labels,
+      ),
+    );
+    _validateSelectivePngOutput(stripped.bytes, labels);
+    final file = await _writeCleanCopy(
+      inputPath,
+      stripped.bytes,
+      outputDirectory,
+    );
+    final isSafOutput = file.path.startsWith('content://');
+    if (!isSafOutput) {
+      try {
+        final persistedBytes = await _persistedOutputReader(file);
+        _validateSelectivePngOutput(persistedBytes, labels);
+      } on Object {
+        try {
+          await file.delete();
+        } on Object {
+          throw const FormatException(
+            'Output validation failed; unverified copy may remain',
+          );
+        }
+        rethrow;
+      }
+    }
+    final removedIds =
+        stripped.removedLabels.map(MetadataFieldId.pngText).toSet();
+    final warnings = isSafOutput
+        ? const [
+            'Generated PNG bytes were validated, but the persisted SAF '
+                'artifact was not read back.',
+          ]
+        : const <String>[];
+    return MetadataRemovalOutput(
+      file: file,
+      report: StripReport.snapshot(
+        requestedFieldIds: requestedIds,
+        removedFieldIds: removedIds,
+        warnings: warnings,
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
+  Future<MetadataRemovalOutput> _stripSelectivePdf(
+    String inputPath,
+    String outputDirectory,
+    Set<MetadataFieldId> requestedIds,
+  ) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('PDF too large for remover MVP');
+    }
+    final bytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('PDF too large for remover MVP');
+    }
+    final labels = requestedIds.map((id) => id.pdfInfoKey!).toSet();
+    final outputBytes = await runOnWorker(
+      () => _stripPdfInfoBytes(bytes, selectiveLabels: labels),
+    );
+    final file = await _writeCleanCopy(
+      inputPath,
+      outputBytes,
+      outputDirectory,
+    );
+    return MetadataRemovalOutput(
+      file: file,
+      report: StripReport.snapshot(
+        requestedFieldIds: requestedIds,
+        warnings: const [_pdfBestEffortWarning],
+        verificationOutcome: StripVerificationOutcome.attemptedUnverified,
+        outputValidated: false,
+      ),
+    );
+  }
+
+  Future<Uint8List> _readBoundedBytes(File file, int maxBytes) async {
+    final handle = await file.open();
+    try {
+      return Uint8List.fromList(await handle.read(maxBytes));
+    } finally {
+      await handle.close();
+    }
+  }
 
   /// Strips metadata from [inputPath] into the configured output folder.
   ///
@@ -148,6 +359,8 @@ class MetadataRemoverDatasource {
         stripGifMetadata(inputPath, outputDirectory: outputDirectory),
       _RemovalRoute.webp =>
         stripWebpMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.bmp =>
+        stripBmpMetadata(inputPath, outputDirectory: outputDirectory),
     };
   }
 
@@ -164,7 +377,13 @@ class MetadataRemoverDatasource {
       throw const FileSystemException('JPEG too large for remover MVP');
     }
 
-    final bytes = await input.readAsBytes();
+    final bytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('JPEG too large for remover MVP');
+    }
     final outputBytes = await runOnWorker(() => _stripJpegBytes(bytes));
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
@@ -191,7 +410,13 @@ class MetadataRemoverDatasource {
       throw const FileSystemException('PNG too large for remover MVP');
     }
 
-    final bytes = await input.readAsBytes();
+    final bytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('PNG too large for remover MVP');
+    }
     final outputBytes = await runOnWorker(
       () => _stripPngBytes(bytes, selectiveLabels: selectiveLabels),
     );
@@ -218,7 +443,13 @@ class MetadataRemoverDatasource {
       throw const FileSystemException('PDF too large for remover MVP');
     }
 
-    final bytes = await input.readAsBytes();
+    final bytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('PDF too large for remover MVP');
+    }
     final outputBytes = await runOnWorker(
       () => _stripPdfInfoBytes(bytes, selectiveLabels: selectiveLabels),
     );
@@ -351,6 +582,96 @@ class MetadataRemoverDatasource {
     );
   }
 
+  /// Writes and verifies a canonical BMP clean copy.
+  Future<File> stripBmpMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) async {
+    final result = await _stripBmpWithReport(
+      inputPath,
+      outputDirectory: outputDirectory,
+    );
+    return result.file;
+  }
+
+  Future<MetadataRemovalOutput> _stripBmpWithReport(
+    String inputPath, {
+    required String? outputDirectory,
+  }) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('BMP too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('BMP too large for remover MVP');
+    }
+
+    final outputBytes = await runOnWorker(() => stripBmp(inputBytes));
+    validateBmpOutput(inputBytes, outputBytes);
+    final output = await _writeCleanCopy(
+      inputPath,
+      outputBytes,
+      outputDirectory,
+    );
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      FileStat? installedStat;
+      try {
+        installedStat = await output.stat();
+        if (installedStat.type != FileSystemEntityType.file ||
+            installedStat.size != outputBytes.length) {
+          throw const FormatException('BMP persisted output size changed');
+        }
+        final persistedBytes = await _persistedOutputReader(output);
+        final validatedStat = await output.stat();
+        if (!_sameFileSnapshot(installedStat, validatedStat)) {
+          throw const FormatException('BMP persisted output changed');
+        }
+        validateBmpOutput(inputBytes, persistedBytes);
+      } on Object {
+        try {
+          final expectedStat = installedStat;
+          if (expectedStat == null) {
+            throw const FormatException(
+              'Output validation failed; unverified copy may remain',
+            );
+          }
+          final currentStat = await output.stat();
+          if (!_sameFileSnapshot(expectedStat, currentStat)) {
+            throw const FormatException(
+              'Output validation failed; unverified copy may remain',
+            );
+          }
+          await output.delete();
+        } on Object {
+          throw const FormatException(
+            'Output validation failed; unverified copy may remain',
+          );
+        }
+        rethrow;
+      }
+    }
+
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        warnings: isSafOutput ? const [_safBmpValidationWarning] : const [],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
   /// Shared pipeline for the newer strip*Metadata methods: stat + size cap +
   /// worker scrub + clean-copy install. Same behavior as [stripPdfMetadata].
   ///
@@ -376,7 +697,13 @@ class MetadataRemoverDatasource {
       throw FileSystemException(errorMessage);
     }
 
-    final bytes = await input.readAsBytes();
+    final bytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw FileSystemException(errorMessage);
+    }
     final outputBytes = await runOnWorker(() => stripper(bytes));
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
@@ -475,6 +802,24 @@ class MetadataRemoverDatasource {
 }
 
 Future<void> _deleteClaim(File claim) => claim.delete();
+
+Future<Uint8List> _readPersistedOutput(File output) async {
+  final handle = await output.open();
+  try {
+    return Uint8List.fromList(
+      await handle.read(AppConstants.maxRemoverFileSizeBytes + 1),
+    );
+  } finally {
+    await handle.close();
+  }
+}
+
+bool _sameFileSnapshot(FileStat expected, FileStat actual) =>
+    expected.type == FileSystemEntityType.file &&
+    actual.type == FileSystemEntityType.file &&
+    expected.size == actual.size &&
+    expected.modified == actual.modified &&
+    expected.changed == actual.changed;
 
 Future<void> _runBestEffort(Future<void> Function() cleanup) async {
   try {
@@ -575,7 +920,13 @@ Uint8List _stripJpegBytes(Uint8List bytes) {
 /// one of the labels are removed; unselected text chunks and the eXIf/tIME
 /// chunks are preserved because the caller asked to delete just the
 /// selected fields.
-Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
+Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) =>
+    _stripPngBytesWithReport(bytes, selectiveLabels: selectiveLabels).bytes;
+
+({Uint8List bytes, Set<String> removedLabels}) _stripPngBytesWithReport(
+  Uint8List bytes, {
+  Set<String>? selectiveLabels,
+}) {
   const signature = [137, 80, 78, 71, 13, 10, 26, 10];
   if (bytes.length < signature.length) {
     throw const FormatException('Not a valid PNG file');
@@ -637,7 +988,63 @@ Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
       if (isSelective && !removedLabels.containsAll(selectiveLabels)) {
         throw const FormatException('Unsupported selective metadata field');
       }
-      return output.toBytes();
+      return (
+        bytes: output.toBytes(),
+        removedLabels: Set.unmodifiable(removedLabels),
+      );
+    }
+  }
+}
+
+void _validateSelectivePngOutput(
+  Uint8List bytes,
+  Set<String> requestedLabels,
+) {
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+  if (bytes.length < signature.length) {
+    throw const FormatException('Generated PNG is invalid');
+  }
+  for (var index = 0; index < signature.length; index++) {
+    if (bytes[index] != signature[index]) {
+      throw const FormatException('Generated PNG is invalid');
+    }
+  }
+
+  var offset = signature.length;
+  while (true) {
+    if (bytes.length - offset < 12) {
+      throw const FormatException('Generated PNG is truncated');
+    }
+    final length = ByteData.sublistView(bytes, offset, offset + 4).getUint32(0);
+    if (length > bytes.length - offset - 12) {
+      throw const FormatException('Generated PNG chunk is invalid');
+    }
+    final chunkEnd = offset + 12 + length;
+    final type = String.fromCharCodes(bytes.sublist(offset + 4, offset + 8));
+    final storedCrc = ByteData.sublistView(
+      bytes,
+      chunkEnd - 4,
+      chunkEnd,
+    ).getUint32(0);
+    if (storedCrc != _pngCrc32(bytes, offset + 4, chunkEnd - 4)) {
+      throw const FormatException('Generated PNG chunk CRC is invalid');
+    }
+    final matched = _matchingSelectivePngLabel(
+      type,
+      bytes,
+      offset + 8,
+      chunkEnd - 4,
+      requestedLabels,
+    );
+    if (matched != null) {
+      throw const FormatException('Requested PNG metadata remains in output');
+    }
+    offset = chunkEnd;
+    if (type == 'IEND') {
+      if (length != 0 || offset != bytes.length) {
+        throw const FormatException('Generated PNG IEND is invalid');
+      }
+      return;
     }
   }
 }
@@ -847,6 +1254,14 @@ const List<String> _pdfInfoKeys = [
   'ModDate',
   'Trapped',
 ];
+
+const _pdfBestEffortWarning =
+    'PDF cleanup was attempted using a best-effort byte scan; field removal '
+    'and document structure were not verified.';
+
+const _safBmpValidationWarning =
+    'Generated BMP bytes were validated, but the persisted SAF artifact was '
+    'not read back.';
 
 /// Returns the Info keys to blank for the requested [selectiveLabels].
 ///

@@ -1,6 +1,6 @@
 # MetaStrip — Gap Closure Implementation Plan
 
-**Status:** In progress — Phase 0 complete; Phase 1 pending
+**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled and TIFF remains deferred
 **Version:** 1.1
 **Created:** 2026-08-08
 **Related plan:** [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
@@ -58,18 +58,32 @@ The existing implementation uses:
 - Declarative per-format extraction/removal limits and processing strategies;
   runtime queue validation consumes the removal limit from the capability.
 
-The current registered remover set contains 18 extensions:
+The current registered remover set contains 19 extensions:
 
 ```text
-jpg, jpeg, png, pdf,
+jpg, jpeg, png, pdf, bmp,
 mp3, flac, ogg, opus, wav, aiff,
 docx, xlsx, pptx, odt, ods, odp,
 gif, webp
 ```
 
-The current PDF implementation is best-effort Info dictionary cleanup. Video,
-HEIC/HEIF, archive removal, BMP/TIFF removal, legacy Office removal, and full
-selective-mode behavior are not yet complete.
+The current PDF implementation is best-effort Info dictionary cleanup. Stable-ID
+selective removal is implemented end to end for PNG text and PDF Info fields;
+PDF results remain attempted/unverified. BMP removal is enabled only for strict
+canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB, positive dimensions, and
+`bfOffBits == 54` inputs. Video, HEIC/HEIF, archive removal, TIFF removal,
+legacy Office removal, and broader selective-mode behavior are not yet complete.
+
+### Final host verification (2026-08-08)
+
+- `flutter test`: 337 passed, 1 skipped.
+- `flutter analyze`: clean (0 issues).
+- Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`).
+- Diff check: passed.
+- Local PNG persisted output is verified. SAF persisted-artifact read-back and
+  Android/iOS device tests remain scheduled/pending. PDF selective cleanup
+  remains attempted/unverified. These host checks do not establish ZIP stress
+  completion or release readiness.
 
 ---
 
@@ -80,13 +94,13 @@ The recommended order is:
 ```text
 Phase 0  Capability registry and safety contracts
 Phase 1  Selective removal for existing formats
-Phase 2  BMP and TIFF subset removal
+Phase 2  BMP subset removal; TIFF structural writer/POC
 Phase 3  PDF structural metadata cleanup
 Phase 4  ZIP-only archive cleanup
 Phase 5  HEIF extraction POC and removal decision
 Phase 6  Video technology spike and incremental implementation
 Phase 7  Legacy Office decision gate
-Phase 8  Selective UI, device validation, and release hardening
+Phase 8  Broader selective UI, device validation, and release hardening
 ```
 
 The first four phases provide the best balance of user value and technical
@@ -117,9 +131,10 @@ Implemented in `lib/core/format/`:
 - Removal queue and pre-processing validation consume the declared per-format
   removal limit.
 
-This phase does not claim that selective removal is production-wired end to
-end. The existing label-based PNG/PDF datasource seam remains for compatibility
-until Phase 1 introduces stable field IDs and an explicit policy object.
+Phase 1 subsequently replaced the label-based PNG/PDF domain contract with
+stable field IDs and an explicit per-file policy. Legacy label parameters remain
+only as an internal compatibility seam; they are not the Viewer-to-Remover
+contract.
 
 Phase 0 security hardening is complete for the registered ZIP-backed routes:
 
@@ -143,6 +158,9 @@ Phase 0 security hardening is complete for the registered ZIP-backed routes:
 Residual risk: the repacker is still in-memory. Its total decompressed-content
 budget is now 32 MiB, materially reducing memory amplification, but device
 stress testing and a future streaming repacker remain release-hardening work.
+Execution is scheduled in
+[`DEVICE_AND_STRESS_TEST_PLAN.md`](DEVICE_AND_STRESS_TEST_PLAN.md); no device or
+memory-stress pass is claimed yet.
 
 ### Goals
 
@@ -230,11 +248,14 @@ image.exif.gpsLatitude
 **Estimate:** Medium to large
 **Dependencies:** Phase 0
 
+**Status:** Complete for PNG text and PDF Info selective flow (2026-08-08).
+Broader formats and modes remain follow-up work.
+
 ### Problem to solve
 
-The current selective plumbing is partial. PNG and PDF support selected fields,
-while other formats reject selective requests before processing. This behavior
-must remain explicit and safe as stable field IDs replace display labels.
+PNG and PDF now support selected stable field IDs end to end, while other
+formats reject selective requests before processing. Unsupported or mismatched
+requests fail closed per file and do not produce a full-cleanup fallback.
 
 ### Policy semantics
 
@@ -244,9 +265,9 @@ Remove all metadata covered by the format's supported stripper.
 
 #### Selective
 
-Remove only the selected stable field IDs. If a selected field is unsupported,
-return a clear warning or failure according to the policy; never silently
-remove additional fields.
+Remove only the selected stable field IDs. In the implemented policy,
+unsupported fields or formats fail closed for that file before cleanup; they
+never silently remove additional fields or fall back to full cleanup.
 
 #### Anonymize
 
@@ -262,33 +283,52 @@ verified.
 
 ### Implementation order
 
-1. Migrate PNG keyword selection to field IDs.
-2. Migrate PDF Info-key selection to field IDs.
-3. Add per-property XML removal for DOCX/XLSX/PPTX.
-4. Add per-property removal for ODT/ODS/ODP.
-5. Add MP3 frame-level removal.
-6. Add FLAC/OGG/Opus comment-key removal.
-7. Add WAV/AIFF field-level removal.
+1. [x] Migrate PNG keyword selection to field IDs.
+2. [x] Migrate PDF Info-key selection to field IDs.
+3. [ ] Add per-property XML removal for DOCX/XLSX/PPTX.
+4. [ ] Add per-property removal for ODT/ODS/ODP.
+5. [ ] Add MP3 frame-level removal.
+6. [ ] Add FLAC/OGG/Opus comment-key removal.
+7. [ ] Add WAV/AIFF field-level removal.
 
 ### Result reporting
 
-Extend processing results to report:
+`StripReport` now provides operation facts without metadata values for:
 
 - requested fields;
 - removed fields;
 - unsupported fields;
-- preserved fields when relevant;
+- already-absent fields;
 - warnings;
 - output validation status;
 - whether re-encoding occurred.
 
+Preserved-field reporting is not claimed in the current PNG/PDF implementation.
+For local PNG output, the persisted clean copy is read back, reparsed, and
+removed stable IDs are reported with a verified outcome. SAF generated bytes
+are validated before writing, but persisted SAF readback remains unverified and
+scheduled for device testing. For PDF, requested IDs and the best-effort
+warning are reported, but removed IDs and output validation are intentionally
+not claimed.
+
 ### Acceptance criteria
 
-- Stable field IDs are used end-to-end.
-- Selective policy is carried per file or explicitly per batch.
-- Unsupported selected fields are visible to the user.
-- Post-removal extraction verifies selected fields are absent.
-- Widget, BLoC, repository, and stripper tests cover selective behavior.
+- [x] Stable field IDs are used end to end for PNG text and PDF Info fields.
+- [x] `StripPolicy` is carried per file through the implemented selective flow.
+- [x] Unsupported/mismatched selective requests fail closed per file with no
+  silent full-strip fallback.
+- [x] `StripReport` facts and PDF warning behavior reach the result UI.
+- [x] Local persisted PNG output validation verifies selected text fields are absent.
+- [ ] SAF persisted PNG readback verification on a physical device.
+- [x] PDF reports cleanup as best-effort attempted/unverified and does not claim
+  field removal or structural validation.
+- [x] Widget, BLoC, repository, datasource, and stripper coverage exercises the
+  implemented PNG/PDF selective behavior.
+- [ ] Preserved fields are identified and verified; no such claim is made by
+  the current report.
+- [ ] Per-property selective removal is implemented for Office/audio formats.
+- [ ] Anonymize and Preserve Technical policies are defined and wired.
+- [ ] Physical-device picker/output behavior passes the scheduled matrix.
 
 ---
 
@@ -298,29 +338,38 @@ Extend processing results to report:
 **Estimate:** Medium for BMP; medium-large for TIFF
 **Dependencies:** Phase 0
 
-### BMP
+**Status:** BMP narrow subset enabled (2026-08-08); SAF persisted BMP readback
+and physical-device validation remain pending. TIFF/TIF removal is disabled and
+requires a future structural writer/POC.
 
-Implement a validated, preferably lossless rewrite for standard BMP files:
+### BMP — enabled narrow subset
 
-- preserve pixel payload;
-- preserve dimensions and bit depth;
-- remove understood profile/trailing metadata;
-- reject unsupported compression/header variants;
-- validate the output signature and header offsets.
+BMP removal is enabled for strict canonical 24/32-bit Windows
+`BITMAPINFOHEADER` files with `BI_RGB`, positive dimensions, and
+`bfOffBits == 54`. The stripper:
 
-Candidate file:
+- preserves the header and pixel payload bytes within the supported structure;
+- zeroes the reserved fields;
+- normalizes the file and image size fields;
+- discards trailing bytes;
+- rejects unsupported or malformed variants.
+
+This is not comprehensive BMP sanitization. It does not claim to cover
+non-canonical headers, compression, profiles, or every possible metadata
+surface. SAF BMP persisted readback remains unverified and scheduled, and
+Android/iOS device validation is pending.
+
+Implemented file:
 
 ```text
 lib/features/remover/data/datasources/strippers/bmp_stripper.dart
 ```
 
-Do not claim complete BMP sanitization until trailing data and profile behavior
-are covered by fixtures.
+### TIFF — disabled
 
-### TIFF
-
-TIFF requires a dedicated parser/re-writer. Extraction support from the `exif`
-package must not be assumed to provide safe writing.
+TIFF/TIF removal remains disabled. Extraction support from the `exif` package
+must not be assumed to provide safe writing. A future structural writer/POC is
+required before TIFF enters the remover registry.
 
 Initial target:
 
@@ -348,10 +397,15 @@ Initially reject or mark experimental:
 
 ### Acceptance criteria
 
-- Output opens in at least two independent TIFF readers.
-- Image dimensions and payload remain valid according to policy.
-- Target metadata is absent after re-extraction.
-- Unsupported variants fail closed.
+- [x] Supported BMP output preserves the documented header/pixel payload bytes,
+  normalizes required fields, and discards trailing bytes.
+- [ ] SAF BMP persisted readback and Android/iOS device validation pass.
+- [ ] TIFF output opens in at least two independent TIFF readers after a future
+  structural writer/POC.
+- [ ] TIFF dimensions/payload remain valid and target metadata is absent after
+  re-extraction.
+- [x] Unsupported BMP variants fail closed; TIFF remains disabled until its
+  writer/POC gates pass.
 
 ---
 
@@ -697,6 +751,10 @@ Run on real Android and iOS environments for:
 - foreground/background lifecycle;
 - external output opening.
 
+Run the maintained schedule and record evidence in
+[`DEVICE_AND_STRESS_TEST_PLAN.md`](DEVICE_AND_STRESS_TEST_PLAN.md). Host tests do
+not satisfy this gate.
+
 ---
 
 ## 15. Acceptance criteria by gap
@@ -727,10 +785,15 @@ Run on real Android and iOS environments for:
 
 ### BMP/TIFF
 
-- [ ] BMP output preserves pixel payload and remains readable.
-- [ ] TIFF baseline variants pass round-trip tests.
+- [x] BMP strict canonical 24/32-bit BI_RGB output preserves header/pixel payload
+  bytes, zeroes reserved fields, normalizes size fields, and discards trailing
+  bytes.
+- [ ] SAF BMP persisted readback is verified on a physical device.
+- [ ] Android/iOS device validation passes for the enabled BMP subset.
+- [ ] TIFF structural writer/POC is implemented and TIFF removal is enabled.
 - [ ] EXIF/GPS/XMP handling is defined.
-- [ ] BigTIFF and unsupported variants fail closed.
+- [ ] BigTIFF, unsupported TIFF variants, and unsupported BMP variants fail
+  closed.
 
 ### Legacy Office
 
@@ -741,11 +804,14 @@ Run on real Android and iOS environments for:
 
 ### Selective removal
 
-- [ ] Stable field IDs are used.
-- [ ] Policy is propagated per file.
-- [ ] Unsupported fields produce clear warning/failure.
-- [ ] No silent full-strip fallback exists.
-- [ ] Removed/preserved/unsupported fields are reported.
+- [x] Stable field IDs are used within the PNG/PDF scope.
+- [x] Policy is propagated per file within the PNG/PDF scope.
+- [x] Unsupported fields/formats fail closed per file.
+- [x] No silent full-strip fallback exists.
+- [x] Requested/removed/already-absent/unsupported facts and warnings can be
+  represented and reach the result UI; PDF does not claim unverified removals.
+- [ ] Preserved-field reporting and preservation verification are implemented.
+- [ ] Selective removal is expanded beyond PNG text and PDF Info fields.
 
 ### Comprehensive PDF
 
@@ -792,7 +858,7 @@ Before enabling any new format in production:
 | MP4/MOV video | XL | Very high |
 | Other video containers | L–XL each | Very high |
 | Legacy Office | L–XL | Very high |
-| Selective UI and final integration | L | Medium–high |
+| Broader selective UI and final integration | L | Medium–high |
 | Device/security/release hardening | L | High |
 
 These are relative planning estimates, not calendar commitments. The HEIF,
@@ -809,7 +875,6 @@ spikes.
 - Structural PDF parser capability for xref streams and object streams.
 - Whether signed APK processing is rejected permanently or becomes a separate
   rebuild/resign feature.
-- Selective-mode behavior for unsupported fields: fail closed versus warning.
 - Streaming/temp-file architecture for large files and recursive archives.
 - Exact product terminology for PDF Level 1, Level 2, and Level 3 cleanup.
 

@@ -67,7 +67,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 
 ### 🗑️ Remover
 - Terima file dari Viewer atau file picker; share intent masih planned
-- Current MVP: clean copies for the 18 registered remover extensions, with PDF DocInfo removal best-effort
+- Current MVP: clean copies for the 19 registered remover extensions, with PDF DocInfo removal best-effort
 - Full Strip, Selective, Anonymize, dan Preserve Technical masih planned/unwired; current UI exposes supported-cleanup behavior only
 - Output otomatis tersimpan ke folder yang sudah dikonfigurasi
 - Progress real-time dengan log detail; background processing dan notifikasi masih planned
@@ -97,7 +97,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 `JPG/JPEG` · `TIFF/TIF` · `PNG` · `GIF` · `WebP` · `BMP` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `PDF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `ZIP/APK/EPUB`.
 
 ### Remover registry
-`JPG/JPEG` · `PNG` · `PDF` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `GIF` · `WebP`.
+`JPG/JPEG` · `PNG` · `PDF` · `BMP` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `GIF` · `WebP`.
 
 HEIC/HEIF, RAW, M4V, legacy Office, GZ/BZ2, video, archives, granular audio removal, and per-property Office removal are not current supported-removal features.
 

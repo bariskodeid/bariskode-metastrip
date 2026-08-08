@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_bloc.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart';
@@ -28,18 +30,18 @@ class _FakeRemoverRepository implements RemoverRepository {
   final bool shouldFail;
   final List<String> processedPaths = [];
   String? lastOutputDirectory;
-  Set<String>? lastSelectiveLabels;
+  StripPolicy? lastPolicy;
 
   @override
   Future<ProcessingResultEntity> stripFile(
     String path, {
     required String outputDirectory,
-    Set<String>? selectiveLabels,
+    required StripPolicy policy,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 5));
     processedPaths.add(path);
     lastOutputDirectory = outputDirectory;
-    lastSelectiveLabels = selectiveLabels;
+    lastPolicy = policy;
     if (shouldFail) {
       return ProcessingResultEntity.failure(
         inputPath: path,
@@ -76,6 +78,68 @@ Future<RemoverState> _waitFor(
 
 void main() {
   group('RemoverBloc', () {
+    test('RemoverFilesAdded snapshots and protects input collections', () {
+      final file = _file('image.png', ext: 'png');
+      final files = <FileItemEntity>[file];
+      final policy = StripPolicy.selective(
+        fieldIds: {MetadataFieldId.pngText('Author')},
+      );
+      final policies = <String, StripPolicy>{file.path: policy};
+
+      final event = RemoverFilesAdded(files, policiesByPath: policies);
+      files.clear();
+      policies.clear();
+
+      expect(event.files, [file]);
+      expect(event.policiesByPath, {file.path: policy});
+      expect(() => event.files.clear(), throwsUnsupportedError);
+      expect(() => event.policiesByPath.clear(), throwsUnsupportedError);
+    });
+
+    test('RemoverState constructor and copyWith snapshot collections', () {
+      final file = _file('image.png', ext: 'png');
+      const policy = StripPolicy.supportedCleanup();
+      final result = ProcessingResultEntity.success(
+        inputPath: file.path,
+        outputPath: '${file.path}.clean',
+      );
+      final files = <FileItemEntity>[file];
+      final policies = <String, StripPolicy>{file.path: policy};
+      final results = <ProcessingResultEntity>[result];
+
+      final state = RemoverState(
+        files: files,
+        status: RemoverStatus.completed,
+        policiesByPath: policies,
+        results: results,
+      );
+      files.clear();
+      policies.clear();
+      results.clear();
+
+      expect(state.files, [file]);
+      expect(state.policiesByPath, {file.path: policy});
+      expect(state.results, [result]);
+      expect(() => state.files.clear(), throwsUnsupportedError);
+      expect(() => state.policiesByPath.clear(), throwsUnsupportedError);
+      expect(() => state.results.clear(), throwsUnsupportedError);
+
+      final nextFiles = <FileItemEntity>[file];
+      final nextPolicies = <String, StripPolicy>{file.path: policy};
+      final nextResults = <ProcessingResultEntity>[result];
+      final copied = state.copyWith(
+        files: nextFiles,
+        policiesByPath: nextPolicies,
+        results: nextResults,
+      );
+      nextFiles.clear();
+      nextPolicies.clear();
+      nextResults.clear();
+      expect(copied.files, [file]);
+      expect(copied.policiesByPath, {file.path: policy});
+      expect(copied.results, [result]);
+    });
+
     test('adds files and dedups by path', () async {
       final bloc = RemoverBloc(
         validateInputs: false,
@@ -89,6 +153,58 @@ void main() {
 
       expect(state.files, hasLength(2));
       bloc.close();
+    });
+
+    test('materializes default policies for every accepted file', () async {
+      final bloc = RemoverBloc(
+        validateInputs: false,
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
+      final files = [_file('a.jpg'), _file('b.png')];
+
+      bloc.add(RemoverFilesAdded(files));
+      final state = await _waitFor(bloc, (s) => s.files.length == 2);
+
+      expect(state.policiesByPath.keys, {'/tmp/a.jpg', '/tmp/b.png'});
+      expect(
+        state.policiesByPath.values.map((policy) => policy.mode),
+        everyElement(StripPolicyMode.supportedCleanup),
+      );
+      await bloc.close();
+    });
+
+    test('duplicate insertion preserves the already queued policy', () async {
+      final bloc = RemoverBloc(
+        validateInputs: false,
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
+      final file = _file('image.png', ext: 'png');
+      final firstPolicy = StripPolicy.selective(
+        fieldIds: {MetadataFieldId.pngText('Author')},
+      );
+      final duplicatePolicy = StripPolicy.selective(
+        fieldIds: {MetadataFieldId.pngText('Title')},
+      );
+      bloc.add(
+        RemoverFilesAdded(
+          [file],
+          policiesByPath: {file.path: firstPolicy},
+        ),
+      );
+      await _waitFor(bloc, (s) => s.files.length == 1);
+
+      bloc.add(
+        RemoverFilesAdded(
+          [file],
+          policiesByPath: {file.path: duplicatePolicy},
+        ),
+      );
+      final state = await _waitFor(bloc, (s) => s.errorMessage != null);
+
+      expect(state.policiesByPath[file.path], same(firstPolicy));
+      await bloc.close();
     });
 
     test('enforces session file cap', () async {
@@ -147,6 +263,8 @@ void main() {
       final state = await _waitFor(bloc, (s) => s.files.length == 1);
 
       expect(state.files.single.name, 'b.png');
+      expect(state.policiesByPath, isNot(contains('/tmp/a.jpg')));
+      expect(state.policiesByPath, contains('/tmp/b.png'));
       bloc.close();
     });
 
@@ -164,7 +282,33 @@ void main() {
 
       expect(state.files, isEmpty);
       expect(state.status, RemoverStatus.idle);
+      expect(state.policiesByPath, isEmpty);
       bloc.close();
+    });
+
+    test('missing policy is a per-file failure and is never defaulted',
+        () async {
+      final repository = _FakeRemoverRepository();
+      final file = _file('a.jpg');
+      final bloc = RemoverBloc(
+        validateInputs: false,
+        repository: repository,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+        initialState: RemoverState(
+          files: [file],
+          status: RemoverStatus.idle,
+        ),
+      );
+
+      bloc.add(const RemoverProcessingStarted());
+      final state =
+          await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
+
+      expect(state.results.single.success, isFalse);
+      expect(state.results.single.error,
+          'Cleanup policy is missing for this file');
+      expect(repository.processedPaths, isEmpty);
+      await bloc.close();
     });
 
     test('processes files sequentially and reaches completed', () async {
@@ -190,8 +334,9 @@ void main() {
       bloc.close();
     });
 
-    test('processes only strippable files and reports supported progress total',
-        () async {
+    test(
+        'processes registered formats including supported BMP and reports '
+        'supported progress total', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
         validateInputs: false,
@@ -199,7 +344,7 @@ void main() {
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
       bloc.add(RemoverFilesAdded([
-        _file('unsupported.bmp', ext: 'bmp'),
+        _file('canonical.bmp', ext: 'bmp'),
         _file('photo.jpg'),
         _file('unsupported.mp4', ext: 'mp4'),
         _file('document.pdf', ext: 'pdf'),
@@ -209,15 +354,16 @@ void main() {
       bloc.add(const RemoverProcessingStarted());
       final processing = await _waitFor(
         bloc,
-        (s) => s.progress?.totalFiles == 2,
+        (s) => s.progress?.totalFiles == 3,
       );
-      expect(processing.progress?.currentFile, 'photo.jpg');
+      expect(processing.progress?.currentFile, 'canonical.bmp');
 
       final state =
           await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
-      expect(repo.processedPaths, ['/tmp/photo.jpg', '/tmp/document.pdf']);
-      expect(state.results, hasLength(2));
-      expect(state.successCount, 2);
+      expect(repo.processedPaths,
+          ['/tmp/canonical.bmp', '/tmp/photo.jpg', '/tmp/document.pdf']);
+      expect(state.results, hasLength(3));
+      expect(state.successCount, 3);
       bloc.close();
     });
 
@@ -327,6 +473,7 @@ void main() {
 
       expect(state.status, RemoverStatus.idle);
       expect(state.files, isEmpty);
+      expect(state.policiesByPath, isEmpty);
       bloc.close();
     });
   });

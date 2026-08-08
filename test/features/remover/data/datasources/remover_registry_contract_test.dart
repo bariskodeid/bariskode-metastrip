@@ -25,6 +25,7 @@ void main() {
       'odp',
       'gif',
       'webp',
+      'bmp',
     });
   });
 
@@ -59,7 +60,9 @@ void main() {
   test('routing is case insensitive and rejects unregistered aliases', () {
     expect(MetadataRemoverDatasource.supportsExtension('JpEg'), isTrue);
     expect(MetadataRemoverDatasource.supportsExtension('AIF'), isFalse);
-    expect(MetadataRemoverDatasource.supportsExtension('bmp'), isFalse);
+    expect(MetadataRemoverDatasource.supportsExtension('bmp'), isTrue);
+    expect(MetadataRemoverDatasource.supportsExtension('tiff'), isFalse);
+    expect(MetadataRemoverDatasource.supportsExtension('tif'), isFalse);
     expect(MetadataRemoverDatasource.supportsExtension('zip'), isFalse);
     expect(MetadataRemoverDatasource.supportsExtension('mp4'), isFalse);
   });

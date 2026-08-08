@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/screens/remover_screen.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
@@ -25,6 +27,23 @@ void main() {
     expect(find.byIcon(Icons.block), findsOneWidget);
     expect(
         find.widgetWithText(FilledButton, 'CLEAN 1 FILE(S)'), findsOneWidget);
+  });
+
+  testWidgets('shows an explicit selective policy seeded for one file',
+      (tester) async {
+    final file = _file('photo.png', 'png');
+    await _pumpScreen(
+      tester,
+      files: [file],
+      policiesByPath: {
+        file.path: StripPolicy.selective(
+          fieldIds: {MetadataFieldId.pngText('Author')},
+        ),
+      },
+    );
+
+    expect(find.text('photo.png'), findsOneWidget);
+    expect(find.text('1 metadata field(s) selected'), findsOneWidget);
   });
 
   testWidgets('disables cleanup for an unsupported-only queue', (tester) async {
@@ -193,12 +212,14 @@ void main() {
 Future<void> _pumpScreen(
   WidgetTester tester, {
   List<FileItemEntity> files = const [],
+  Map<String, StripPolicy> policiesByPath = const {},
   Future<List<PlatformFile>?> Function()? picker,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       home: RemoverScreen(
         initialFiles: files,
+        initialPoliciesByPath: policiesByPath,
         outputFolderRepository: _UnexpectedOutputFolderRepository(),
         removerRepository: _UnexpectedRemoverRepository(),
         pickFiles: picker ?? (() async => null),
@@ -225,7 +246,7 @@ class _UnexpectedRemoverRepository implements RemoverRepository {
   Future<ProcessingResultEntity> stripFile(
     String path, {
     required String outputDirectory,
-    Set<String>? selectiveLabels,
+    required StripPolicy policy,
   }) {
     throw StateError('stripFile should not be called by this test');
   }

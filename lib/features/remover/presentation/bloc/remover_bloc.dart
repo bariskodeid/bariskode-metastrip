@@ -5,6 +5,7 @@ import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_state.dart';
@@ -23,10 +24,11 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
     required RemoverRepository repository,
     required OutputFolderRepository outputFolderRepository,
     bool validateInputs = true,
+    RemoverState? initialState,
   })  : _repository = repository,
         _outputFolderRepository = outputFolderRepository,
         _validateInputs = validateInputs,
-        super(RemoverState.initial()) {
+        super(initialState ?? RemoverState.initial()) {
     on<RemoverFilesAdded>(_onFilesAdded);
     on<RemoverFileRemoved>(_onFileRemoved);
     on<RemoverClearRequested>(_onClearRequested);
@@ -46,6 +48,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
   void _onFilesAdded(RemoverFilesAdded event, Emitter<RemoverState> emit) {
     final seen = state.files.map((f) => f.path).toSet();
     final newFiles = <FileItemEntity>[];
+    final policiesByPath = Map<String, StripPolicy>.of(state.policiesByPath);
     var skipped = 0;
     for (final file in event.files) {
       final capability = FormatRegistry.standard.lookup(file.extension);
@@ -66,11 +69,14 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
         continue;
       }
       newFiles.add(file);
+      policiesByPath[file.path] = event.policiesByPath[file.path] ??
+          const StripPolicy.supportedCleanup();
     }
 
     emit(
       state.copyWith(
         files: [...state.files, ...newFiles],
+        policiesByPath: policiesByPath,
         errorMessage: skipped > 0
             ? '$skipped file(s) skipped: too large, duplicate, or over '
                 '${AppConstants.maxFilesPerSession} limit.'
@@ -81,9 +87,12 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
   }
 
   void _onFileRemoved(RemoverFileRemoved event, Emitter<RemoverState> emit) {
+    final policiesByPath = Map<String, StripPolicy>.of(state.policiesByPath)
+      ..remove(event.path);
     emit(
       state.copyWith(
         files: state.files.where((f) => f.path != event.path).toList(),
+        policiesByPath: policiesByPath,
         clearError: true,
       ),
     );
@@ -160,11 +169,15 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       );
       final validationError =
           _validateInputs ? await _validateInput(file) : null;
-      if (validationError != null) {
+      final policy = state.policiesByPath[file.path];
+      final policyError = policy == null
+          ? 'Cleanup policy is missing for this file'
+          : _validatePolicy(file, policy);
+      if (validationError != null || policyError != null) {
         results.add(
           ProcessingResultEntity.failure(
             inputPath: file.path,
-            error: validationError,
+            error: validationError ?? policyError!,
           ),
         );
         emit(state.copyWith(results: [...results]));
@@ -173,6 +186,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       final result = await _repository.stripFile(
         file.path,
         outputDirectory: outputDirectory,
+        policy: policy!,
       );
       results.add(result);
       emit(state.copyWith(results: [...results]));
@@ -211,6 +225,23 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       return 'Input file is missing or unreadable';
     }
     return null;
+  }
+
+  String? _validatePolicy(FileItemEntity file, StripPolicy policy) {
+    if (policy.mode != StripPolicyMode.selective) return null;
+    final extension = FormatRegistry.normalizeExtension(file.extension);
+    if (FormatRegistry.standard.lookup(extension)?.supportsSelectiveRemoval !=
+        true) {
+      return 'Selective cleanup is unavailable for this file type';
+    }
+    final matchesFormat = switch (extension) {
+      'png' => policy.selectedFieldIds.every((id) => id.isPngText),
+      'pdf' => policy.selectedFieldIds.every((id) => id.isPdfInfo),
+      _ => false,
+    };
+    return matchesFormat
+        ? null
+        : 'Selected metadata fields do not match this file type';
   }
 
   void _onResetRequested(

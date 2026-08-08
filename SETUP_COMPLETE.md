@@ -1,24 +1,39 @@
 # MetaStrip Project Progress Report
 
 **Snapshot:** 2026-08-08
-**Overall:** Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain.
+**Overall:** Implemented-scope MVP is usable and mostly complete. Gap-closure Phases 0-1 are implemented and the narrow Phase 2 BMP subset is enabled; full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
 **Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
 
 ## Status Definitions
 
-- **Implemented-scope MVP:** the currently usable scope covering onboarding, Viewer functionality for registered extractors, clean-copy removal for the registered 18 extensions, and exposed Settings controls. Known format and workflow limitations remain.
+- **Implemented-scope MVP:** the currently usable scope covering onboarding, Viewer functionality for registered extractors, clean-copy removal for the registered 19 extensions, and exposed Settings controls. Known format and workflow limitations remain.
 - **Full product-spec MVP:** the complete target described in `docs/SPECS.md`. It includes capabilities that are still planned, deferred, or unwired, so it is **not complete**.
 - **Release-ready product:** full product-spec MVP plus integration/device testing, performance and accessibility verification, release-build validation, and release hardening. It is **not complete**.
 
 ## Gap Closure Update (2026-08-08)
 
-Phase 0 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` is complete. A shared
-capability registry now describes all 41 Viewer extensions, preserves the
-existing 18 Remover extensions, normalizes extension lookup, and supplies the
-runtime removal size limit. Viewer extraction routes and Remover routes are
-covered by bidirectional contract tests. This is an architecture and safety
-foundation; it does not enable BMP/TIFF, archives, HEIF, video, legacy Office,
-or end-to-end selective policy/UI behavior.
+Phases 0 and 1 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` are complete within
+the current PNG/PDF selective scope, and the narrow Phase 2 BMP subset is
+enabled. The shared capability registry describes all 41 Viewer extensions and
+the 19 registered Remover extensions.
+Stable field IDs and a per-file `StripPolicy` now travel from Viewer field
+selection through the Remover BLoC, repository, and datasource. `StripReport`
+facts reach the result UI, including warnings and output-validation state.
+Unsupported or mismatched selective requests fail closed per file without a
+silent full-cleanup fallback.
+
+PNG selective text removal is verified for local persisted output: the clean
+copy is read back and reparsed before the report is marked verified. Generated
+SAF PNG bytes are validated before writing, but persisted SAF readback remains
+unverified and scheduled for device validation. PDF selective DocInfo cleanup is only attempted by the existing
+best-effort scanner: its report does not claim removed IDs or validated output,
+and the result UI presents the unverified warning. These changes do not enable
+TIFF removal, archive removal, HEIF, video, legacy Office, broader selective format
+support, Anonymize, or Preserve Technical behavior.
+
+Device/SAF and ZIP-family memory stress testing are scheduled, not complete.
+The executable lanes and acceptance thresholds are in
+[`docs/DEVICE_AND_STRESS_TEST_PLAN.md`](docs/DEVICE_AND_STRESS_TEST_PLAN.md).
 
 ## Completed Phases
 
@@ -54,11 +69,12 @@ or end-to-end selective policy/UI behavior.
 - Office: DOCX/XLSX/PPTX core props via archive + ODT/ODS/ODP ODF meta.xml
 - Archives: ZIP entry listing + best-effort textual APK manifest package/version
   scanning; binary AXML parsing remains deferred
-- GIF (comment extension), WebP (EXIF/XMP RIFF chunks), BMP (status only)
+- GIF (comment extension), WebP (EXIF/XMP RIFF chunks), BMP extraction and
+  narrow canonical BMP removal
 - Isolate-worker extraction while the app is foregrounded (single
   `runOnWorker` for parse + hash); OS background execution is not wired
 
-**Done (removal, 18 extensions):**
+**Done (removal, 19 extensions):**
 - JPEG/PNG scrubbers, PDF linear-scanner DocInfo stripper (9 keys incl.
   `Trapped`)
 - New strippers: ID3 (synchsafe masked), Vorbis (FLAC block drop + OGG
@@ -66,11 +82,20 @@ or end-to-end selective policy/UI behavior.
   OpenXML (zip repack without `docProps/{core,app,custom}.xml`),
   ODF (zip repack without `meta.xml`), GIF (comment + XMP app-extension),
   WebP (EXIF/XMP chunk + VP8X flag clear)
-- Limited selector parameters for PNG tEXt/iTXt (per keyword) and PDF DocInfo
-  (per Info key); null requests full cleanup, while empty or unsupported
-  selective requests fail closed. The general Selective mode UI remains
-  unavailable.
+- Stable-ID selective cleanup for PNG tEXt/iTXt (per keyword) and PDF DocInfo
+  (per Info key) is wired end to end through a per-file policy. Local PNG output
+  is read back, reparsed, and verified; SAF reports best-effort attempted/
+  unverified semantics until persisted readback is tested on device. PDF reports
+  best-effort attempted/unverified semantics.
+  Unsupported fields/formats fail closed per file. Anonymize, Preserve
+  Technical, and granular cleanup for other formats remain unavailable.
 - Output naming: collision-safe `_clean`, `_clean_1`, …; SAF content:// write
+
+- BMP removal for strict canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB,
+  positive dimensions, and `bfOffBits == 54`: header/pixel payload bytes are
+  preserved, reserved fields are zeroed, size fields are normalized, and
+  trailing bytes are discarded. This is not comprehensive BMP sanitization.
+  TIFF/TIF removal remains disabled pending a future structural writer/POC.
 
 **Deferred / out of scope:**
 - Video (MP4/MKV/AVI/WebM/3GP/FLV/WMV) — `ffmpeg_kit_flutter_full_gpl` retired
@@ -107,6 +132,8 @@ or end-to-end selective policy/UI behavior.
   and current size)
 - ProcessingScreen: live progress bar + per-file status + cancel
 - ResultScreen: 4-tile stats grid + per-file output list + Done
+- Viewer field selection can enqueue PNG/PDF files with a stable-ID selective
+  policy; result summaries consume `StripReport` removal/absence/warning facts
 - **JPEG scrubber:** preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM; EOI truncation
 - **PNG scrubber:** drops text chunks + tIME + eXIf
 - **PDF scrubber:** DocInfo blanking (best-effort) — linear scanner
@@ -115,7 +142,7 @@ or end-to-end selective policy/UI behavior.
 - Error sanitization (strips filesystem paths from messages)
 - Android package fix: `MainActivity.kt` → `com.bariskode.metastrip`
 
-**Remover verification:** contract tests assert the exact 18-extension registry
+**Remover verification:** contract tests assert the exact 19-extension registry
 and datasource routing. Integration-style tests use the real remover pipeline
 to verify clean-copy output, preservation of the original, and no output for
 malformed input. This is host-side verification only; Android device and SAF
@@ -164,12 +191,20 @@ claimed.
 
 ### Phase 6: Polish & Testing — Release-readiness work
 
-## Verification (2026-08-08)
+## Verification Snapshot (2026-08-08)
+
+**Final host verification:**
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: **304 passed, 1 skipped**
+- `flutter test`: 337 passed, 1 skipped
 - Test coverage: not measured in this verification run
-- Debug APK: builds (`build\app\outputs\flutter-apk\app-debug.apk`)
-- These checks do not establish full product-spec completion or release readiness; integration/device, performance, accessibility, and release-build verification remain outstanding.
+- Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`)
+- Diff check: passed
+- Local PNG persisted output is verified. SAF persisted-artifact read-back and
+  Android/iOS device tests remain scheduled/pending. PDF selective cleanup
+  remains attempted/unverified.
+- These checks do not establish full product-spec completion or release
+  readiness. ZIP stress testing, integration/device testing, performance,
+  accessibility, and release-build verification remain outstanding.
 
 ## Dependencies
 

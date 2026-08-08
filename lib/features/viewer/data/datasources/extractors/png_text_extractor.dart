@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
 
@@ -72,6 +73,7 @@ List<MetadataFieldEntity> _parseTextChunk(Uint8List data) {
       section: 'PNG Text',
       label: truncateMetadataValue(keyword),
       value: truncateMetadataValue(value),
+      id: _selectableId(keyword),
       isPrivacySensitive: isTextPrivacySensitive(keyword),
     ),
   ];
@@ -97,7 +99,16 @@ List<MetadataFieldEntity> _parseInternationalTextChunk(Uint8List data) {
       section: 'PNG Text',
       label: truncateMetadataValue(keyword),
       value: truncateMetadataValue(value),
+      id: _selectableId(keyword),
       isPrivacySensitive: isTextPrivacySensitive(keyword),
     ),
   ];
+}
+
+MetadataFieldId? _selectableId(String keyword) {
+  try {
+    return MetadataFieldId.pngText(keyword);
+  } on ArgumentError {
+    return null;
+  }
 }

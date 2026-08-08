@@ -5,6 +5,9 @@ import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/remover/data/datasources/metadata_remover_datasource.dart';
 import 'package:metastrip/features/remover/data/repositories/remover_repository_impl.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_report.dart';
 
 void main() {
   test('stripPngMetadata selective removes only the matching author chunk',
@@ -308,29 +311,40 @@ void main() {
     final result = await repository.stripFile(
       input.path,
       outputDirectory: outDir.path,
-      selectiveLabels: {'Author', 'Title'},
+      policy: StripPolicy.selective(
+        fieldIds: {
+          MetadataFieldId.pngText('Author'),
+          MetadataFieldId.pngText('Title'),
+        },
+      ),
     );
 
-    expect(datasource.capturedSelectiveLabels, {'Author', 'Title'});
+    expect(datasource.capturedPolicy?.selectedFieldIds, {
+      MetadataFieldId.pngText('Author'),
+      MetadataFieldId.pngText('Title'),
+    });
     expect(result.success, isTrue);
   });
 }
 
 class _CapturingDatasource extends MetadataRemoverDatasource {
-  Set<String>? capturedSelectiveLabels;
+  StripPolicy? capturedPolicy;
 
   @override
-  Future<File> stripMetadata(
+  Future<MetadataRemovalOutput> stripMetadataWithPolicy(
     String inputPath, {
-    String? outputDirectory,
-    Set<String>? selectiveLabels,
+    required String outputDirectory,
+    required StripPolicy policy,
   }) async {
-    capturedSelectiveLabels = selectiveLabels;
+    capturedPolicy = policy;
     final output = File(
-      '${outputDirectory!}${Platform.pathSeparator}copied.jpg',
+      '$outputDirectory${Platform.pathSeparator}copied.jpg',
     );
     await File(inputPath).copy(output.path);
-    return output;
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport(),
+    );
   }
 }
 
