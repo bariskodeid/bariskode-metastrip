@@ -56,7 +56,7 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
   required String extension,
 }) async {
   try {
-    final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+    final archive = decodeGuardedZip(bytes);
     final core = _findEntry(archive, 'docProps/core.xml');
     final app = _findEntry(archive, 'docProps/app.xml');
     if (core == null && app == null) {
@@ -74,7 +74,7 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
     if (core != null) {
       final content = decodeArchiveFileSafely(
         core,
-        maxBytes: AppConstants.maxZipEntryDecompressBytes,
+        maxBytes: maxPackageDescriptorSize,
       );
       if (content == null) return _invalidStatus();
       totalDecompressed += content.length;
@@ -86,7 +86,7 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
     if (app != null) {
       final content = decodeArchiveFileSafely(
         app,
-        maxBytes: AppConstants.maxZipEntryDecompressBytes,
+        maxBytes: maxPackageDescriptorSize,
       );
       if (content == null) return _invalidStatus();
       totalDecompressed += content.length;

@@ -26,6 +26,7 @@ dependencies:
   path: ^1.9.0
   mime: ^1.0.5
   archive: ^3.6.0
+  xml: ^6.5.0
 
   # Metadata — Images
   exif: ^3.3.0

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gap closure foundation (2026-08-08)
+
+- Added a shared declarative capability registry covering all 41 Viewer
+  extensions and preserving exactly the existing 18 Remover extensions.
+- Viewer and Remover support gates now query the shared registry; the legacy
+  extension classes remain compatibility facades.
+- Added bidirectional registry contracts for concrete Viewer extraction specs
+  and Remover routes, normalized extension lookup, and per-format removal
+  limits.
+- Selective capability remains limited to the existing PNG text and basic PDF
+  Info seams. Stable field IDs, strict policy plumbing, and selective UI remain
+  planned for the next gap-closure phase.
+
 ### Project status terminology
 
 - **Implemented-scope MVP:** usable and mostly complete for the registered Viewer extractors and 18 Remover extensions, with documented limitations such as best-effort PDF cleanup.
@@ -58,13 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ODF metadata, GIF comments, WebP EXIF/XMP
 - Limited selective parameters for PNG tEXt/iTXt (per keyword) and PDF DocInfo
   (per Info key, 9 keys incl. `Trapped`); the broader Selective, Anonymize, and
-  Preserve Technical modes are planned/unwired. Null/empty `selectiveLabels`
-  uses the current supported-cleanup behavior.
+  Preserve Technical modes are planned/unwired. Null requests full cleanup;
+  empty or unsupported selective requests fail closed.
 - PDF removal rewritten with a linear byte scanner (no regex backtracking)
-- Shared zip-entry path normalization (`normalizeEntryPath`): extractor viewer
-  and remover stripper use the same exact-or-suffix matching, so a docx/odt
-  with non-canonical entry paths (`a/docProps/core.xml`, `docProps//core.xml`,
-  `docProps\core.xml`) is consistently stripped instead of silently leaking
+- Shared zip-entry path normalization (`normalizeEntryPath`) rejects unsafe or
+  duplicate canonical paths. OOXML property cleanup follows root package
+  relationships instead of deleting arbitrary suffix matches.
 - Remover UI copy updated to advertise the 18-format remover registry
 
 #### Remaining
@@ -129,9 +141,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte scanner (no `(?:\\\.|[^)])*` overlap → no ReDoS on hostile backslash
   floods); 9 Info keys incl. `Trapped` blanked
 - Zip path consistency: shared `normalizeEntryPath` (collapse slashes, strip
-  `.` segments, `\` → `/`) used by extractor viewer and remover stripper
-  with exact-or-suffix matching; closes silent strip-failure for
-  `a/docProps/core.xml` / `docProps//core.xml` / `docProps\core.xml`
+  `.` segments, `\` → `/`) supports duplicate/traversal rejection and aligns
+  Viewer-visible OOXML property discovery with full-cleanup removal.
+
+### Remover Hardening Follow-up (2026-08-08)
+**Status:** Done in the current working tree; device/SAF smoke testing remains required.
+
+- Remover now has its own direct multi-file picker, filtered to the registered
+  remover extensions, rather than relying on Viewer handoff.
+- The remover-wide input cap is explicitly named and enforced as
+  `AppConstants.maxRemoverFileSizeBytes` (50 MiB / 50 MB); oversized files are
+  rejected when queued and checked again immediately before processing.
+- Pre-processing validation now checks the actual local path on disk (present
+  regular file, unchanged supported extension, and current size),
+  rather than trusting picker-time metadata.
+- Contract tests assert the exact 18-extension remover registry and that every
+  registered extension has a datasource route.
+- Integration-style tests exercise the real remover flow, verify clean-copy
+  output and original preservation, and verify malformed input produces no
+  output.
+- These tests are host-side verification only. Android device behavior,
+  including Storage Access Framework (SAF) picker/output smoke testing, still
+  needs to be exercised before claiming device validation or release readiness.
+
+### ZIP Package Security Hardening (2026-08-08)
+**Status:** Done; device stress testing remains required.
+
+- ZIP-family Viewer and Remover routes now perform raw EOCD/central-directory
+  preflight before `ZipDecoder`, rejecting ZIP64/multi-disk structures,
+  encryption, unsupported compression, symlinks, unsafe/duplicate paths,
+  malformed local ranges/descriptors, and excessive entry counts. Repack-only
+  payload policy is separate so Viewer can inspect bounded metadata without
+  decompressing unrelated large entries.
+- DEFLATE output is written through a bounded sink and accepted only after
+  exact-size and CRC checks, including understated-size bomb regression tests.
+- In-memory ZIP repacking is capped at 32 MiB total decompressed content to
+  reduce mobile memory-exhaustion risk until a streaming repacker is available.
+- OOXML cleanup validates a bounded semantic content-types manifest and accepts
+  the correct Transitional and Strict DOCX/XLSX/PPTX main-part types. Cleanup
+  removes the union of validated root-relationship targets and normalized
+  conventional Viewer-visible property paths, including suffix locations;
+  external, duplicate, ambiguous, or missing targets fail closed, and cleaned
+  output removes the corresponding relationships and content-type overrides.
+- ODF cleanup validates the physical first, stored `mimetype` entry and emits
+  cleaned output with that conformance preserved.
+- `xml` is now a direct dependency for bounded OOXML manifest parsing.
 
 ### Phase 5: Settings — Implemented-scope MVP Complete (2026-08-07)
 **Status:** Complete for exposed MVP controls; advanced storage/processing controls remain follow-up
@@ -149,9 +203,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Verification (2026-08-07, Phase 2 + hardening + path-normalization)
+## Verification (2026-08-08, Phase 0 + ZIP package hardening)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: **248 passed, 1 skipped**
+- `flutter test`: **304 passed, 1 skipped**
 - Test coverage: not measured in this verification run
 - Debug APK: build verified (`build\app\outputs\flutter-apk\app-debug.apk`); no
   device-install verification is claimed here.
@@ -164,7 +218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moving it to `shared/domain/` remains future cleanup.
 - Custom font declarations disabled; asset folders empty; runtime uses system fallbacks.
 - No background processing or notification support yet.
-- No crash reporting, signing, or obfuscation for release builds.
+- Release signing is environment-configured but has not been validated with
+  production credentials; crash reporting and obfuscation are not configured.
 
 ## Historical Baseline
 

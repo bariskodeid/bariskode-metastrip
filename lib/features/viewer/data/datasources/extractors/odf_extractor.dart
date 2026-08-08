@@ -37,7 +37,7 @@ const Set<String> _privacyLabels = {'Author', 'Initial Creator'};
 /// throws.
 Future<List<MetadataFieldEntity>> extractOdf(Uint8List bytes) async {
   try {
-    final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+    final archive = decodeGuardedZip(bytes);
     final meta = _findEntry(archive, 'meta.xml');
     if (meta == null) {
       return [
@@ -47,7 +47,7 @@ Future<List<MetadataFieldEntity>> extractOdf(Uint8List bytes) async {
 
     final content = decodeArchiveFileSafely(
       meta,
-      maxBytes: AppConstants.maxZipEntryDecompressBytes,
+      maxBytes: maxPackageDescriptorSize,
     );
     if (content == null) {
       return [

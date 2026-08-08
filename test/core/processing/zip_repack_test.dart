@@ -50,6 +50,66 @@ void main() {
     });
   });
 
+  group('preflightZip', () {
+    test('accepts oversized payload declarations for structural inspection',
+        () {
+      final large = ArchiveFile.string('large.bin', 'x')
+        ..size = maxRepackEntrySize + 1;
+      final archive = Archive()..addFile(large);
+      final bytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
+
+      expect(preflightZip(bytes), hasLength(1));
+    });
+
+    test('rejects encrypted entries before archive decoding', () {
+      final bytes = _zip({'a.txt': 'safe'});
+      _patchUint16(bytes, _centralOffset(bytes) + 8, 1);
+
+      expect(() => preflightZip(bytes), throwsFormatException);
+    });
+
+    test('rejects unsupported compression methods before decoding', () {
+      final bytes = _zip({'a.txt': 'safe'});
+      _patchUint16(bytes, _centralOffset(bytes) + 10, 12);
+
+      expect(() => preflightZip(bytes), throwsFormatException);
+    });
+
+    test('rejects Unix symbolic links before decoding', () {
+      final bytes = _zip({'link': 'target'});
+      final central = _centralOffset(bytes);
+      _patchUint16(bytes, central + 4, 3 << 8);
+      _patchUint32(bytes, central + 38, 0xa000 << 16);
+
+      expect(() => preflightZip(bytes), throwsFormatException);
+    });
+
+    test('bounded decoder aborts an understated deflate stream', () {
+      final bytes = _zip({'bomb.txt': 'A' * 1024 * 1024});
+      final central = _centralOffset(bytes);
+      _patchUint32(bytes, 22, 1);
+      _patchUint32(bytes, central + 24, 1);
+      final archive = decodeGuardedZip(bytes);
+
+      expect(
+        () => decodeZipEntrySafely(
+          archive.findFile('bomb.txt')!,
+          maxBytes: 1024,
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects canonically duplicate entry names', () {
+      final archive = Archive()
+        ..addFile(ArchiveFile.string('a/b.txt', 'first'))
+        ..addFile(ArchiveFile.string(r'a\b.txt', 'second'));
+      final bytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
+
+      expect(() => preflightZip(bytes), throwsFormatException);
+    });
+  });
+
   group('repackZipWithoutEntries', () {
     test('removes skipped entries and keeps the rest verbatim', () {
       final bytes = _zip({
@@ -80,6 +140,7 @@ void main() {
 
     test('removes a skipped entry stored at a non-root location', () {
       final bytes = _zip({
+        '[Content_Types].xml': _docxContentTypes,
         'a/docProps/core.xml': '<coreProperties/>',
         'word/document.xml': '<document/>',
       });
@@ -95,8 +156,9 @@ void main() {
       expect(names, isNot(contains('a/docProps/core.xml')));
     });
 
-    test('stripOpenXml removes a non-root docProps entry', () {
+    test('stripOpenXml removes a viewer-visible non-root docProps entry', () {
       final bytes = _zip({
+        '[Content_Types].xml': _docxContentTypes,
         'a/docProps/core.xml': '<coreProperties/>',
         'word/document.xml': '<document/>',
       });
@@ -107,7 +169,7 @@ void main() {
       expect(zipArchiveContainsEntry(result, 'word/document.xml'), isTrue);
     });
 
-    test('drops entries with path-traversal names', () {
+    test('rejects archives with path-traversal names', () {
       final bytes = _zip({
         '../evil.txt': 'pwned',
         'a/../escape.txt': 'pwned',
@@ -116,14 +178,9 @@ void main() {
         'safe.txt': 'ok',
       });
 
-      final result = repackZipWithoutEntries(bytes, skipPaths: const {});
-
-      final archive = ZipDecoder().decodeBytes(result, verify: false);
-      final names = archive.files.map((f) => f.name).toList();
-      expect(names, ['safe.txt']);
       expect(
-        String.fromCharCodes(archive.findFile('safe.txt')!.content as List<int>),
-        'ok',
+        () => repackZipWithoutEntries(bytes, skipPaths: const {}),
+        throwsFormatException,
       );
     });
 
@@ -134,9 +191,9 @@ void main() {
         ..addFile(
           ArchiveFile('big.bin', 0, Uint8List.fromList([1, 2, 3])),
         );
-      // Declared uncompressed size above the 256MB cap; the actual content
+      // Declared uncompressed size above the 32MB cap; the actual content
       // stays tiny, so decoding the fixture itself is cheap.
-      archive.files.last.size = 300 * 1024 * 1024;
+      archive.files.last.size = maxRepackTotalSize + 1;
       final bytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
 
       expect(
@@ -170,17 +227,15 @@ void main() {
       );
     });
 
-    test('rejects an entry whose declared size exceeds the per-entry cap',
-        () {
+    test('rejects an entry whose declared size exceeds the per-entry cap', () {
       final archive = Archive()
         ..addFile(ArchiveFile.string('a.txt', 'small'))
         ..addFile(
           ArchiveFile('big.bin', 0, Uint8List.fromList([1, 2, 3])),
         );
-      // Declared size above the 64MB per-entry cap but below the 256MB total
-      // cap, so only the per-entry guard can catch it. The real content stays
-      // tiny so the fixture itself is cheap to encode/decode.
-      archive.files.last.size = 70 * 1024 * 1024;
+      // Declared size above the repack entry cap. The real content stays tiny
+      // so the fixture itself is cheap to encode/decode.
+      archive.files.last.size = maxRepackEntrySize + 1;
       final bytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
 
       expect(
@@ -196,12 +251,11 @@ void main() {
     });
 
     test('throws FormatException when an entry decompresses past the cap', () {
-      // A real payload larger than the 64MB per-entry cap. The declared size
+      // A real payload larger than the 32MB repack cap. The declared size
       // is accurate, so both the declared pre-check and the decompressed
       // content check would reject it.
-      final bigContent = Uint8List(70 * 1024 * 1024);
-      final archive = Archive()
-        ..addFile(ArchiveFile('big.bin', 0, bigContent));
+      final bigContent = Uint8List(maxRepackEntrySize + 1);
+      final archive = Archive()..addFile(ArchiveFile('big.bin', 0, bigContent));
       final bytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
 
       expect(
@@ -252,4 +306,30 @@ Uint8List _zip(Map<String, String> files) {
     archive.addFile(ArchiveFile.string(name, content));
   }
   return Uint8List.fromList(ZipEncoder().encode(archive)!);
+}
+
+const _docxContentTypes =
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Override PartName="/word/document.xml" '
+    'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    '</Types>';
+
+int _centralOffset(Uint8List bytes) {
+  for (var i = 0; i <= bytes.length - 4; i++) {
+    if (bytes[i] == 0x50 &&
+        bytes[i + 1] == 0x4b &&
+        bytes[i + 2] == 0x01 &&
+        bytes[i + 3] == 0x02) {
+      return i;
+    }
+  }
+  throw StateError('Central directory not found');
+}
+
+void _patchUint16(Uint8List bytes, int offset, int value) {
+  ByteData.sublistView(bytes).setUint16(offset, value, Endian.little);
+}
+
+void _patchUint32(Uint8List bytes, int offset, int value) {
+  ByteData.sublistView(bytes).setUint32(offset, value, Endian.little);
 }

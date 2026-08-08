@@ -37,7 +37,7 @@ void main() {
     final input = File('${dir.path}${Platform.pathSeparator}report.docx');
     await input.writeAsBytes(
       _officeZip({
-        '[Content_Types].xml': '<Types/>',
+        '[Content_Types].xml': _docxContentTypes,
         'docProps/core.xml': '<coreProperties/>',
         'word/document.xml': '<w:document/>',
       }),
@@ -178,6 +178,12 @@ Uint8List _officeZip(Map<String, String> files) {
   }
   return Uint8List.fromList(ZipEncoder().encode(archive)!);
 }
+
+const _docxContentTypes =
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Override PartName="/word/document.xml" '
+    'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    '</Types>';
 
 Uint8List _flacFile({
   required List<List<int>> blocks,

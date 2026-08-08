@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/processing/isolate_runner.dart';
+import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/gif_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/id3_stripper.dart';
@@ -16,6 +17,22 @@ import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 import 'package:saf/saf.dart';
 
+enum _RemovalRoute {
+  jpeg,
+  png,
+  pdf,
+  mp3,
+  flac,
+  ogg,
+  opus,
+  wav,
+  aiff,
+  openXml,
+  odf,
+  gif,
+  webp,
+}
+
 class MetadataRemoverDatasource {
   MetadataRemoverDatasource({
     Future<void> Function(File claim)? claimCleanup,
@@ -23,54 +40,114 @@ class MetadataRemoverDatasource {
 
   final Future<void> Function(File claim) _claimCleanup;
 
+  /// Returns whether this datasource has a remover route for [extension].
+  static bool supportsExtension(String extension) {
+    final normalized = FormatRegistry.normalizeExtension(extension);
+    return FormatRegistry.standard.supportsRemoval(normalized) &&
+        _routes.containsKey(normalized);
+  }
+
+  /// Concrete routes used by [stripMetadata].
+  static const Map<String, _RemovalRoute> _routes = {
+    'jpg': _RemovalRoute.jpeg,
+    'jpeg': _RemovalRoute.jpeg,
+    'png': _RemovalRoute.png,
+    'pdf': _RemovalRoute.pdf,
+    'mp3': _RemovalRoute.mp3,
+    'flac': _RemovalRoute.flac,
+    'ogg': _RemovalRoute.ogg,
+    'opus': _RemovalRoute.opus,
+    'wav': _RemovalRoute.wav,
+    'aiff': _RemovalRoute.aiff,
+    'docx': _RemovalRoute.openXml,
+    'xlsx': _RemovalRoute.openXml,
+    'pptx': _RemovalRoute.openXml,
+    'odt': _RemovalRoute.odf,
+    'ods': _RemovalRoute.odf,
+    'odp': _RemovalRoute.odf,
+    'gif': _RemovalRoute.gif,
+    'webp': _RemovalRoute.webp,
+  };
+
+  static Set<String> get handlerExtensions => Set.unmodifiable(_routes.keys);
+
+  static List<String> get handlerConsistencyIssues =>
+      FormatRegistry.standard.handlerMapConsistencyIssues(
+        removalHandlerExtensions: _routes.keys,
+      );
+
   /// Strips metadata from [inputPath] into the configured output folder.
   ///
-  /// [selectiveLabels] (extractor `label` values) requests field-level
-  /// stripping: only the matching fields are removed for formats that support
-  /// it (PNG text chunks and PDF Info keys). Formats without granular support
-  /// always perform a full strip, ignoring the labels. Null or empty labels
-  /// keep the current full-strip behavior everywhere.
+  /// A null [selectiveLabels] value requests full removal. A non-empty set
+  /// requests field-level removal and is accepted only for formats that support
+  /// it (PNG text chunks and PDF Info keys). Empty sets, unsupported formats,
+  /// and unknown field labels are rejected.
   Future<File> stripMetadata(
     String inputPath, {
     String? outputDirectory,
     Set<String>? selectiveLabels,
   }) async {
-    final ext = p.extension(inputPath).toLowerCase().replaceFirst('.', '');
-    return switch (ext) {
-      'jpg' || 'jpeg' => stripJpegMetadata(
+    final ext = FormatRegistry.normalizeExtension(p.extension(inputPath));
+    final route = _routes[ext];
+    if (!FormatRegistry.standard.supportsRemoval(ext) || route == null) {
+      throw FileSystemException('Unsupported remover format: $ext');
+    }
+    if (selectiveLabels != null && selectiveLabels.isEmpty) {
+      throw const FormatException('No metadata fields selected');
+    }
+    if (selectiveLabels != null &&
+        !FormatRegistry.standard.lookup(ext)!.supportsSelectiveRemoval) {
+      throw const FormatException(
+        'Selective cleanup is unavailable for this format',
+      );
+    }
+    if (route == _RemovalRoute.pdf &&
+        selectiveLabels != null &&
+        selectiveLabels.isNotEmpty &&
+        !selectiveLabels.every(_pdfInfoKeys.contains)) {
+      throw const FormatException('Unsupported selective metadata field');
+    }
+    return switch (route) {
+      _RemovalRoute.jpeg => stripJpegMetadata(
           inputPath,
           outputDirectory: outputDirectory,
         ),
-      'png' => stripPngMetadata(
+      _RemovalRoute.png => stripPngMetadata(
           inputPath,
           outputDirectory: outputDirectory,
           selectiveLabels: selectiveLabels,
         ),
-      'pdf' => stripPdfMetadata(
+      _RemovalRoute.pdf => stripPdfMetadata(
           inputPath,
           outputDirectory: outputDirectory,
           selectiveLabels: selectiveLabels,
         ),
-      'mp3' => stripMp3Metadata(inputPath, outputDirectory: outputDirectory),
-      'flac' => stripFlacMetadata(inputPath, outputDirectory: outputDirectory),
-      'ogg' => stripOggMetadata(inputPath, outputDirectory: outputDirectory),
-      'opus' => stripOpusMetadata(inputPath, outputDirectory: outputDirectory),
-      'wav' => stripWavMetadata(inputPath, outputDirectory: outputDirectory),
-      'aiff' || 'aif' => stripAiffMetadata(
+      _RemovalRoute.mp3 =>
+        stripMp3Metadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.flac =>
+        stripFlacMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.ogg =>
+        stripOggMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.opus =>
+        stripOpusMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.wav =>
+        stripWavMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.aiff => stripAiffMetadata(
           inputPath,
           outputDirectory: outputDirectory,
         ),
-      'docx' || 'xlsx' || 'pptx' => stripOpenXmlMetadata(
+      _RemovalRoute.openXml => stripOpenXmlMetadata(
           inputPath,
           outputDirectory: outputDirectory,
         ),
-      'odt' || 'ods' || 'odp' => stripOdfMetadata(
+      _RemovalRoute.odf => stripOdfMetadata(
           inputPath,
           outputDirectory: outputDirectory,
         ),
-      'gif' => stripGifMetadata(inputPath, outputDirectory: outputDirectory),
-      'webp' => stripWebpMetadata(inputPath, outputDirectory: outputDirectory),
-      _ => throw FileSystemException('Unsupported remover format: $ext'),
+      _RemovalRoute.gif =>
+        stripGifMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.webp =>
+        stripWebpMetadata(inputPath, outputDirectory: outputDirectory),
     };
   }
 
@@ -83,7 +160,7 @@ class MetadataRemoverDatasource {
     if (stat.type != FileSystemEntityType.file) {
       throw const FileSystemException('Input is not a file');
     }
-    if (stat.size > AppConstants.maxJpegRemovalSizeBytes) {
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
       throw const FileSystemException('JPEG too large for remover MVP');
     }
 
@@ -94,9 +171,9 @@ class MetadataRemoverDatasource {
 
   /// Writes a PNG clean copy, removing text metadata chunks.
   ///
-  /// A null or empty [selectiveLabels] keeps the current full-strip behavior:
+  /// A null [selectiveLabels] keeps the current full-strip behavior:
   /// tEXt/zTXt/iTXt text chunks plus the eXIf and tIME chunks are removed.
-  /// When [selectiveLabels] is non-empty only text chunks whose keyword
+  /// When [selectiveLabels] is provided, only text chunks whose keyword
   /// matches a label are removed; every other chunk (image data plus any
   /// unselected metadata, including eXIf and tIME) is preserved. Labels use
   /// the PNG text keyword produced by the viewer's extractor.
@@ -110,7 +187,7 @@ class MetadataRemoverDatasource {
     if (stat.type != FileSystemEntityType.file) {
       throw const FileSystemException('Input is not a file');
     }
-    if (stat.size > AppConstants.maxJpegRemovalSizeBytes) {
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
       throw const FileSystemException('PNG too large for remover MVP');
     }
 
@@ -123,8 +200,8 @@ class MetadataRemoverDatasource {
 
   /// Writes a clean PDF copy, blanking document Info values.
   ///
-  /// A null or empty [selectiveLabels] blanks all nine Info keys as before.
-  /// When [selectiveLabels] is non-empty only the keys present in the set are
+  /// A null [selectiveLabels] blanks all nine Info keys as before. When
+  /// [selectiveLabels] is provided, only the keys present in the set are
   /// blanked; the other Info entries keep their values. Labels use the PDF
   /// Info key names produced by the extractor (for example `Title`).
   Future<File> stripPdfMetadata(
@@ -137,7 +214,7 @@ class MetadataRemoverDatasource {
     if (stat.type != FileSystemEntityType.file) {
       throw const FileSystemException('Input is not a file');
     }
-    if (stat.size > AppConstants.maxJpegRemovalSizeBytes) {
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
       throw const FileSystemException('PDF too large for remover MVP');
     }
 
@@ -225,7 +302,10 @@ class MetadataRemoverDatasource {
     String? outputDirectory,
   }) {
     return _stripWithBytes(
-      stripOpenXml,
+      (bytes) => stripOpenXml(
+        bytes,
+        extension: FormatRegistry.normalizeExtension(p.extension(inputPath)),
+      ),
       inputPath,
       'Office document too large for remover MVP',
       outputDirectory: outputDirectory,
@@ -237,7 +317,10 @@ class MetadataRemoverDatasource {
     String? outputDirectory,
   }) {
     return _stripWithBytes(
-      stripOdf,
+      (bytes) => stripOdf(
+        bytes,
+        extension: FormatRegistry.normalizeExtension(p.extension(inputPath)),
+      ),
       inputPath,
       'ODF document too large for remover MVP',
       outputDirectory: outputDirectory,
@@ -271,10 +354,9 @@ class MetadataRemoverDatasource {
   /// Shared pipeline for the newer strip*Metadata methods: stat + size cap +
   /// worker scrub + clean-copy install. Same behavior as [stripPdfMetadata].
   ///
-  /// [selectiveLabels] is accepted for signature consistency but is ignored:
-  /// formats routed through this helper have no granular fields yet, so any
-  /// request still lands on the full-strip fallback (safe default for a
-  /// privacy tool).
+  /// [selectiveLabels] is accepted for signature consistency. The public
+  /// facade rejects selective requests before formats routed through this
+  /// helper can reach it.
   Future<File> _stripWithBytes(
     Uint8List Function(Uint8List) stripper,
     String inputPath,
@@ -290,7 +372,7 @@ class MetadataRemoverDatasource {
     if (stat.type != FileSystemEntityType.file) {
       throw const FileSystemException('Input is not a file');
     }
-    if (stat.size > AppConstants.maxJpegRemovalSizeBytes) {
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
       throw FileSystemException(errorMessage);
     }
 
@@ -504,6 +586,7 @@ Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
     }
   }
   final isSelective = selectiveLabels != null && selectiveLabels.isNotEmpty;
+  final removedLabels = <String>{};
   final output = BytesBuilder(copy: false)..add(signature);
   var offset = 8;
   while (true) {
@@ -531,14 +614,18 @@ Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
     if (type == 'IEND' && length != 0) {
       throw const FormatException('Invalid PNG IEND chunk');
     }
-    final shouldKeep = isSelective
-        ? !_matchesSelectivePngText(
+    final matchedLabel = isSelective
+        ? _matchingSelectivePngLabel(
             type,
             bytes,
             offset + 8,
             chunkEnd - 4,
             selectiveLabels,
           )
+        : null;
+    if (matchedLabel != null) removedLabels.add(matchedLabel);
+    final shouldKeep = isSelective
+        ? matchedLabel == null
         // Full strip drops text chunks, EXIF, and the last-modified
         // timestamp (tIME leaks edit history; pHYs carry pixel dimensions).
         : !{'tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME'}.contains(type);
@@ -546,7 +633,12 @@ Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
       output.add(bytes.sublist(offset, chunkEnd));
     }
     offset = chunkEnd;
-    if (type == 'IEND') return output.toBytes();
+    if (type == 'IEND') {
+      if (isSelective && !removedLabels.containsAll(selectiveLabels)) {
+        throw const FormatException('Unsupported selective metadata field');
+      }
+      return output.toBytes();
+    }
   }
 }
 
@@ -556,21 +648,21 @@ Uint8List _stripPngBytes(Uint8List bytes, {Set<String>? selectiveLabels}) {
 /// Non-text chunks never match: in selective mode eXIf/tIME are preserved
 /// unless the label set names one (the extractor never does today; it only
 /// outputs text keyword labels).
-bool _matchesSelectivePngText(
+String? _matchingSelectivePngLabel(
   String type,
   Uint8List bytes,
   int dataStart,
   int dataEnd,
   Set<String> selectiveLabels,
 ) {
-  if (type != 'tEXt' && type != 'zTXt' && type != 'iTXt') return false;
+  if (type != 'tEXt' && type != 'zTXt' && type != 'iTXt') return null;
   var separator = dataStart;
   while (separator < dataEnd && bytes[separator] != 0) {
     separator++;
   }
-  if (separator == dataStart || separator == dataEnd) return false;
+  if (separator == dataStart || separator == dataEnd) return null;
   final label = String.fromCharCodes(bytes.sublist(dataStart, separator));
-  return selectiveLabels.contains(label);
+  return selectiveLabels.contains(label) ? label : null;
 }
 
 int _pngCrc32(Uint8List bytes, int start, int end) {
@@ -586,8 +678,8 @@ int _pngCrc32(Uint8List bytes, int start, int end) {
 
 /// Blanks PDF document Info values in [bytes] with same-length spaces.
 ///
-/// With a null or empty [selectiveLabels] all nine known Info keys are
-/// blanked (full strip). With a non-empty [selectiveLabels] only the keys
+/// With a null [selectiveLabels] all nine known Info keys are blanked (full
+/// strip). With a non-empty [selectiveLabels] only the keys
 /// present in the set are blanked; unselected Info entries keep their
 /// original values. Labels use the PDF Info key names surfaced by the
 /// extractor (for example `Title`, `Author`, or `Trapped`).
@@ -706,8 +798,8 @@ bool _isPdfWhitespace(int unit) {
 /// `/TitleFoo` is then skipped instead of being treated as `/Title` followed
 /// by a bare value.
 bool _isPdfNameChar(int unit) {
-  final isLetter = (unit >= 0x41 && unit <= 0x5A) ||
-      (unit >= 0x61 && unit <= 0x7A);
+  final isLetter =
+      (unit >= 0x41 && unit <= 0x5A) || (unit >= 0x61 && unit <= 0x7A);
   final isDigit = unit >= 0x30 && unit <= 0x39;
   return isLetter ||
       isDigit ||

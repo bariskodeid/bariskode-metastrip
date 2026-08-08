@@ -124,7 +124,8 @@ void main() {
       expect(fields.single.value, 'Invalid office document');
     });
 
-    test('returns a status field when a docProps entry declares an oversized size',
+    test(
+        'returns a status field when a docProps entry declares an oversized size',
         () async {
       final archive = Archive()
         ..addFile(
@@ -145,6 +146,25 @@ void main() {
       expect(fields.single.section, 'Office Document');
       expect(fields.single.label, 'Status');
       expect(fields.single.value, 'Invalid office document');
+    });
+
+    test('reads small properties despite an unrelated oversized entry',
+        () async {
+      final large = ArchiveFile.string('word/media/large.bin', 'x')
+        ..size = 70 * 1024 * 1024;
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'docProps/core.xml',
+          '<cp:coreProperties xmlns:cp="core" xmlns:dc="dc">'
+              '<dc:creator>Jane Doe</dc:creator>'
+              '</cp:coreProperties>',
+        ),
+        large,
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+      final byLabel = {for (final field in fields) field.label: field};
+      expect(byLabel['Author']?.value, 'Jane Doe');
     });
   });
 }

@@ -61,7 +61,7 @@ void main() {
       expect(fields.single.value, 'Invalid archive');
     });
 
-    test('reports an oversized declared APK manifest without decompressing it',
+    test('rejects an oversized declared APK manifest before decompression',
         () async {
       final manifest = ArchiveFile.string(
         'AndroidManifest.xml',
@@ -70,11 +70,26 @@ void main() {
       final bytes = _zipBytes([manifest]);
 
       final fields = await extractZip(bytes, extension: 'apk');
-      final byLabel = {for (final field in fields) field.label: field};
+      final status = fields.where((field) => field.label == 'Status').single;
+      expect(status.section, 'APK Manifest');
+      expect(status.value, 'Manifest is too large to read safely');
+    });
 
-      expect(byLabel['Entries']?.value, '1');
-      expect(byLabel.containsKey('Package Name'), isFalse);
-      expect(byLabel['Status']?.value, 'Manifest is too large to read safely');
+    test('reads a small manifest despite an unrelated oversized entry',
+        () async {
+      final large = ArchiveFile.string('assets/large.bin', 'x')
+        ..size = 70 * 1024 * 1024;
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'AndroidManifest.xml',
+          '<manifest package="com.example.safe"></manifest>',
+        ),
+        large,
+      ]);
+
+      final fields = await extractZip(bytes, extension: 'apk');
+      final byLabel = {for (final field in fields) field.label: field};
+      expect(byLabel['Package Name']?.value, 'com.example.safe');
     });
   });
 }

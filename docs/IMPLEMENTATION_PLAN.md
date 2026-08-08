@@ -304,7 +304,7 @@ Done:
 - [x] **Phase 4 Remover UI (2026-08-06): RemoverBloc with sequential processing, cancel, queue cap. ProcessingScreen with live progress + cancel. ResultScreen with stats grid. Security hardening: JPEG preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM + EOI truncation; PNG drops text chunks + tIME + eXIf; PDF DocInfo blanking. Error sanitization. SAF output writing. Android package fix.**
 - [x] **Phase 5 Settings (2026-08-07): app-level SettingsCubit persistence, 7 preset themes plus custom 16-token theme builder with live application, output-folder configuration synchronized with onboarding, cache status/action, portable JSON export/import, two-step reset back to onboarding, About, and Licenses.**
 - [x] **Phase 2 implemented-scope MVP complete (2026-08-07): registered image/audio/document/archive extractors, an 18-extension remover registry, SHA-256 computation, supported extension allowlist, and MIME lookup. Video, HEIC/HEIF, archive removal, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
-- [x] Verification: `flutter analyze` clean; `flutter test` **248 passed, 1 skipped**; debug APK build verified. Test coverage was not measured in this verification.
+- [x] Verification: `flutter analyze` clean; `flutter test` **304 passed, 1 skipped**; debug APK build verified. Test coverage was not measured in this verification.
 
 Still pending:
 - [ ] Dev/prod flavors (the remaining Phase 0 roadmap task) when separate environments are actually needed.
@@ -317,7 +317,7 @@ Still pending:
 - [ ] Phase 3 remaining: thumbnails, thumbnail cache, share intent receiver, GPS map preview, per-field selective mark in UI, share metadata.
 - [ ] Phase 5 follow-up: expose and wire naming template, folder structure, keep-original, JPEG quality, concurrency, and auto-confirm controls. These fields are persisted/imported but intentionally absent from the current UI and processing pipeline.
 - [ ] Phase 5 follow-up: implement real cache deletion when thumbnail/temp caches are introduced; current action reports 0 bytes.
-- [ ] Phase 6: E2E tests, accessibility audit, performance profiling, dark theme consistency, crash reporting, release signing/obfuscation.
+- [ ] Phase 6: E2E tests, accessibility audit, performance profiling, dark theme consistency, crash reporting, signed release-build validation with production credentials, and obfuscation.
 - [ ] Move `FileItemEntity` to `shared/domain/` to remove remover→viewer cross-feature coupling.
 
 ### Phase 0: Project Setup (1 minggu)
@@ -405,7 +405,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | ODT/ODS/ODP remover | Repack ZIP without `meta.xml` | ✅ |
 | Fixed output naming | `_clean` suffix with collision auto-increment | ✅ |
 | Configurable naming templates | Persisted setting exists; template processing is not wired to output naming | ❌ follow-up |
-| Limited selector plumbing | PNG per keyword + PDF per Info key via `stripFile(..., selectiveLabels:)`; null/empty uses supported-cleanup behavior | ✅ plumbing only; general Selective mode UI unavailable |
+| Limited selector plumbing | PNG per keyword + PDF per Info key via `stripFile(..., selectiveLabels:)`; null requests full cleanup and empty/unsupported requests fail closed | ✅ plumbing only; general Selective mode UI unavailable |
 | Background isolate | `runOnWorker` for stripper byte ops | ✅ |
 | Progress reporting | Per-file progress emitted by `RemoverBloc`; worker isolate returns one result per file | ✅ |
 | Error handling | Per-file failures and partial-batch continuation; automatic retry is not implemented | ✅ limited |
@@ -496,7 +496,7 @@ Foundation hardening also validates the output folder before use and safely rese
 
 | Task | Detail | Status |
 |------|--------|--------|
-| Unit tests — all BLoCs | Planned coverage target; coverage not measured | 248 passed, 1 skipped (current verification baseline) |
+| Unit tests — all BLoCs | Planned coverage target; coverage not measured | 304 passed, 1 skipped (current verification baseline) |
 | Widget tests — key screens | Viewer, Remover, Detail | Partial |
 | Integration tests | Full flow end-to-end | ❌ |
 | Performance profiling | Memory, CPU, frame drops | ❌ |
@@ -509,7 +509,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Android 14 compatibility | Scoped storage, granular media permissions | ❌ |
 | iOS testing | Permission flow, file access | ❌ |
 | Crash reporting setup | (Sentry atau Firebase Crashlytics) | ❌ |
-| Build & release prep | `flutter build apk --release`, signing, obfuscation | ❌ |
+| Build & release prep | Signing is environment-configured; validate a production-signed `flutter build apk --release` and add obfuscation | ❌ |
 
 ---
 
@@ -1199,7 +1199,7 @@ test/
 
 ### 6.2 Coverage Status
 Coverage was not measured in the current verification run. The authoritative
-test result is **248 passed, 1 skipped**; no percentage threshold is claimed.
+test result is **304 passed, 1 skipped**; no percentage threshold is claimed.
 
 ### 6.3 Integration Tests (e2e)
 ```dart

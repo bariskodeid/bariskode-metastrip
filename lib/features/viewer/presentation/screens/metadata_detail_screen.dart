@@ -8,10 +8,20 @@ import 'package:metastrip/features/viewer/domain/entities/metadata_entity.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
 import 'package:metastrip/features/viewer/presentation/widgets/extension_badge.dart';
 
+typedef MetadataLoader = Future<MetadataEntity> Function(
+  FileItemEntity file, {
+  required bool computeHash,
+});
+
 class MetadataDetailScreen extends StatefulWidget {
-  const MetadataDetailScreen({required this.file, super.key});
+  const MetadataDetailScreen({
+    required this.file,
+    this.metadataLoader,
+    super.key,
+  });
 
   final FileItemEntity file;
+  final MetadataLoader? metadataLoader;
 
   @override
   State<MetadataDetailScreen> createState() => _MetadataDetailScreenState();
@@ -28,6 +38,14 @@ class _MetadataDetailScreenState extends State<MetadataDetailScreen> {
   }
 
   Future<MetadataEntity> _extractMetadata() {
+    final metadataLoader = widget.metadataLoader;
+    if (metadataLoader != null) {
+      return metadataLoader(
+        widget.file,
+        computeHash: _computeHash,
+      );
+    }
+
     return MetadataExtractorDatasource().extractBasic(
       widget.file,
       computeHash: _computeHash,

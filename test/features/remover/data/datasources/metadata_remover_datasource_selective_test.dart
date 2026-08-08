@@ -51,6 +51,7 @@ void main() {
       ..._pngChunk('IHDR', List<int>.filled(13, 0)),
       ..._pngChunk('zTXt',
           [0x43, 0x6F, 0x6D, 0x6D, 0x65, 0x6E, 0x74, 0x00]), // 'Comment\0'
+      ..._pngChunk('tEXt', 'Author\u0000Alice'.codeUnits),
       ..._pngChunk('IDAT', [1, 2, 3]),
       ..._pngChunk('IEND', const []),
     ]);
@@ -66,8 +67,7 @@ void main() {
     expect(text, contains('zTXt'));
   });
 
-  test('stripPngMetadata with empty selective labels falls back to full strip',
-      () async {
+  test('stripMetadata rejects an empty selective field set', () async {
     final dir = await Directory.systemTemp.createTemp('remap_png_full_sel_');
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}image.png');
@@ -82,20 +82,44 @@ void main() {
       ..._pngChunk('IEND', const []),
     ]);
 
-    final output = await MetadataRemoverDatasource().stripPngMetadata(
-      input.path,
-      outputDirectory: dir.path,
-      selectiveLabels: const <String>{},
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: const <String>{},
+      ),
+      throwsFormatException,
     );
-    final text = String.fromCharCodes(await output.readAsBytes());
+  });
 
-    expect(text, isNot(contains('Author')));
-    expect(text, isNot(contains('Title')));
-    expect(text, isNot(contains('eXIf')));
-    expect(text, isNot(contains('tIME')));
-    expect(text, contains('IHDR'));
-    expect(text, contains('IDAT'));
-    expect(text, contains('IEND'));
+  test('stripPngMetadata rejects a selective label not present in the file',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_png_missing_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}input.png');
+    await input.writeAsBytes([
+      137,
+      80,
+      78,
+      71,
+      13,
+      10,
+      26,
+      10,
+      ..._pngChunk('IHDR', List<int>.filled(13, 0)),
+      ..._pngChunk('tEXt', 'Title\u0000Example'.codeUnits),
+      ..._pngChunk('IDAT', [1, 2, 3]),
+      ..._pngChunk('IEND', const []),
+    ]);
+
+    expect(
+      () => MetadataRemoverDatasource().stripPngMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: {'Author'},
+      ),
+      throwsFormatException,
+    );
   });
 
   test('stripPdfMetadata selective labels blank only the selected Info key',
@@ -120,8 +144,7 @@ void main() {
     expect(text, contains('Author (Jane Doe)'));
   });
 
-  test('stripPdfMetadata with empty selective labels blanks every key',
-      () async {
+  test('stripMetadata rejects empty selective labels for PDF', () async {
     final dir = await Directory.systemTemp.createTemp('remap_pdf_full_');
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
@@ -130,19 +153,18 @@ void main() {
       'endobj\n%%EOF',
     );
 
-    final output = await MetadataRemoverDatasource().stripPdfMetadata(
-      input.path,
-      outputDirectory: dir.path,
-      selectiveLabels: const <String>{},
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: const <String>{},
+      ),
+      throwsFormatException,
     );
-    final text = await output.readAsString();
-
-    expect(text, contains('/Title (             )'));
-    expect(text, isNot(contains('Secret Report')));
-    expect(text, isNot(contains('Jane Doe')));
   });
 
-  test('stripPdfMetadata survives an unterminated literal with many '
+  test(
+      'stripPdfMetadata survives an unterminated literal with many '
       'backslashes (ReDoS regression)', () async {
     final dir = await Directory.systemTemp.createTemp('metastrip_pdf_redos_');
     addTearDown(() => dir.delete(recursive: true));
@@ -235,32 +257,42 @@ void main() {
     expect(text, isNot(contains('68656C6C6F')));
   });
 
-  test('stripMetadata ignores labels for unsupported docx (full strip)',
-      () async {
+  test('stripMetadata rejects selective labels for unsupported docx', () async {
     final dir = await Directory.systemTemp.createTemp('remap_docx_selective_');
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}report.docx');
     await input.writeAsBytes(
       _officeZip({
-        '[Content_Types].xml': '<Types/>',
+        '[Content_Types].xml': _docxContentTypes,
         'docProps/core.xml': '<coreProperties/>',
         'word/document.xml': '<w:document/>',
       }),
     );
 
-    final output = await MetadataRemoverDatasource().stripMetadata(
-      input.path,
-      outputDirectory: dir.path,
-      selectiveLabels: {'Author'},
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: {'Author'},
+      ),
+      throwsFormatException,
     );
-    final archive = ZipDecoder().decodeBytes(
-      await output.readAsBytes(),
-      verify: false,
-    );
-    final names = archive.files.map((file) => file.name).toSet();
+  });
 
-    expect(names, contains('word/document.xml'));
-    expect(names, isNot(contains('docProps/core.xml')));
+  test('stripMetadata rejects unsupported selective PDF labels', () async {
+    final dir = await Directory.systemTemp.createTemp('pdf_unknown_field_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}report.pdf');
+    await input.writeAsString('%PDF-1.4\n/Title (Keep)\n%%EOF');
+
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: {'GPS'},
+      ),
+      throwsFormatException,
+    );
   });
 
   test('remover_repository_impl passes selective labels through', () async {
@@ -309,6 +341,12 @@ Uint8List _officeZip(Map<String, String> files) {
   }
   return Uint8List.fromList(ZipEncoder().encode(archive)!);
 }
+
+const _docxContentTypes =
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Override PartName="/word/document.xml" '
+    'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    '</Types>';
 
 List<int> _pngChunk(String type, List<int> data) {
   final length = ByteData(4)..setUint32(0, data.length);

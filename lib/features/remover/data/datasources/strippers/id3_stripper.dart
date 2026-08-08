@@ -73,9 +73,8 @@ int _id3v2TagEnd(Uint8List bytes) {
 /// of [bytes], or -1 when absent.
 int _findApev2Start(Uint8List bytes) {
   if (bytes.length < _apev2Signature.length) return -1;
-  final scanStart = bytes.length > _apev2ScanLength
-      ? bytes.length - _apev2ScanLength
-      : 0;
+  final scanStart =
+      bytes.length > _apev2ScanLength ? bytes.length - _apev2ScanLength : 0;
   final lastMatchStart = bytes.length - _apev2Signature.length;
   for (var offset = scanStart; offset <= lastMatchStart; offset++) {
     if (_startsWith(bytes, _apev2Signature, start: offset)) {

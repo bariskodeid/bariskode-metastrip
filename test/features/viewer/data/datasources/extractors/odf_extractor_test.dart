@@ -68,6 +68,24 @@ void main() {
       expect(fields.single.label, 'Status');
       expect(fields.single.value, 'Invalid ODF document');
     });
+
+    test('reads small metadata despite an unrelated oversized entry', () async {
+      final large = ArchiveFile.string('Pictures/large.bin', 'x')
+        ..size = 70 * 1024 * 1024;
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'meta.xml',
+          '<office:document-meta xmlns:office="office" xmlns:dc="dc">'
+              '<dc:title>Safe title</dc:title>'
+              '</office:document-meta>',
+        ),
+        large,
+      ]);
+
+      final fields = await extractOdf(bytes);
+      final byLabel = {for (final field in fields) field.label: field};
+      expect(byLabel['Title']?.value, 'Safe title');
+    });
   });
 }
 

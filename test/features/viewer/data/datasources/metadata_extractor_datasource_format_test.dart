@@ -29,8 +29,7 @@ void main() {
       expect(title.value, 'My Song');
     });
 
-    test('reads only a bounded prefix plus tail for large mp3 files',
-        () async {
+    test('reads only a bounded prefix plus tail for large mp3 files', () async {
       final id3v1 = List<int>.filled(128, 0);
       id3v1.setRange(0, 3, 'TAG'.codeUnits);
       id3v1.setRange(3, 3 + 10, latin1.encode('Tail Title'));
@@ -95,12 +94,12 @@ void main() {
           ArchiveFile.string(
             'docProps/core.xml',
             '<?xml version="1.0" encoding="UTF-8"?>'
-            '<cp:coreProperties '
-            'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata'
-            '/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">'
-            '<dc:title>Quarterly Report</dc:title>'
-            '<dc:creator>Ada Lovelace</dc:creator>'
-            '</cp:coreProperties>',
+                '<cp:coreProperties '
+                'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata'
+                '/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">'
+                '<dc:title>Quarterly Report</dc:title>'
+                '<dc:creator>Ada Lovelace</dc:creator>'
+                '</cp:coreProperties>',
           ),
         ]),
       );
@@ -108,8 +107,7 @@ void main() {
       final metadata = await _extract(file, 'docx');
 
       final title = metadata.fields.singleWhere(
-        (field) =>
-            field.section == 'Office Document' && field.label == 'Title',
+        (field) => field.section == 'Office Document' && field.label == 'Title',
       );
       expect(title.value, 'Quarterly Report');
       final author = metadata.fields.singleWhere(
@@ -120,8 +118,7 @@ void main() {
       expect(author.isPrivacySensitive, isTrue);
     });
 
-    test('routes zip archives to the zip extractor via the registry',
-        () async {
+    test('routes zip archives to the zip extractor via the registry', () async {
       final file = await _tempFile(
         'sample.zip',
         _zipBytes([ArchiveFile.string('readme.txt', 'hello archive')]),
@@ -167,7 +164,8 @@ void main() {
 
       expect(
         metadata.fields.any(
-          (field) => field.section.startsWith('Audio') ||
+          (field) =>
+              field.section.startsWith('Audio') ||
               field.section.contains('EXIF') ||
               field.section.contains('Document') ||
               field.section == 'Archive',
@@ -179,9 +177,30 @@ void main() {
 
     test('registry exposes supported extensions and stable specs', () {
       for (final extension in [
-        'jpg', 'jpeg', 'tif', 'tiff', 'png', 'gif', 'webp', 'bmp',
-        'mp3', 'flac', 'ogg', 'opus', 'wav', 'aiff', 'pdf',
-        'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'zip', 'apk', 'epub',
+        'jpg',
+        'jpeg',
+        'tif',
+        'tiff',
+        'png',
+        'gif',
+        'webp',
+        'bmp',
+        'mp3',
+        'flac',
+        'ogg',
+        'opus',
+        'wav',
+        'aiff',
+        'pdf',
+        'docx',
+        'xlsx',
+        'pptx',
+        'odt',
+        'ods',
+        'odp',
+        'zip',
+        'apk',
+        'epub',
       ]) {
         expect(formatSpecFor(extension), isNotNull, reason: extension);
       }
@@ -191,6 +210,7 @@ void main() {
       expect(formatSpecFor('heic'), isNull);
       expect(formatSpecFor('rtf'), isNull);
       expect(supportedExtractionExtensions, contains('pdf'));
+      expect(extractionHandlerConsistencyIssues, isEmpty);
     });
   });
 }

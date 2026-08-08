@@ -67,7 +67,16 @@ void main() {
     });
 
     test('keeps graphic control, plain text and non-XMP app extensions', () {
-      final graphicControl = <int>[0x21, 0xF9, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00];
+      final graphicControl = <int>[
+        0x21,
+        0xF9,
+        0x04,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00
+      ];
       final plainText = <int>[
         0x21, 0x01, // plain text extension
         ..._subBlock([0x01, 0x02, 0x03]),
@@ -78,7 +87,8 @@ void main() {
         ..._subBlock([...'NETSCAPE2.0'.codeUnits]),
         0x00,
       ];
-      final bytes = _gif([...graphicControl, ...plainText, ...netScape, ..._image()]);
+      final bytes =
+          _gif([...graphicControl, ...plainText, ...netScape, ..._image()]);
 
       final result = stripGif(bytes);
 

@@ -1,6 +1,6 @@
 # MetaStrip Project Progress Report
 
-**Snapshot:** 2026-08-07  
+**Snapshot:** 2026-08-08
 **Overall:** Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain.
 **Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
 
@@ -9,6 +9,16 @@
 - **Implemented-scope MVP:** the currently usable scope covering onboarding, Viewer functionality for registered extractors, clean-copy removal for the registered 18 extensions, and exposed Settings controls. Known format and workflow limitations remain.
 - **Full product-spec MVP:** the complete target described in `docs/SPECS.md`. It includes capabilities that are still planned, deferred, or unwired, so it is **not complete**.
 - **Release-ready product:** full product-spec MVP plus integration/device testing, performance and accessibility verification, release-build validation, and release hardening. It is **not complete**.
+
+## Gap Closure Update (2026-08-08)
+
+Phase 0 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` is complete. A shared
+capability registry now describes all 41 Viewer extensions, preserves the
+existing 18 Remover extensions, normalizes extension lookup, and supplies the
+runtime removal size limit. Viewer extraction routes and Remover routes are
+covered by bidirectional contract tests. This is an architecture and safety
+foundation; it does not enable BMP/TIFF, archives, HEIF, video, legacy Office,
+or end-to-end selective policy/UI behavior.
 
 ## Completed Phases
 
@@ -57,8 +67,9 @@
   ODF (zip repack without `meta.xml`), GIF (comment + XMP app-extension),
   WebP (EXIF/XMP chunk + VP8X flag clear)
 - Limited selector parameters for PNG tEXt/iTXt (per keyword) and PDF DocInfo
-  (per Info key); null/empty uses the current supported-cleanup behavior. The
-  general Selective mode UI remains unavailable.
+  (per Info key); null requests full cleanup, while empty or unsupported
+  selective requests fail closed. The general Selective mode UI remains
+  unavailable.
 - Output naming: collision-safe `_clean`, `_clean_1`, …; SAF content:// write
 
 **Deferred / out of scope:**
@@ -85,8 +96,15 @@
 
 ### Phase 4: Remover UI — Implemented-scope MVP Complete + Security Hardening
 - RemoverBloc: sequential processing, queue cap, cancel, reset
-- RemoverScreen: file queue with supported-cleanup status, process button; the
+- RemoverScreen: direct remover file picking with the registered extension
+  filter, file queue with supported-cleanup status, process button; the
   broader mode selector remains planned/unwired
+- Remover-wide 50 MB input cap is named as
+  `AppConstants.maxRemoverFileSizeBytes`; it is enforced both when files enter
+  the queue and during actual pre-processing validation
+- Pre-processing validation checks the current local filesystem entry rather
+  than trusting picker metadata (present regular file, supported extension,
+  and current size)
 - ProcessingScreen: live progress bar + per-file status + cancel
 - ResultScreen: 4-tile stats grid + per-file output list + Done
 - **JPEG scrubber:** preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM; EOI truncation
@@ -96,6 +114,13 @@
 - SAF output writing for `content://` URIs via `Saf().writeFileBytes()`
 - Error sanitization (strips filesystem paths from messages)
 - Android package fix: `MainActivity.kt` → `com.bariskode.metastrip`
+
+**Remover verification:** contract tests assert the exact 18-extension registry
+and datasource routing. Integration-style tests use the real remover pipeline
+to verify clean-copy output, preservation of the original, and no output for
+malformed input. This is host-side verification only; Android device and SAF
+picker/output smoke testing remains required, and no device validation is
+claimed.
 
 ### Phase 5: Settings — Implemented-scope MVP Complete (2026-08-07)
 - App-level SettingsCubit with SharedPreferences-backed persistence and serialized operations
@@ -107,21 +132,29 @@
 - Naming/folder-structure/keep-original and JPEG-quality/concurrency/auto-confirm fields persist for import compatibility, but their controls are not exposed or wired to processing
 
 ### Security & Correctness Hardening (2026-08-07)
-- Zip decompression-bomb guard: shared `decodeArchiveFileSafely` caps
-  per-entry decompression at 64MB (declared + real) and 128MB cumulative
-  before any `entry.content` access — oversized entries degrade to status
-  fields instead of OOM on mobile
-- Zip repack hardening: per-entry cap (declared + actual) and actual-content
-  total cap; exception messages no longer embed hostile entry names
+- ZIP package preflight now parses raw EOCD/central-directory records before
+  `ZipDecoder`, rejecting ZIP64/multi-disk input, encryption, unsupported
+  compression, symlinks, unsafe/duplicate paths, malformed local records, and
+  excessive entry counts. Structural validation is separate from repack-only
+  size policy, so Viewer can inspect bounded metadata without decompressing
+  unrelated large entries.
+- ZIP decompression uses a bounded output sink followed by exact-size and CRC
+  checks. Viewer ZIP/OpenXML/ODF and Remover repacking share this path. The
+  in-memory repacker has a 32 MiB total decompressed-content budget.
+- OOXML cleanup validates bounded semantic content types for Transitional and
+  Strict DOCX/XLSX/PPTX packages, removes the union of validated root-relationship
+  targets and normalized conventional Viewer-visible property paths, rejects
+  unsafe/ambiguous targets, and removes dangling relationship/content-type
+  declarations. ODF cleanup requires and preserves a physical first, stored,
+  exact `mimetype` entry.
 - PDF extractor: replaced non-greedy `obj...endobj` regex scan with a
   bounded linear scan (max 64 regions, 1MB window) — no quadratic hang
 - PDF removal: replaced regex-over-whole-document with a single-pass linear
   byte scanner — no `(?:\\\.|[^)])*` overlap → no ReDoS on hostile backslash
   floods
 - Zip path consistency: shared `normalizeEntryPath` (collapse slashes,
-  strip `.` segments, `\` → `/`) used by viewer extractor and remover
-  stripper with exact-or-suffix matching — closes silent strip-failure
-  for non-canonical paths
+  strip `.` segments, `\` → `/`) supports structural duplicate and traversal
+  rejection; OOXML cleanup uses relationship-resolved exact paths.
 - Honest SHA-256 for bounded-read audio (full-file hash via second isolate
   read); hash cache bounded to 512 entries
 - ID3 synchsafe mask consistency (`& 0x7F`) between extractor and stripper
@@ -131,16 +164,16 @@
 
 ### Phase 6: Polish & Testing — Release-readiness work
 
-## Verification (2026-08-07)
+## Verification (2026-08-08)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: **248 passed, 1 skipped**
+- `flutter test`: **304 passed, 1 skipped**
 - Test coverage: not measured in this verification run
 - Debug APK: builds (`build\app\outputs\flutter-apk\app-debug.apk`)
 - These checks do not establish full product-spec completion or release readiness; integration/device, performance, accessibility, and release-build verification remain outstanding.
 
 ## Dependencies
 
-**Installed:** flutter_bloc, bloc, equatable, shared_preferences, path_provider, file_picker, path, mime, archive, exif, image, lucide_icons_flutter, flutter_colorpicker, shimmer, lottie, crypto, convert, intl, file_selector, saf, cupertino_icons
+**Installed:** flutter_bloc, bloc, equatable, shared_preferences, path_provider, file_picker, path, mime, archive, xml, exif, image, lucide_icons_flutter, flutter_colorpicker, shimmer, lottie, crypto, convert, intl, file_selector, saf, cupertino_icons
 
 **Planned (Phase 6/follow-ups):** sqflite, permission_handler, cached_network_image, logger, dartz, share_plus, receive_sharing_intent, flutter_local_notifications
 

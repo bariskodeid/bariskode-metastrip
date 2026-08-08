@@ -54,8 +54,8 @@ class ResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'JPEG/PNG metadata cleanup; PDF basic DocInfo only '
-              '(best effort).',
+              'Audio, image, and office metadata cleanup. '
+              'PDF DocInfo cleanup is best effort.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.md),

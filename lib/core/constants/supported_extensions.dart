@@ -1,43 +1,25 @@
-/// File extensions accepted by the Viewer MVP.
+import 'package:metastrip/core/format/format_registry.dart';
+
+/// Backwards-compatible access to file extensions accepted by the Viewer.
 class SupportedExtensions {
   SupportedExtensions._();
 
-  static const values = <String>[
-    // Images
-    'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'tif', 'heic',
-    // Video
-    'mp4', 'mov', 'avi', 'mkv', 'webm', '3gp', 'flv', 'wmv',
-    // Audio
-    'mp3', 'flac', 'aac', 'ogg', 'wav', 'm4a', 'opus', 'wma', 'aiff',
-    'aif', 'aifc',
-    // Documents
-    'pdf', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'txt',
-    // Archives
-    'zip', 'tar', 'apk', 'epub',
-  ];
+  static final List<String> values =
+      FormatRegistry.standard.extensions.toList(growable: false);
 
-  static const _lookup = <String>{
-    ...values,
-  };
-
-  static bool contains(String extension) => _lookup.contains(extension);
+  static bool contains(String extension) =>
+      FormatRegistry.standard.supportsViewerExtension(extension);
 }
 
 /// Extensions the Remover MVP can actually strip.
 ///
-/// This is the single source of truth — consumed by both the datasource
-/// format switch and the queue UI gate. Audio, image and office formats are
-/// covered; video and archive formats are intentionally excluded.
+/// The capability registry is the source of truth. This facade remains for
+/// compatibility with existing Viewer/Remover callers.
 class RemoverStrippableExtensions {
   RemoverStrippableExtensions._();
 
-  static const values = <String>{
-    'jpg', 'jpeg', 'png', 'pdf',
-    'mp3', 'flac', 'ogg', 'opus', 'wav', 'aiff',
-    'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp',
-    'gif', 'webp',
-  };
+  static final Set<String> values = FormatRegistry.standard.removableExtensions;
 
   static bool contains(String extension) =>
-      values.contains(extension.toLowerCase());
+      FormatRegistry.standard.supportsRemoval(extension);
 }

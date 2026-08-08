@@ -8,12 +8,16 @@ import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart'
 import 'package:metastrip/features/remover/presentation/bloc/remover_state.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 
-FileItemEntity _file(String name, {String ext = 'jpg'}) {
+FileItemEntity _file(
+  String name, {
+  String ext = 'jpg',
+  int sizeBytes = 100,
+}) {
   return FileItemEntity(
     path: '/tmp/$name',
     name: name,
     extension: ext,
-    sizeBytes: 100,
+    sizeBytes: sizeBytes,
     addedAt: DateTime(2026, 1, 1),
   );
 }
@@ -74,6 +78,7 @@ void main() {
   group('RemoverBloc', () {
     test('adds files and dedups by path', () async {
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: _FakeRemoverRepository(),
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -88,6 +93,7 @@ void main() {
 
     test('enforces session file cap', () async {
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: _FakeRemoverRepository(),
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -106,8 +112,31 @@ void main() {
       bloc.close();
     });
 
+    test('rejects oversized supported files', () async {
+      final bloc = RemoverBloc(
+        validateInputs: false,
+        repository: _FakeRemoverRepository(),
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
+      bloc.add(
+        RemoverFilesAdded([
+          _file(
+            'large.jpg',
+            sizeBytes: AppConstants.maxRemoverFileSizeBytes + 1,
+          ),
+          _file('small.jpg'),
+        ]),
+      );
+      final state = await _waitFor(bloc, (s) => s.errorMessage != null);
+
+      expect(state.files.map((file) => file.name), ['small.jpg']);
+      expect(state.errorMessage, contains('too large'));
+      bloc.close();
+    });
+
     test('removes a single file from the queue', () async {
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: _FakeRemoverRepository(),
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -123,6 +152,7 @@ void main() {
 
     test('clear resets to idle', () async {
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: _FakeRemoverRepository(),
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -140,6 +170,7 @@ void main() {
     test('processes files sequentially and reaches completed', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -163,6 +194,7 @@ void main() {
         () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -192,6 +224,7 @@ void main() {
     test('only unsupported files fail clearly without processing', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(path: null),
       );
@@ -215,6 +248,7 @@ void main() {
     test('records failures without aborting the batch', () async {
       final repo = _FakeRemoverRepository(shouldFail: true);
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -233,6 +267,7 @@ void main() {
     test('invalid output folder stops before processing', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(path: null),
       );
@@ -251,6 +286,7 @@ void main() {
     test('requestCancel stops processing and marks cancelled', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
@@ -276,6 +312,7 @@ void main() {
     test('reset returns to idle after completion', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
+        validateInputs: false,
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );

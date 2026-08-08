@@ -1,12 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
-import 'package:metastrip/core/constants/supported_extensions.dart';
+import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/features/remover/domain/entities/processing_result_entity.dart';
 import 'package:metastrip/features/remover/domain/repositories/remover_repository.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart';
 import 'package:metastrip/features/remover/presentation/bloc/remover_state.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
+import 'package:path/path.dart' as p;
 
 /// Manages the remover queue and sequential file processing.
 ///
@@ -19,8 +22,10 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
   RemoverBloc({
     required RemoverRepository repository,
     required OutputFolderRepository outputFolderRepository,
+    bool validateInputs = true,
   })  : _repository = repository,
         _outputFolderRepository = outputFolderRepository,
+        _validateInputs = validateInputs,
         super(RemoverState.initial()) {
     on<RemoverFilesAdded>(_onFilesAdded);
     on<RemoverFileRemoved>(_onFileRemoved);
@@ -31,6 +36,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
 
   final RemoverRepository _repository;
   final OutputFolderRepository _outputFolderRepository;
+  final bool _validateInputs;
   bool _cancelRequested = false;
 
   /// Interrupts processing after the current file completes.
@@ -42,6 +48,14 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
     final newFiles = <FileItemEntity>[];
     var skipped = 0;
     for (final file in event.files) {
+      final capability = FormatRegistry.standard.lookup(file.extension);
+      final removalLimit = capability?.removalSizeLimitBytes;
+      if (capability?.supportsFullRemoval == true &&
+          removalLimit != null &&
+          file.sizeBytes > removalLimit) {
+        skipped++;
+        continue;
+      }
       if (!seen.add(file.path)) {
         skipped++;
         continue;
@@ -58,7 +72,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       state.copyWith(
         files: [...state.files, ...newFiles],
         errorMessage: skipped > 0
-            ? '$skipped file(s) skipped: duplicate or over '
+            ? '$skipped file(s) skipped: too large, duplicate, or over '
                 '${AppConstants.maxFilesPerSession} limit.'
             : null,
         clearError: skipped == 0,
@@ -89,7 +103,8 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
   ) async {
     if (state.files.isEmpty) return;
     final supportedFiles = state.files
-        .where((file) => RemoverStrippableExtensions.contains(file.extension))
+        .where(
+            (file) => FormatRegistry.standard.supportsRemoval(file.extension))
         .toList();
     if (supportedFiles.isEmpty) {
       emit(
@@ -143,6 +158,18 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
           ),
         ),
       );
+      final validationError =
+          _validateInputs ? await _validateInput(file) : null;
+      if (validationError != null) {
+        results.add(
+          ProcessingResultEntity.failure(
+            inputPath: file.path,
+            error: validationError,
+          ),
+        );
+        emit(state.copyWith(results: [...results]));
+        continue;
+      }
       final result = await _repository.stripFile(
         file.path,
         outputDirectory: outputDirectory,
@@ -159,6 +186,31 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
         clearProgress: true,
       ),
     );
+  }
+
+  Future<String?> _validateInput(FileItemEntity file) async {
+    final pathExtension = FormatRegistry.normalizeExtension(
+      p.extension(file.path),
+    );
+    final itemExtension = FormatRegistry.normalizeExtension(file.extension);
+    if (pathExtension != itemExtension ||
+        !FormatRegistry.standard.supportsRemoval(pathExtension)) {
+      return 'Input file extension changed or is unsupported';
+    }
+    try {
+      final stat = await File(file.path).stat();
+      if (stat.type != FileSystemEntityType.file) {
+        return 'Input file is missing or not a regular file';
+      }
+      final limit =
+          FormatRegistry.standard.lookup(pathExtension)?.removalSizeLimitBytes;
+      if (limit == null || stat.size > limit) {
+        return 'Input file is too large for cleanup';
+      }
+    } on Object {
+      return 'Input file is missing or unreadable';
+    }
+    return null;
   }
 
   void _onResetRequested(

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/format/format_registry.dart' as capabilities;
 import 'package:metastrip/features/viewer/data/datasources/extractors/bmp_extractor.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/exif_extractor.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/gif_extractor.dart';
@@ -33,8 +34,7 @@ class FormatExtractionSpec {
   ///
   /// The closure captures any extension argument the extractor needs (for
   /// example `extractVorbis`), so callers only pass the raw bytes.
-  final Future<List<MetadataFieldEntity>> Function(Uint8List bytes)?
-      extractor;
+  final Future<List<MetadataFieldEntity>> Function(Uint8List bytes)? extractor;
 
   /// Whether only a bounded prefix (plus an MP3 tail) is read from disk.
   ///
@@ -146,8 +146,18 @@ final Map<String, FormatExtractionSpec> _specs = {
 /// Matching is case-insensitive; unknown extensions such as `mp4`, `heic` or
 /// `rtf` resolve to null.
 FormatExtractionSpec? formatSpecFor(String extension) {
-  return _specs[extension.trim().toLowerCase()];
+  final normalized = capabilities.FormatRegistry.normalizeExtension(extension);
+  final capability = capabilities.FormatRegistry.standard.lookup(normalized);
+  if (capability?.supportsExtraction != true) {
+    return null;
+  }
+  return _specs[normalized];
 }
 
 /// Every extension that has a registered extraction spec.
 Set<String> get supportedExtractionExtensions => Set.unmodifiable(_specs.keys);
+
+/// Reports missing or undeclared concrete extraction handler routes.
+List<String> get extractionHandlerConsistencyIssues =>
+    capabilities.FormatRegistry.standard
+        .handlerMapConsistencyIssues(extractionHandlerExtensions: _specs.keys);

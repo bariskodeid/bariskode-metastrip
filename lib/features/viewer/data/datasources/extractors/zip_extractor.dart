@@ -29,17 +29,8 @@ const int _maxZipEntries = 200;
 Uint8List? decodeArchiveFileSafely(
   ArchiveFile entry, {
   required int maxBytes,
-}) {
-  if (entry.size > maxBytes) return null;
-  final content = entry.content;
-  if (content is! List<int>) return null;
-  if (content.length > maxBytes) {
-    throw const FormatException('Decompressed archive entry exceeds size cap');
-  }
-  return content is Uint8List
-      ? content
-      : Uint8List.fromList(List<int>.from(content));
-}
+}) =>
+    decodeZipEntrySafely(entry, maxBytes: maxBytes);
 
 /// Extracts archive metadata from raw [bytes] for [extension].
 ///
@@ -54,7 +45,7 @@ Future<List<MetadataFieldEntity>> extractZip(
   required String extension,
 }) async {
   try {
-    final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+    final archive = decodeGuardedZip(bytes);
     if (archive.isEmpty) {
       return [
         statusField(archiveSection, 'Status', 'No archive entries'),

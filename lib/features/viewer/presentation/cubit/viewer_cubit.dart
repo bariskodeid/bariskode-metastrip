@@ -1,7 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
-import 'package:metastrip/core/constants/supported_extensions.dart';
+import 'package:metastrip/core/format/format_registry.dart';
 import 'package:metastrip/core/utils/file_utils.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 import 'package:metastrip/features/viewer/presentation/cubit/viewer_state.dart';
@@ -16,7 +16,8 @@ class ViewerCubit extends Cubit<ViewerState> {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         type: FileType.custom,
-        allowedExtensions: SupportedExtensions.values,
+        allowedExtensions:
+            FormatRegistry.standard.extensions.toList(growable: false),
         withData: false,
       );
 
@@ -50,7 +51,7 @@ class ViewerCubit extends Cubit<ViewerState> {
       }
 
       final extension = FileUtils.extension(path);
-      if (!SupportedExtensions.contains(extension) ||
+      if (!FormatRegistry.standard.supportsViewerExtension(extension) ||
           file.size > AppConstants.maxFileSizeBytes) {
         skippedCount++;
         continue;
