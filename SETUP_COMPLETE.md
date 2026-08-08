@@ -1,21 +1,21 @@
 # MetaStrip Project Progress Report
 
-**Snapshot:** 2026-08-08
-**Overall:** Implemented-scope MVP is usable and mostly complete. Gap-closure Phases 0-1 are implemented and the narrow Phase 2 BMP subset is enabled; full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
+**Snapshot:** 2026-08-09
+**Overall:** Implemented-scope MVP is usable and mostly complete. Gap-closure Phases 0-1 are implemented, the narrow Phase 2 BMP subset is enabled, and Phase 4 ZIP-only cleanup is implemented; full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
 **Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
 
 ## Status Definitions
 
-- **Implemented-scope MVP:** the currently usable scope covering onboarding, Viewer functionality for registered extractors, clean-copy removal for the registered 19 extensions, and exposed Settings controls. Known format and workflow limitations remain.
+- **Implemented-scope MVP:** the currently usable scope covering onboarding, Viewer functionality for registered extractors, clean-copy removal for the registered 20 extensions, and exposed Settings controls. Known format and workflow limitations remain.
 - **Full product-spec MVP:** the complete target described in `docs/SPECS.md`. It includes capabilities that are still planned, deferred, or unwired, so it is **not complete**.
 - **Release-ready product:** full product-spec MVP plus integration/device testing, performance and accessibility verification, release-build validation, and release hardening. It is **not complete**.
 
-## Gap Closure Update (2026-08-08)
+## Gap Closure Update (2026-08-09)
 
 Phases 0 and 1 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` are complete within
 the current PNG/PDF selective scope, and the narrow Phase 2 BMP subset is
 enabled. The shared capability registry describes all 41 Viewer extensions and
-the 19 registered Remover extensions.
+the 20 registered Remover extensions, including ZIP-only container cleanup.
 Stable field IDs and a per-file `StripPolicy` now travel from Viewer field
 selection through the Remover BLoC, repository, and datasource. `StripReport`
 facts reach the result UI, including warnings and output-validation state.
@@ -28,7 +28,7 @@ SAF PNG bytes are validated before writing, but persisted SAF readback remains
 unverified and scheduled for device validation. PDF selective DocInfo cleanup is only attempted by the existing
 best-effort scanner: its report does not claim removed IDs or validated output,
 and the result UI presents the unverified warning. These changes do not enable
-TIFF removal, archive removal, HEIF, video, legacy Office, broader selective format
+TIFF removal, APK/EPUB removal, recursive archive-member cleanup, HEIF, video, legacy Office, broader selective format
 support, Anonymize, or Preserve Technical behavior.
 
 Device/SAF and ZIP-family memory stress testing are scheduled, not complete.
@@ -74,14 +74,16 @@ The executable lanes and acceptance thresholds are in
 - Isolate-worker extraction while the app is foregrounded (single
   `runOnWorker` for parse + hash); OS background execution is not wired
 
-**Done (removal, 19 extensions):**
+**Done (removal, 20 extensions):**
 - JPEG/PNG scrubbers, PDF linear-scanner DocInfo stripper (9 keys incl.
   `Trapped`)
 - New strippers: ID3 (synchsafe masked), Vorbis (FLAC block drop + OGG
   in-place comment rewrite with Ogg CRC recompute), RIFF (WAV/AIFF),
   OpenXML (zip repack without `docProps/{core,app,custom}.xml`),
   ODF (zip repack without `meta.xml`), GIF (comment + XMP app-extension),
-  WebP (EXIF/XMP chunk + VP8X flag clear)
+  WebP (EXIF/XMP chunk + VP8X flag clear), and ZIP container cleanup (EOCD and
+  entry comments, DOS timestamps, recognized `0x5455`/`0x000a` extras; member
+  compressed payloads preserved; no recursive member cleanup)
 - Stable-ID selective cleanup for PNG tEXt/iTXt (per keyword) and PDF DocInfo
   (per Info key) is wired end to end through a per-file policy. Local PNG output
   is read back, reparsed, and verified; SAF reports best-effort attempted/
@@ -102,8 +104,8 @@ The executable lanes and acceptance thresholds are in
   upstream and breaks on Flutter ≥3.29; alternative is a pure-Dart container
   parser, deferred to a follow-up
 - HEIC/HEIF extraction — requires HEIF container parser, deferred
-- Archive removal (ZIP/APK stripping) — APK stripping would invalidate the
-  signing block; out of MVP strip scope
+- APK and EPUB removal — unsupported; APK stripping would invalidate the signing
+  block. ZIP-only container cleanup is implemented and is not recursive.
 - Audio selective strip (MP3 frame-level, Vorbis per-key) — parameter
   plumbing shipped, stripper implementation pending
 - Granular Office property removal — current Office strippers perform
@@ -142,7 +144,7 @@ The executable lanes and acceptance thresholds are in
 - Error sanitization (strips filesystem paths from messages)
 - Android package fix: `MainActivity.kt` → `com.bariskode.metastrip`
 
-**Remover verification:** contract tests assert the exact 19-extension registry
+**Remover verification:** contract tests assert the exact 20-extension registry
 and datasource routing. Integration-style tests use the real remover pipeline
 to verify clean-copy output, preservation of the original, and no output for
 malformed input. This is host-side verification only; Android device and SAF
@@ -166,8 +168,12 @@ claimed.
   size policy, so Viewer can inspect bounded metadata without decompressing
   unrelated large entries.
 - ZIP decompression uses a bounded output sink followed by exact-size and CRC
-  checks. Viewer ZIP/OpenXML/ODF and Remover repacking share this path. The
-  in-memory repacker has a 32 MiB total decompressed-content budget.
+  checks for Viewer ZIP/OpenXML/ODF decoding. ZIP container cleanup preserves
+  compressed payloads and only checks structural CRC-field consistency; it does
+  not verify payload CRCs. The in-memory repacker has a 32 MiB total
+  decompressed-content budget and a 50 MiB input cap. Device/SAF and stress
+  validation remain pending, so these are safety bounds rather than demonstrated
+  performance limits.
 - OOXML cleanup validates bounded semantic content types for Transitional and
   Strict DOCX/XLSX/PPTX packages, removes the union of validated root-relationship
   targets and normalized conventional Viewer-visible property paths, rejects
@@ -197,11 +203,11 @@ claimed.
 
 ### Phase 6: Polish & Testing — Release-readiness work
 
-## Verification Snapshot (2026-08-08)
+## Verification Snapshot (2026-08-09)
 
 **Final host verification:**
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: 337 passed, 1 skipped
+- `flutter test`: 390 tests completed; 389 passed, 1 skipped
 - Test coverage: not measured in this verification run
 - Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`)
 - Diff check: passed

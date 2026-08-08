@@ -67,7 +67,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 
 ### 🗑️ Remover
 - Terima file dari Viewer atau file picker; share intent masih planned
-- Current MVP: clean copies for the 19 registered remover extensions, with PDF DocInfo removal best-effort
+- Current MVP: clean copies for the 20 registered remover extensions, including ZIP-only, non-recursive container cleanup; PDF DocInfo removal remains best-effort
 - Full Strip, Selective, Anonymize, dan Preserve Technical masih planned/unwired; current UI exposes supported-cleanup behavior only
 - Output otomatis tersimpan ke folder yang sudah dikonfigurasi
 - Progress real-time dengan log detail; background processing dan notifikasi masih planned

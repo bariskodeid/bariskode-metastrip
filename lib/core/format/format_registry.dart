@@ -401,9 +401,25 @@ const List<FormatCapability> _standardCapabilities = [
     knownLimitations: ['Only filesystem metadata is currently shown.'],
   ),
   FormatCapability(
-    extensions: {'zip', 'apk', 'epub'},
+    extensions: {'zip'},
+    mimeTypes: {'application/zip'},
+    category: FormatCategory.archive,
+    supportsExtraction: true,
+    supportsFullRemoval: true,
+    supportsSelectiveRemoval: false,
+    processingStrategy: ProcessingStrategy.inMemory,
+    extractionHandlerFactory: _handlerDeclaration,
+    removalHandlerFactory: _handlerDeclaration,
+    extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
+    outputValidationStrategy: OutputValidationStrategy.containerStructure,
+    removalCoverage: RemovalCoverage.verifiedSupportedScope,
+    knownLimitations: [
+      'Only ZIP container metadata is cleaned; member payload metadata is not recursively cleaned.',
+    ],
+  ),
+  FormatCapability(
+    extensions: {'apk', 'epub'},
     mimeTypes: {
-      'application/zip',
       'application/vnd.android.package-archive',
       'application/epub+zip',
     },

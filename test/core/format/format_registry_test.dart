@@ -67,6 +67,7 @@ void main() {
     'gif',
     'webp',
     'bmp',
+    'zip',
   };
 
   group('shared format capability registry', () {
@@ -83,9 +84,9 @@ void main() {
       }
     });
 
-    test('advertises exactly the Phase 2 removable extensions', () {
+    test('advertises exactly the Phase 4 removable extensions', () {
       expect(FormatRegistry.standard.removableExtensions, removerExtensions);
-      expect(FormatRegistry.standard.removableExtensions, hasLength(19));
+      expect(FormatRegistry.standard.removableExtensions, hasLength(20));
     });
 
     test('normalizes case, whitespace, and any leading dots', () {
@@ -122,6 +123,16 @@ void main() {
       expect(bmp.supportsExtraction, isTrue);
       expect(bmp.supportsFullRemoval, isTrue);
       expect(bmp.supportsSelectiveRemoval, isFalse);
+
+      final zip = registry.lookup('zip')!;
+      expect(zip.supportsExtraction, isTrue);
+      expect(zip.supportsFullRemoval, isTrue);
+      expect(zip.supportsSelectiveRemoval, isFalse);
+      expect(zip.category, FormatCategory.archive);
+      expect(
+        zip.outputValidationStrategy,
+        OutputValidationStrategy.containerStructure,
+      );
 
       for (final extension in ['tiff', 'tif']) {
         final tiff = registry.lookup(extension)!;

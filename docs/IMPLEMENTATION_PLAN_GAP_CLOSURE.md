@@ -1,6 +1,6 @@
 # MetaStrip — Gap Closure Implementation Plan
 
-**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled, TIFF remains deferred, and the Phase 3 PDF safety spike is hardened while structural cleanup remains pending
+**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled, Phase 3 PDF structural cleanup remains pending, and Phase 4 ZIP-only container cleanup is implemented with device/SAF stress validation still pending
 **Version:** 1.1
 **Created:** 2026-08-08
 **Related plan:** [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
@@ -58,13 +58,14 @@ The existing implementation uses:
 - Declarative per-format extraction/removal limits and processing strategies;
   runtime queue validation consumes the removal limit from the capability.
 
-The current registered remover set contains 19 extensions:
+The current registered remover set contains 20 extensions; `.zip` is the only newly
+supported archive-removal extension. APK and EPUB remain unsupported for removal:
 
 ```text
 jpg, jpeg, png, pdf, bmp,
 mp3, flac, ogg, opus, wav, aiff,
 docx, xlsx, pptx, odt, ods, odp,
-gif, webp
+gif, webp, zip
 ```
 
 The current PDF implementation is best-effort Info dictionary cleanup. Stable-ID
@@ -75,12 +76,15 @@ parser, caps recognized key candidates, and fails closed on malformed supported
 Info values and cap breaches. It does not read persisted output back or claim PDF structural
 validity. BMP removal is enabled only for strict
 canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB, positive dimensions, and
-`bfOffBits == 54` inputs. Video, HEIC/HEIF, archive removal, TIFF removal,
+`bfOffBits == 54` inputs. Video, HEIC/HEIF, APK/EPUB removal, TIFF removal,
 legacy Office removal, and broader selective-mode behavior are not yet complete.
+ZIP cleanup is container-only: it removes the EOCD and entry comments, DOS
+timestamps, and recognized `0x5455`/`0x000a` timestamp extras while preserving
+member compressed payloads. It does not recursively clean metadata inside members.
 
-### Final host verification (2026-08-08)
+### Final host verification (2026-08-09)
 
-- `flutter test`: 378 tests discovered; 377 passed, 1 skipped.
+- `flutter test`: 390 tests completed; 389 passed, 1 skipped.
 - `flutter analyze`: clean (0 issues).
 - Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`).
 - Diff check: passed.
@@ -125,7 +129,8 @@ switch statement.
 Implemented in `lib/core/format/`:
 
 - Shared descriptors cover all 41 Viewer-accepted extensions.
-- Removal remains exactly the existing 18-extension set.
+- Removal currently covers the registered 20-extension set, including ZIP-only
+  container cleanup; APK and EPUB remain excluded.
 - PNG and basic PDF Info cleanup are the only formats advertising selective
   capability; no new format was enabled.
 - Lookup normalizes case, whitespace, and leading dots.
@@ -159,9 +164,10 @@ Phase 0 security hardening is complete for the registered ZIP-backed routes:
 - ODF removal requires an exact bounded `mimetype` as the first physical,
   uncompressed entry and preserves that rule in cleaned output.
 
-Residual risk: the repacker is still in-memory. Its total decompressed-content
-budget is now 32 MiB, materially reducing memory amplification, but device
-stress testing and a future streaming repacker remain release-hardening work.
+Residual risk: the repacker is still in-memory. The 50 MiB input cap and 32 MiB
+decompressed-content budget are safety bounds, not performance evidence; device,
+SAF, and stress testing plus a future streaming repacker remain release-hardening
+work.
 Execution is scheduled in
 [`DEVICE_AND_STRESS_TEST_PLAN.md`](DEVICE_AND_STRESS_TEST_PLAN.md); no device or
 memory-stress pass is claimed yet.
@@ -511,11 +517,16 @@ entry ordering, compression, and package structure.
 
 ### Acceptance criteria
 
-- ZIP output reopens successfully.
-- Entry names, count, CRC, and safe paths are valid.
-- Bomb and traversal limits remain enforced.
-- Target archive metadata is removed.
-- Recursive member metadata is not claimed as removed unless separately tested.
+- [x] ZIP output reopens successfully.
+- [x] Entry names, count, and safe paths are structurally valid; local/central
+  CRC fields and data-descriptor fields are consistent with each other. The
+  container validator does not decompress payloads or verify payload CRCs.
+- [x] Bomb and traversal limits remain enforced.
+- [x] Container metadata cleanup removes EOCD and entry comments, DOS timestamps,
+  and recognized `0x5455`/`0x000a` timestamp extras.
+- [x] Member compressed payloads are preserved; member metadata is not recursively
+  cleaned or claimed as removed.
+- [ ] Device/SAF and ZIP stress validation passes.
 
 ---
 
@@ -789,10 +800,12 @@ not satisfy this gate.
 
 ### Archives
 
-- [ ] ZIP container cleanup works without damaging entries.
-- [ ] Bomb, traversal, and size protections remain active.
-- [ ] Recursive member cleanup is not overclaimed.
-- [ ] APK signed-state policy is explicit.
+- [x] ZIP-only container cleanup works without damaging entries or changing member
+  compressed payloads.
+- [x] Bomb, traversal, and size protections remain active.
+- [x] Recursive member cleanup is explicitly not claimed.
+- [x] APK remains unsupported for removal; signed APKs are not repacked.
+- [x] EPUB remains unsupported for removal and is not added to the remover registry.
 - [ ] EPUB preserves its required `mimetype` constraints if enabled.
 
 ### BMP/TIFF

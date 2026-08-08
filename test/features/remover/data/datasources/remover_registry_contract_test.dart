@@ -26,6 +26,7 @@ void main() {
       'gif',
       'webp',
       'bmp',
+      'zip',
     });
   });
 
@@ -63,7 +64,8 @@ void main() {
     expect(MetadataRemoverDatasource.supportsExtension('bmp'), isTrue);
     expect(MetadataRemoverDatasource.supportsExtension('tiff'), isFalse);
     expect(MetadataRemoverDatasource.supportsExtension('tif'), isFalse);
-    expect(MetadataRemoverDatasource.supportsExtension('zip'), isFalse);
+    expect(MetadataRemoverDatasource.supportsExtension('zip'), isTrue);
+    expect(MetadataRemoverDatasource.supportsExtension('.ZIP'), isTrue);
     expect(MetadataRemoverDatasource.supportsExtension('mp4'), isFalse);
   });
 }

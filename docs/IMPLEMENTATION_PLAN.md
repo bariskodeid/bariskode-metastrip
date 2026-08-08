@@ -2,7 +2,7 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Stack:** Flutter 3.22+ / Dart 3.4+  
-**Last Updated:** 2026-08-08
+**Last Updated:** 2026-08-09
 
 ---
 
@@ -285,7 +285,7 @@ dev_dependencies:
 
 ### Implementation Status (updated 2026-08-07)
 
-**Overall: Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; Phase 2 follow-ups and Phase 6 remain.**
+**Overall: Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; ZIP-only Phase 4 cleanup is implemented, while Phase 2 follow-ups and Phase 6 remain.**
 
 ### Status terminology
 
@@ -303,8 +303,8 @@ Done:
 - [x] **Phase 3 Viewer UI (2026-07-31): ViewerCubit with multi-file picker, extension filter, dedup, sort/filter (name/size/type/newest), file list items with badges, metadata detail with grouped accordion sections, selectable fields, copy to clipboard, mark visible/clear/send to Remover handoff.**
 - [x] **Phase 4 Remover UI (2026-08-06): RemoverBloc with sequential processing, cancel, queue cap. ProcessingScreen with live progress + cancel. ResultScreen with stats grid. Security hardening: JPEG preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM + EOI truncation; PNG drops text chunks + tIME + eXIf; PDF DocInfo blanking. Error sanitization. SAF output writing. Android package fix.**
 - [x] **Phase 5 Settings (2026-08-07): app-level SettingsCubit persistence, 7 preset themes plus custom 16-token theme builder with live application, output-folder configuration synchronized with onboarding, cache status/action, portable JSON export/import, two-step reset back to onboarding, About, and Licenses.**
-- [x] **Phase 2 implemented-scope MVP complete (2026-08-08): registered image/audio/document/archive extractors, a 19-extension remover registry including narrow canonical BMP removal, SHA-256 computation, supported extension allowlist, and MIME lookup. TIFF removal, video, HEIC/HEIF, archive removal, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
-- [x] Verification: `flutter analyze` clean; `flutter test` **304 passed, 1 skipped**; debug APK build verified. Test coverage was not measured in this verification.
+- [x] **Phase 2 implemented-scope MVP complete (2026-08-08): registered image/audio/document/archive extractors, a 20-extension remover registry including narrow canonical BMP removal and ZIP-only cleanup, SHA-256 computation, supported extension allowlist, and MIME lookup. TIFF removal, video, HEIC/HEIF, APK/EPUB removal, recursive archive-member cleanup, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
+- [x] Verification (2026-08-09): `flutter analyze` clean; `flutter test` **390 tests completed; 389 passed, 1 skipped**; debug APK build previously verified. Test coverage was not measured in this verification.
 
 Still pending:
 - [ ] Dev/prod flavors (the remaining Phase 0 roadmap task) when separate environments are actually needed.
@@ -313,7 +313,7 @@ Still pending:
 - [ ] Phase 2 video (MP4/MKV/AVI/WebM/3GP/FLV/WMV): deferred — `ffmpeg_kit_flutter_full_gpl` retired upstream and breaks on Flutter ≥3.29; pending a pure-Dart container parser or a maintained alternative.
 - [ ] Phase 2 HEIC/HEIF extraction: requires a HEIF container parser, deferred.
 - [ ] Phase 2 selective strip for audio (MP3 frame-level, Vorbis per-key) and Office (per XML property): parameter plumbing shipped, stripper implementation pending.
-- [ ] Phase 2 archive removal (ZIP/APK): out of MVP strip scope; APK stripping would invalidate the signing block.
+- [x] Phase 4 ZIP-only archive cleanup: removes EOCD and entry comments, DOS timestamps, and recognized `0x5455`/`0x000a` timestamp extras while preserving member compressed payloads; cleanup is not recursive. APK and EPUB remain unsupported for removal.
 - [x] Phase 2 BMP subset removal: strict canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB, positive dimensions, and `bfOffBits == 54`; preserves header/pixel payload bytes, zeroes reserved fields, normalizes size fields, and discards trailing bytes. This is not comprehensive BMP sanitization.
 - [ ] Phase 2 TIFF/TIF removal: disabled pending a future structural writer/POC.
 - [ ] Phase 3 remaining: thumbnails, thumbnail cache, share intent receiver, GPS map preview, per-field selective mark in UI, share metadata.
@@ -390,7 +390,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Unit tests — extractors | Test per format dengan inline byte fixtures | ✅ |
 
 **Sprint 3 — Metadata Removal**
-**Status:** Implemented-scope MVP complete for 19 registered remover extensions, including the narrow canonical BMP subset; video, archive removal, granular audio/Office removal, and the broader removal modes are deferred or unwired. Full product-spec MVP and release readiness remain incomplete.
+**Status:** Implemented-scope MVP complete for 20 registered remover extensions, including the narrow canonical BMP subset and ZIP-only container cleanup; video, APK/EPUB removal, recursive archive-member cleanup, granular audio/Office removal, and the broader removal modes are deferred or unwired. Full product-spec MVP and release readiness remain incomplete.
 
 | Task | Detail | Status |
 |------|--------|--------|
@@ -405,6 +405,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | PDF remover | Linear byte scanner (no regex ReDoS), 9 Info keys incl. `Trapped` | ✅ (best-effort; XMP untouched) |
 | DOCX/XLSX/PPTX remover | Repack ZIP via shared `zip_repack.dart` without `docProps/{core,app,custom}.xml` | ✅ |
 | ODT/ODS/ODP remover | Repack ZIP without `meta.xml` | ✅ |
+| ZIP remover | Container-only cleanup of EOCD/entry comments, DOS timestamps, and recognized `0x5455`/`0x000a` extras; preserves compressed member payloads and does not recurse into members | ✅ |
 | Fixed output naming | `_clean` suffix with collision auto-increment | ✅ |
 | Configurable naming templates | Persisted setting exists; template processing is not wired to output naming | ❌ follow-up |
 | Limited selector plumbing | PNG per keyword + PDF per Info key via `stripFile(..., selectiveLabels:)`; null requests full cleanup and empty/unsupported requests fail closed | ✅ plumbing only; general Selective mode UI unavailable |
@@ -498,7 +499,7 @@ Foundation hardening also validates the output folder before use and safely rese
 
 | Task | Detail | Status |
 |------|--------|--------|
-| Unit tests — all BLoCs | Planned coverage target; coverage not measured | 304 passed, 1 skipped (current verification baseline) |
+| Unit tests — all BLoCs | Planned coverage target; coverage not measured | 390 tests completed; 389 passed, 1 skipped (current verification baseline) |
 | Widget tests — key screens | Viewer, Remover, Detail | Partial |
 | Integration tests | Full flow end-to-end | ❌ |
 | Performance profiling | Memory, CPU, frame drops | ❌ |
@@ -1201,7 +1202,7 @@ test/
 
 ### 6.2 Coverage Status
 Coverage was not measured in the current verification run. The authoritative
-test result is **304 passed, 1 skipped**; no percentage threshold is claimed.
+test result is **390 tests completed; 389 passed, 1 skipped**; no percentage threshold is claimed.
 
 ### 6.3 Integration Tests (e2e)
 ```dart

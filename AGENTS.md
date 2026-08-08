@@ -1,6 +1,6 @@
 # AGENTS.md — MetaStrip
 
-Flutter app (Dart 3, package name `metastrip`). Reads metadata from an allowlisted set and strips metadata from the registered 19-extension Remover set, including the narrow canonical BMP subset. Offline-only.
+Flutter app (Dart 3, package name `metastrip`). Reads metadata from an allowlisted set and strips metadata from the registered 20-extension Remover set, including the narrow canonical BMP subset and ZIP-only container cleanup. Offline-only.
 
 ## Commands
 
@@ -51,9 +51,9 @@ Each feature follows `data/` (repo impls + datasources/models) → `domain/` (en
 
 ## Key conventions / gotchas
 
-- **Remover MVP scope**: the registry currently includes JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, and WebP. BMP removal is limited to the narrow canonical subset, and PDF removal remains best-effort DocInfo only. Video, archives, HEIC/HEIF, RAW, granular audio removal, per-property Office removal, and the Full Strip/Selective/Anonymize/Preserve Technical UI modes are deferred or unwired.
+- **Remover MVP scope**: the registry currently includes JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, and ZIP. BMP removal is limited to the narrow canonical subset, PDF removal remains best-effort DocInfo only, and ZIP cleanup is container-only/nonrecursive. APK and EPUB are excluded from removal. Video, archives other than ZIP, HEIC/HEIF, RAW, granular audio removal, per-property Office removal, and the Full Strip/Selective/Anonymize/Preserve Technical UI modes are deferred or unwired.
 - **Clean copies**: output is a new file in the user-configured output folder; originals are never mutated.
-- **MVP size cap**: SHA-256 only computed for files ≤ 100MB.
+- **MVP size cap**: SHA-256 only computed for files ≤ 100MB. ZIP-family processing is bounded by a 50MiB input cap and in-memory limits; device/SAF and stress validation are still pending, so these are safety bounds rather than demonstrated performance guarantees.
 - **Custom fonts**: `pubspec.yaml` font blocks are commented out. Runtime uses system fallbacks (IBM Plex Mono → system mono). Do not assume `Bebas Neue` / `Space Mono` are loaded.
 - **Assets folders** (`assets/{fonts,illustrations,icons,textures}/`) exist but are empty.
 - **State management**: `flutter_bloc` with Cubits for onboarding, viewer, and Settings; `RemoverBloc` handles removal. Mirror the owning feature's existing pattern.

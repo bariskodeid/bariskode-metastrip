@@ -131,6 +131,278 @@ Uint8List repackZipWithoutEntries(
   return Uint8List.fromList(ZipEncoder().encode(output)!);
 }
 
+/// Rewrites ZIP container metadata without decoding or recompressing members.
+///
+/// This intentionally cleans the container only. Metadata inside a member is
+/// not inspected or changed. Local records, descriptors, and compressed data
+/// are copied verbatim; only the headers and directory are rebuilt.
+Uint8List rewriteZipMetadata(Uint8List bytes) {
+  final entries = preflightZip(bytes);
+  final eocd = _findEocd(bytes);
+  final originalDirectoryOffset = _u32(bytes, eocd + 16);
+  final originalDirectorySize = _u32(bytes, eocd + 12);
+  if (originalDirectoryOffset + originalDirectorySize != eocd) {
+    throw const FormatException('Unsupported ZIP structure');
+  }
+  // The source archive may legally list central-directory records in an
+  // order different from the physical local-record order. Validate both
+  // regions independently, then canonicalize the output below.
+  _validateCanonicalZipLayout(bytes, entries, eocd);
+  final records = <_RawZipEntry>[];
+  var centralCursor = originalDirectoryOffset;
+  for (final entry in entries) {
+    final nameLength = _u16(bytes, centralCursor + 28);
+    final extraLength = _u16(bytes, centralCursor + 30);
+    final commentLength = _u16(bytes, centralCursor + 32);
+    final centralLength = 46 + nameLength + extraLength + commentLength;
+    final localOffset = entry.localHeaderOffset;
+    final localNameLength = _u16(bytes, localOffset + 26);
+    final localExtraLength = _u16(bytes, localOffset + 28);
+    final localData = localOffset + 30 + localNameLength + localExtraLength;
+    final localEnd =
+        _localRecordEnd(bytes, localData, entry, originalDirectoryOffset);
+    final centralExtra = _rewriteExtra(bytes.sublist(
+      centralCursor + 46 + nameLength,
+      centralCursor + 46 + nameLength + extraLength,
+    ));
+    final localExtra = _rewriteExtra(
+      bytes.sublist(localOffset + 30 + localNameLength,
+          localOffset + 30 + localNameLength + localExtraLength),
+    );
+    records.add(_RawZipEntry(
+      localOffset: localOffset,
+      localEnd: localEnd,
+      localNameLength: localNameLength,
+      localExtraLength: localExtraLength,
+      localDataStart: localData,
+      localExtra: localExtra,
+      centralExtra: centralExtra,
+      nameLength: nameLength,
+      centralOffset: centralCursor,
+      centralLength: centralLength,
+    ));
+    centralCursor += centralLength;
+  }
+  final physicalRecords = records.toList()
+    ..sort((first, second) => first.localOffset.compareTo(second.localOffset));
+
+  final output = BytesBuilder(copy: false);
+  final newLocalOffsets = <int, int>{};
+  for (final record in physicalRecords) {
+    newLocalOffsets[record.localOffset] = output.length;
+    final localHeader = bytes.sublist(
+      record.localOffset,
+      record.localOffset + 30 + record.localNameLength,
+    );
+    localHeader[10] = 0;
+    localHeader[11] = 0;
+    localHeader[12] = 0x21;
+    localHeader[13] = 0;
+    _set16List(localHeader, 28, record.localExtra.length);
+    output.add(localHeader);
+    output.add(record.localExtra);
+    output.add(bytes.sublist(record.localDataStart, record.localEnd));
+  }
+  final newDirectoryOffset = output.length;
+  // Canonical output uses the physical local-record order for its central
+  // directory too. The local-offset mapping above is keyed by source offset,
+  // so reordering records does not lose the correct offsets.
+  for (final record in physicalRecords) {
+    final central = bytes.sublist(
+      record.centralOffset,
+      record.centralOffset + record.centralLength,
+    );
+    central[12] = 0;
+    central[13] = 0;
+    central[14] = 0x21;
+    central[15] = 0;
+    _set16List(central, 30, record.centralExtra.length);
+    _set16List(central, 32, 0);
+    _set32List(central, 42, newLocalOffsets[record.localOffset]!);
+    output.add(central.sublist(0, 46));
+    output.add(central.sublist(46, 46 + record.nameLength));
+    output.add(record.centralExtra);
+  }
+  final directorySize = output.length - newDirectoryOffset;
+  final end = bytes.sublist(eocd, eocd + 22);
+  _set16List(end, 20, 0);
+  _set32List(end, 12, directorySize);
+  _set32List(end, 16, newDirectoryOffset);
+  output.add(end);
+  return output.takeBytes();
+}
+
+class _RawZipEntry {
+  const _RawZipEntry({
+    required this.localOffset,
+    required this.localEnd,
+    required this.localNameLength,
+    required this.localExtraLength,
+    required this.localExtra,
+    required this.centralExtra,
+    required this.nameLength,
+    required this.localDataStart,
+    required this.centralOffset,
+    required this.centralLength,
+  });
+  final int localOffset, localEnd;
+  final int localNameLength, localExtraLength, nameLength;
+  final int localDataStart, centralOffset, centralLength;
+  final List<int> localExtra, centralExtra;
+}
+
+/// Validates the already-rewritten ZIP metadata without allocating a second
+/// full archive. Payload bytes are copied, but not decoded or CRC-verified.
+void validateCanonicalZipMetadata(Uint8List bytes) {
+  final eocd = _findEocd(bytes);
+  final entries = preflightZip(bytes);
+  if (_u16(bytes, eocd + 20) != 0) {
+    throw const FormatException('Generated ZIP metadata is not canonical');
+  }
+  final directory = _u32(bytes, eocd + 16);
+  _validateCanonicalZipLayout(
+    bytes,
+    entries,
+    eocd,
+    requireCentralPhysicalOrder: true,
+  );
+  var central = directory;
+  for (final entry in entries) {
+    final nameLength = _u16(bytes, central + 28);
+    final extraLength = _u16(bytes, central + 30);
+    final commentLength = _u16(bytes, central + 32);
+    if (commentLength != 0 ||
+        _u16(bytes, central + 12) != 0 ||
+        _u16(bytes, central + 14) != 0x21 ||
+        !_extrasContainOnlyAllowed(
+            bytes, central + 46 + nameLength, extraLength)) {
+      throw const FormatException('Generated ZIP metadata is not canonical');
+    }
+    final local = entry.localHeaderOffset;
+    if (_u16(bytes, local + 10) != 0 ||
+        _u16(bytes, local + 12) != 0x21 ||
+        !_extrasContainOnlyAllowed(bytes, local + 30 + _u16(bytes, local + 26),
+            _u16(bytes, local + 28))) {
+      throw const FormatException('Generated ZIP metadata is not canonical');
+    }
+    central += 46 + nameLength + extraLength + commentLength;
+  }
+}
+
+/// Enforces the canonical byte layout produced by the ZIP metadata rewriter.
+///
+/// This is deliberately independent from metadata checks: callers validating
+/// an already-persisted output must not trust that it was produced by the
+/// rewriter. Central-directory order is the authoritative record order.
+void _validateCanonicalZipLayout(
+  Uint8List bytes,
+  List<ZipPreflightEntry> entries,
+  int eocd, {
+  bool requireCentralPhysicalOrder = false,
+}) {
+  final directoryOffset = _u32(bytes, eocd + 16);
+  final directorySize = _u32(bytes, eocd + 12);
+  final commentLength = _u16(bytes, eocd + 20);
+  if (eocd + 22 + commentLength != bytes.length) {
+    throw const FormatException('Unsupported non-canonical ZIP layout');
+  }
+  var central = directoryOffset;
+  final physicalEntries = entries.toList()
+    ..sort((first, second) =>
+        first.localHeaderOffset.compareTo(second.localHeaderOffset));
+  var expectedLocalOffset = 0;
+  for (final entry in physicalEntries) {
+    if (entry.localHeaderOffset != expectedLocalOffset) {
+      throw const FormatException('Unsupported non-canonical ZIP layout');
+    }
+    final localNameLength = _u16(bytes, entry.localHeaderOffset + 26);
+    final localExtraLength = _u16(bytes, entry.localHeaderOffset + 28);
+    final localData =
+        entry.localHeaderOffset + 30 + localNameLength + localExtraLength;
+    expectedLocalOffset =
+        _localRecordEnd(bytes, localData, entry, directoryOffset);
+  }
+  central = directoryOffset;
+  for (var index = 0; index < entries.length; index++) {
+    final nameLength = _u16(bytes, central + 28);
+    final extraLength = _u16(bytes, central + 30);
+    final commentLength = _u16(bytes, central + 32);
+    final centralLength = 46 + nameLength + extraLength + commentLength;
+    if (requireCentralPhysicalOrder &&
+        _u32(bytes, central + 42) != physicalEntries[index].localHeaderOffset) {
+      throw const FormatException('Generated ZIP metadata is not canonical');
+    }
+    central += centralLength;
+  }
+  if (expectedLocalOffset != directoryOffset ||
+      central != directoryOffset + directorySize ||
+      central != eocd) {
+    throw const FormatException('Unsupported non-canonical ZIP layout');
+  }
+}
+
+bool _extrasContainOnlyAllowed(Uint8List bytes, int offset, int length) {
+  for (var cursor = 0; cursor < length;) {
+    if (cursor + 4 > length) return false;
+    final id = _u16(bytes, offset + cursor);
+    final size = _u16(bytes, offset + cursor + 2);
+    if (cursor + 4 + size > length) return false;
+    if (id == 0x5455 || id == 0x000a) return false;
+    cursor += 4 + size;
+  }
+  return true;
+}
+
+List<int> _rewriteExtra(List<int> extra) {
+  final result = <int>[];
+  for (var cursor = 0; cursor < extra.length;) {
+    if (cursor + 4 > extra.length) {
+      throw const FormatException('Malformed ZIP extra field');
+    }
+    final id = extra[cursor] | extra[cursor + 1] << 8;
+    final length = extra[cursor + 2] | extra[cursor + 3] << 8;
+    if (cursor + 4 + length > extra.length) {
+      throw const FormatException('Malformed ZIP extra field');
+    }
+    if (id != 0x5455 && id != 0x000a) {
+      result.addAll(extra.sublist(cursor, cursor + 4 + length));
+    }
+    cursor += 4 + length;
+  }
+  return result;
+}
+
+int _localRecordEnd(
+  Uint8List bytes,
+  int dataStart,
+  ZipPreflightEntry entry,
+  int directoryOffset,
+) {
+  var end = dataStart + entry.compressedSize;
+  if (end > directoryOffset) {
+    throw const FormatException('Invalid zip archive');
+  }
+  if ((_u16(bytes, entry.localHeaderOffset + 6) & 0x8) != 0) {
+    final signed = end + 4 <= directoryOffset && _u32(bytes, end) == 0x08074b50;
+    end += (signed ? 4 : 0) + 12;
+  }
+  if (end > directoryOffset) {
+    throw const FormatException('Invalid zip archive');
+  }
+  return end;
+}
+
+void _set16List(List<int> bytes, int offset, int value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = value >> 8;
+}
+
+void _set32List(List<int> bytes, int offset, int value) {
+  for (var i = 0; i < 4; i++) {
+    bytes[offset + i] = value >> (8 * i) & 0xff;
+  }
+}
+
 /// Decodes [bytes] after structural ZIP validation.
 Archive decodeGuardedZip(Uint8List bytes) {
   preflightZip(bytes);

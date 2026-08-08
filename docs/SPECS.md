@@ -2,9 +2,9 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Platform:** Flutter (Android-first, iOS ready)  
-**Last Updated:** 2026-08-08
+**Last Updated:** 2026-08-09
 
-> **Implementation status:** This file describes the product target. Current code accepts a narrower Viewer allowlist, has registered extractors for only some allowlisted formats, and has a 19-extension Remover registry. Full Strip, Selective, Anonymize, Preserve Technical, share intent, and background processing are planned unless explicitly marked implemented in the progress reports.
+> **Implementation status:** This file describes the product target. Current code accepts a narrower Viewer allowlist, has registered extractors for only some allowlisted formats, and has a 20-extension Remover registry. Full Strip, Selective, Anonymize, Preserve Technical, share intent, and background processing are planned unless explicitly marked implemented in the progress reports.
 
 ---
 
@@ -72,7 +72,7 @@ Target pengguna: jurnalis, fotografer, aktivis privasi, developer, dan pengguna 
 ### 2.5 Archive & Other Files (target; see current registry summary below)
 | Extension | Library | Metadata yang Didukung |
 |-----------|---------|----------------------|
-| `.zip` | `archive` package | Central directory comment, file entries (date, method, CRC) |
+| `.zip` | `archive` package | Viewer entry listing; ZIP-only removal cleans EOCD/entry comments, DOS timestamps, and recognized `0x5455`/`0x000a` timestamp extras. Unknown extra fields and platform/external attributes remain. Compressed member payloads are preserved without decompression or payload CRC verification; member metadata is not recursively cleaned. |
 | `.tar` / `.gz` / `.bz2` | Planned archive parser | `.tar` is Viewer-allowlisted but has no registered extractor; `.gz`/`.bz2` are not in the current allowlist |
 | `.apk` | `archive` + XML | AndroidManifest.xml (package, version, permissions, minSdk), CERT.RSA signer info |
 | `.epub` | `archive` + XML | OPF metadata (title, creator, publisher, date, rights, language, subject) |
@@ -81,8 +81,8 @@ Target pengguna: jurnalis, fotografer, aktivis privasi, developer, dan pengguna 
 
 - **Viewer allowlist:** JPG/JPEG, PNG, WebP, GIF, BMP, TIFF/TIF, HEIC; MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV; MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF/AIF/AIFC; PDF, DOCX, XLSX, PPTX, ODT/ODS/ODP, RTF, TXT; ZIP, TAR, APK, EPUB.
 - **Registered payload extractors:** JPG/JPEG, TIFF/TIF, PNG, GIF, WebP, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, PDF, DOCX/XLSX/PPTX, ODT/ODS/ODP, ZIP/APK/EPUB. Other allowlisted extensions receive filesystem metadata only.
-- **Remover registry:** JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX/XLSX/PPTX, ODT/ODS/ODP, GIF, WebP.
-- **Not current support:** TIFF/TIF removal, HEIF, RAW, M4V, legacy Office, GZ/BZ2. TIFF/TIF extraction remains available, but removal is disabled pending a future structural writer/POC. HEIC is allowlisted but has no format extractor. Video and archive removal, granular audio removal, and per-property Office removal are deferred.
+- **Remover registry:** JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX/XLSX/PPTX, ODT/ODS/ODP, GIF, WebP, ZIP. ZIP is container-only and non-recursive; APK and EPUB are excluded from removal.
+- **Not current support:** APK/EPUB removal, TIFF/TIF removal, HEIF, RAW, M4V, legacy Office, GZ/BZ2. TIFF/TIF extraction remains available, but removal is disabled pending a future structural writer/POC. HEIC is allowlisted but has no format extractor. Video, recursive archive-member cleanup, granular audio removal, and per-property Office removal are deferred. Device/SAF validation and stress testing remain pending.
 
 ### 2.7 File System Metadata (Universal — semua allowlisted file)
 Selalu ditampilkan untuk setiap file terlepas dari formatnya:

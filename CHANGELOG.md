@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ZIP-only cleanup (2026-08-09)
+
+- Added `.zip` as the 20th removable extension. Cleanup removes supported
+  container metadata: EOCD and entry comments, DOS timestamps, and recognized
+  `0x5455`/`0x000a` timestamp extras.
+- Member compressed payloads are preserved and metadata inside members is not
+  recursively cleaned. APK and EPUB remain unsupported for removal.
+- Device/SAF and ZIP stress validation remain pending; comprehensive archive
+  cleanup and release readiness are not claimed.
+
 ### BMP removal subset (2026-08-08)
 
 - Enabled BMP removal for strict canonical 24/32-bit Windows
@@ -134,8 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HEIC/HEIF extraction: requires a HEIF container parser; pending.
 - Selective stripping for audio (MP3 frame-level) and Vorbis (per-key):
   parameter plumbing shipped, stripper implementation pending.
-- Archive removal (ZIP/APK metadata stripping): out of MVP strip scope; APK
-  stripping would invalidate the signing block.
+- APK and EPUB removal remain unsupported. ZIP-only container cleanup is
+  implemented; APK stripping would invalidate the signing block.
 - Granular audio removal and per-property Office removal: deferred; current
   strippers use format-level cleanup behavior.
 
@@ -202,7 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-processing validation now checks the actual local path on disk (present
   regular file, unchanged supported extension, and current size),
   rather than trusting picker-time metadata.
-- Contract tests assert the exact 19-extension remover registry and that every
+- Contract tests assert the exact 20-extension remover registry and that every
   registered extension has a datasource route.
 - Integration-style tests exercise the real remover flow, verify clean-copy
   output and original preservation, and verify malformed input produces no
@@ -250,9 +260,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Verification (2026-08-08, latest implementation verification)
+## Verification (2026-08-09, latest implementation verification)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: 337 passed, 1 skipped
+- `flutter test`: 390 tests completed; 389 passed, 1 skipped
 - Test coverage: not measured in this verification run
 - Debug APK: build verified (`build\app\outputs\flutter-apk\app-debug.apk`); no
   device-install verification is claimed here.

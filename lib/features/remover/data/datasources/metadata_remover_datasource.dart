@@ -3,8 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
-import 'package:metastrip/core/processing/isolate_runner.dart';
 import 'package:metastrip/core/format/format_registry.dart';
+import 'package:metastrip/core/processing/isolate_runner.dart';
+import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/bmp_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/gif_stripper.dart';
@@ -38,6 +39,7 @@ enum _RemovalRoute {
   gif,
   webp,
   bmp,
+  zip,
 }
 
 /// Successful datasource output with value-free cleanup facts.
@@ -86,6 +88,7 @@ class MetadataRemoverDatasource {
     'gif': _RemovalRoute.gif,
     'webp': _RemovalRoute.webp,
     'bmp': _RemovalRoute.bmp,
+    'zip': _RemovalRoute.zip,
   };
 
   static Set<String> get handlerExtensions => Set.unmodifiable(_routes.keys);
@@ -121,6 +124,12 @@ class MetadataRemoverDatasource {
       }
       if (extension == 'pdf') {
         return _stripPdfWithReport(
+          inputPath,
+          outputDirectory: outputDirectory,
+        );
+      }
+      if (extension == 'zip') {
+        return _stripZipWithReport(
           inputPath,
           outputDirectory: outputDirectory,
         );
@@ -214,13 +223,9 @@ class MetadataRemoverDatasource {
         final persistedBytes = await _persistedOutputReader(file);
         _validateSelectivePngOutput(persistedBytes, labels);
       } on Object {
-        try {
-          await file.delete();
-        } on Object {
-          throw const FormatException(
-            'Output validation failed; unverified copy may remain',
-          );
-        }
+        // File paths are not stable identities. Leave the unverified output
+        // in place rather than deleting a path that another writer may have
+        // substituted during validation.
         rethrow;
       }
     }
@@ -365,6 +370,8 @@ class MetadataRemoverDatasource {
         stripWebpMetadata(inputPath, outputDirectory: outputDirectory),
       _RemovalRoute.bmp =>
         stripBmpMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.zip =>
+        stripZipMetadata(inputPath, outputDirectory: outputDirectory),
     };
   }
 
@@ -606,6 +613,89 @@ class MetadataRemoverDatasource {
     return result.file;
   }
 
+  /// Writes a ZIP copy with container-level metadata normalized.
+  Future<File> stripZipMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) async {
+    final result = await _stripZipWithReport(
+      inputPath,
+      outputDirectory: outputDirectory,
+    );
+    return result.file;
+  }
+
+  Future<MetadataRemovalOutput> _stripZipWithReport(
+    String inputPath, {
+    required String? outputDirectory,
+  }) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('ZIP too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('ZIP too large for remover MVP');
+    }
+    final outputBytes = await runOnWorker(
+      () => rewriteZipMetadata(inputBytes),
+    );
+    _validateGeneratedZip(outputBytes);
+    final output = await _writeCleanCopy(
+      inputPath,
+      outputBytes,
+      outputDirectory,
+    );
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      FileStat? installedStat;
+      try {
+        installedStat = await output.stat();
+        if (installedStat.type != FileSystemEntityType.file ||
+            installedStat.size != outputBytes.length) {
+          throw const FormatException('ZIP persisted output size changed');
+        }
+        final persisted = await _persistedOutputReader(output);
+        final validatedStat = await output.stat();
+        if (!_sameStatAttributes(installedStat, validatedStat)) {
+          throw const FormatException('ZIP persisted output changed');
+        }
+        _validateGeneratedZip(persisted);
+        if (!_sameBytes(persisted, outputBytes)) {
+          throw const FormatException('ZIP persisted output differs');
+        }
+      } on Object {
+        // FileStat exposes mutable attributes, not a reliable file identity.
+        // Never delete a persisted output from a failed validation based only
+        // on matching size/timestamps: another writer may have substituted it.
+        rethrow;
+      }
+    }
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        warnings: const [
+          'ZIP container metadata was cleaned; metadata inside archive members was not recursively cleaned.',
+        ],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
+  void _validateGeneratedZip(Uint8List bytes) {
+    validateCanonicalZipMetadata(bytes);
+  }
+
   Future<MetadataRemovalOutput> _stripBmpWithReport(
     String inputPath, {
     required String? outputDirectory,
@@ -644,26 +734,15 @@ class MetadataRemoverDatasource {
         }
         final persistedBytes = await _persistedOutputReader(output);
         final validatedStat = await output.stat();
-        if (!_sameFileSnapshot(installedStat, validatedStat)) {
+        if (!_sameStatAttributes(installedStat, validatedStat)) {
           throw const FormatException('BMP persisted output changed');
         }
         validateBmpOutput(inputBytes, persistedBytes);
       } on Object {
-        try {
-          final expectedStat = installedStat;
-          if (expectedStat == null) {
-            throw const FormatException(
-              'Output validation failed; unverified copy may remain',
-            );
-          }
-          final currentStat = await output.stat();
-          if (!_sameFileSnapshot(expectedStat, currentStat)) {
-            throw const FormatException(
-              'Output validation failed; unverified copy may remain',
-            );
-          }
-          await output.delete();
-        } on Object {
+        // FileStat size/timestamps are not identity. Leave the failed output
+        // in place rather than risk deleting a replacement installed by an
+        // unrelated writer.
+        if (installedStat == null) {
           throw const FormatException(
             'Output validation failed; unverified copy may remain',
           );
@@ -826,12 +905,23 @@ Future<Uint8List> _readPersistedOutput(File output) async {
   }
 }
 
-bool _sameFileSnapshot(FileStat expected, FileStat actual) =>
+/// Compares observable stat attributes only. This is useful for detecting a
+/// change during one validation pass, but is deliberately not treated as file
+/// identity and must never authorize deletion of the path.
+bool _sameStatAttributes(FileStat expected, FileStat actual) =>
     expected.type == FileSystemEntityType.file &&
     actual.type == FileSystemEntityType.file &&
     expected.size == actual.size &&
     expected.modified == actual.modified &&
     expected.changed == actual.changed;
+
+bool _sameBytes(List<int> first, List<int> second) {
+  if (first.length != second.length) return false;
+  for (var i = 0; i < first.length; i++) {
+    if (first[i] != second[i]) return false;
+  }
+  return true;
+}
 
 Future<void> _runBestEffort(Future<void> Function() cleanup) async {
   try {
