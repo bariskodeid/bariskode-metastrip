@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/ogg_vorbis_selective_poc.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_stripper.dart';
 
 void main() {
@@ -322,6 +323,207 @@ void main() {
       );
     });
   });
+
+  group('disabled Ogg Vorbis selective POC', () {
+    test('uses the Xiph non-reflected CRC known vector', () {
+      expect(_independentOggCrc('123456789'.codeUnits), 0x89A1897F);
+    });
+
+    test('requires BOS on the first page and rejects later BOS', () {
+      final packet = <int>[0x01, ...'vorbis'.codeUnits, 1];
+      final noBos = Uint8List.fromList(_oggPage(packets: [packet]));
+      final laterBos = Uint8List.fromList([
+        ..._oggPage(packets: [packet], headerType: 2),
+        ..._oggPage(packets: [packet], headerType: 2, sequence: 1),
+      ]);
+      for (final input in [noBos, laterBos]) {
+        expect(
+          () => stripOggVorbisCommentsSelectivePoc(
+            input,
+            selectedKeys: {'TITLE'},
+          ),
+          throwsFormatException,
+        );
+      }
+    });
+
+    test('handles the exact 255-byte packet boundary with a terminating zero',
+        () {
+      final identification = <int>[0x01, ...'vorbis'.codeUnits, 1];
+      final value = List<String>.filled(229, 'x').join();
+      final comment = <int>[
+        0x03,
+        ...'vorbis'.codeUnits,
+        ..._vorbisCommentPayload(vendor: 'x', comments: ['TITLE=$value']),
+      ];
+      expect(comment.length, 255);
+      final input = Uint8List.fromList([
+        ..._oggPage(packets: [identification], headerType: 2),
+        ..._oggPage(packets: [comment], sequence: 1),
+      ]);
+      expect(
+        () =>
+            stripOggVorbisCommentsSelectivePoc(input, selectedKeys: {'TITLE'}),
+        returnsNormally,
+      );
+    });
+
+    test('removes all normalized key occurrences and preserves other data', () {
+      final identification = <int>[0x01, ...'vorbis'.codeUnits, 1, 2, 3];
+      final comment = <int>[
+        0x03,
+        ...'vorbis'.codeUnits,
+        ..._vorbisCommentPayload(
+          vendor: 'keep-vendor',
+          comments: const [
+            'title=remove one',
+            'ARTIST=keep artist',
+            ' TITLE =remove two',
+            'CUSTOM=keep custom',
+          ],
+        ),
+      ];
+      final setup = <int>[0x05, ...'vorbis'.codeUnits, 9, 8, 7];
+      final first = _oggPage(packets: [identification], headerType: 2);
+      final middle = _oggPage(
+        packets: [comment, setup],
+        sequence: 1,
+      );
+      final last = _oggPage(
+        packets: const [
+          <int>[10, 11, 12]
+        ],
+        headerType: 4,
+        sequence: 2,
+      );
+      final input = Uint8List.fromList([...first, ...middle, ...last]);
+
+      final result = stripOggVorbisCommentsSelectivePoc(
+        input,
+        selectedKeys: {'\tTiTlE '},
+      );
+
+      expect(result.matchedKeys, {'TITLE'});
+      expect(result.bytes.sublist(0, first.length), first);
+      expect(result.bytes.sublist(result.bytes.length - last.length), last);
+      final rewrittenPackets = _oggPackets(result.bytes, first.length);
+      expect(_commentStrings(rewrittenPackets.first), [
+        'ARTIST=keep artist',
+        'CUSTOM=keep custom',
+      ]);
+      expect(rewrittenPackets[1], setup);
+      final rewrittenPage = result.bytes.sublist(
+        first.length,
+        result.bytes.length - last.length,
+      );
+      expect(
+        ByteData.sublistView(rewrittenPage).getUint32(22, Endian.little),
+        _xiphCrc(rewrittenPage),
+      );
+    });
+
+    test('fails closed for a continued page or cross-page packet', () {
+      final identification = <int>[0x01, ...'vorbis'.codeUnits, 1];
+      final continued = _oggPage(
+        packets: const [
+          <int>[1, 2]
+        ],
+        headerType: 1,
+        sequence: 1,
+      );
+      final input = Uint8List.fromList([
+        ..._oggPage(packets: [identification], headerType: 2),
+        ...continued,
+      ]);
+
+      expect(
+        () => stripOggVorbisCommentsSelectivePoc(
+          input,
+          selectedKeys: {'TITLE'},
+        ),
+        throwsFormatException,
+      );
+
+      final crossPage = Uint8List.fromList([
+        ..._oggPage(packets: [identification], headerType: 2),
+        ..._oggPage(
+          packets: [List<int>.filled(255, 1)],
+          sequence: 1,
+        ),
+      ]);
+      expect(
+        () => stripOggVorbisCommentsSelectivePoc(
+          crossPage,
+          selectedKeys: {'TITLE'},
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('fails closed for Opus, chained streams, and malformed comments', () {
+      final opus = Uint8List.fromList(
+        _oggPage(packets: [
+          <int>[...'OpusHead'.codeUnits, 1]
+        ], headerType: 2),
+      );
+      final malformed = Uint8List.fromList([
+        ..._oggPage(
+          packets: [
+            <int>[0x01, ...'vorbis'.codeUnits]
+          ],
+          headerType: 2,
+        ),
+        ..._oggPage(
+          packets: [
+            <int>[0x03, ...'vorbis'.codeUnits, 0xff]
+          ],
+          sequence: 1,
+        ),
+      ]);
+      final chained = Uint8List.fromList([
+        ..._oggPage(
+          packets: [
+            <int>[0x01, ...'vorbis'.codeUnits]
+          ],
+          headerType: 2,
+        ),
+        ..._oggPage(
+          packets: [
+            <int>[0x03, ...'vorbis'.codeUnits]
+          ],
+          sequence: 1,
+          serial: 0x76543210,
+        ),
+      ]);
+
+      for (final input in [opus, malformed, chained]) {
+        expect(
+          () => stripOggVorbisCommentsSelectivePoc(
+            input,
+            selectedKeys: {'TITLE'},
+          ),
+          throwsFormatException,
+        );
+      }
+    });
+  });
+}
+
+List<String> _commentStrings(Uint8List packet) {
+  final view = ByteData.sublistView(packet);
+  final vendorLength = view.getUint32(7, Endian.little);
+  var offset = 11 + vendorLength;
+  final count = view.getUint32(offset, Endian.little);
+  offset += 4;
+  final comments = <String>[];
+  for (var i = 0; i < count; i++) {
+    final length = view.getUint32(offset, Endian.little);
+    offset += 4;
+    comments.add(String.fromCharCodes(packet.sublist(offset, offset + length)));
+    offset += length;
+  }
+  expect(offset, packet.length);
+  return comments;
 }
 
 Uint8List _flacFile({
@@ -416,6 +618,7 @@ List<int> _oggPage({
   required List<List<int>> packets,
   int headerType = 0,
   int sequence = 0,
+  int serial = 0x12345678,
 }) {
   final laces = <int>[];
   final payload = <int>[];
@@ -429,14 +632,14 @@ List<int> _oggPage({
     0x00, // version
     headerType,
     ..._le64(0), // granule position
-    ..._le32(0x12345678), // serial
+    ..._le32(serial), // serial
     ..._le32(sequence),
     0x00, 0x00, 0x00, 0x00, // CRC placeholder
     laces.length,
     ...laces,
     ...payload,
   ];
-  final crc = _crc(page);
+  final crc = _xiphCrc(page);
   page[22] = crc & 0xFF;
   page[23] = (crc >> 8) & 0xFF;
   page[24] = (crc >> 16) & 0xFF;
@@ -456,6 +659,7 @@ List<int> _oggPage({
   }
   laces.add(packet.length - offset);
   payload.addAll(packet.sublist(offset));
+  if (laces.last == 255) laces.add(0);
   return (laces, payload);
 }
 
@@ -493,23 +697,36 @@ List<int> _le64(int value) => [
       (value >> 56) & 0xFF,
     ];
 
-/// Ogg page CRC, same algorithm as the stripper: reflected CRC-32 with
-/// polynomial 0x04C11DB7, init 0, no final XOR, covering the header without
-/// the CRC field (bytes 0..21) plus everything from the segment count on.
+/// Test-only page builder checksum. Kept separate from production code and
+/// independently written from the Xiph/Ogg specification.
 int _crc(List<int> page) {
   var crc = 0;
-  void update(int value) {
-    crc ^= value;
-    for (var i = 0; i < 8; i++) {
+  for (var i = 0; i < page.length; i++) {
+    if (i >= 22 && i < 26) continue;
+    crc ^= page[i];
+    for (var bit = 0; bit < 8; bit++) {
       crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
     }
   }
+  return crc;
+}
 
-  for (var i = 0; i < 22; i++) {
-    update(page[i]);
-  }
-  for (var i = 26; i < page.length; i++) {
-    update(page[i]);
+int _xiphCrc(List<int> page) {
+  final covered = <int>[...page.take(22), ...page.skip(26)];
+  return _independentOggCrc(covered);
+}
+
+int _independentOggCrc(List<int> bytes) {
+  var crc = 0;
+  for (final byte in bytes) {
+    crc ^= byte << 24;
+    for (var i = 0; i < 8; i++) {
+      if ((crc & 0x80000000) != 0) {
+        crc = ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFFFFFF;
+      }
+    }
   }
   return crc;
 }

@@ -305,7 +305,13 @@ verified.
    canonical STREAMINFO ordering, a final metadata block, preservation of the
    vendor, unselected comments, non-comment block bytes/order, and audio suffix.
    It does not decode or validate FLAC audio frames. OGG/Opus selective removal
-   remains disabled; device/SAF validation remains pending.
+    remains disabled; device/SAF validation remains pending. A disabled,
+    low-level Ogg Vorbis selective POC now exists only for a bounded strict
+     single-stream subset with BOS first, no later BOS, EOS only if final, and
+     a self-contained single-page comment packet. It uses explicit bounded
+     input/output, page, packet, comment, vendor, and entry limits.
+    It is not registry/datasource/UI capability, does not cover Opus, and does
+    not close the broader OGG/Opus selective-removal gap.
 7. [ ] Add WAV/AIFF field-level removal.
 
 ### Result reporting
@@ -344,6 +350,11 @@ not claimed.
 - [ ] Preserved fields are identified and verified; no such claim is made by
   the current report.
 - [ ] Per-property selective removal is implemented for Office/audio formats.
+- [~] Ogg Vorbis selective removal has a disabled low-level POC only; strict
+  synthetic subset tests cover normalized all-occurrence removal, internal
+  structural preservation checks, conforming Xiph CRC rewrite with an
+  independent test oracle/known vector, strict UTF-8, lacing boundaries, and
+  fail-closed unsupported structures. This is not independent Ogg validation.
 - [ ] Anonymize and Preserve Technical policies are defined and wired.
 - [ ] Physical-device picker/output behavior passes the scheduled matrix.
 

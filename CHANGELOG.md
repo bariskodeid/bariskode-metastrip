@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Disabled Ogg Vorbis selective POC (2026-08-09)
+
+- Added an un-routed, low-level bounded parser/writer POC for removing selected
+  Vorbis comment keys from a strict single-stream, self-contained single-page
+  comment-packet subset. Key matching uses the existing stable normalization;
+  every selected occurrence is removed while vendor, unselected entries,
+  non-comment packets, and unaffected pages are rebuilt/preserved and page CRCs
+  are recomputed.
+- Added structural self-checks and fail-closed handling for malformed
+  pages/comments, invalid CRCs, chained streams, Opus, and continued or
+  cross-page packets. The tests include an independent Xiph CRC oracle and
+  known vector; this is not independent format validation. This is not a remover capability: registry routing,
+  datasource selection, UI, and Opus selective behavior remain disabled. No
+  device/SAF or broad Ogg compatibility claim is made.
+
 ### FLAC selective Vorbis comments (2026-08-09)
 
 - Added FLAC-only selective removal using stable, canonical Vorbis comment-key
