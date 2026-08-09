@@ -8,6 +8,7 @@ import 'package:metastrip/core/processing/isolate_runner.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/bmp_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/flac_validator.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/gif_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/id3_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/odf_stripper.dart';
@@ -161,6 +162,11 @@ class MetadataRemoverDatasource {
           outputDirectory,
           policy.selectedFieldIds,
         ),
+      'flac' => _stripSelectiveFlac(
+          inputPath,
+          outputDirectory,
+          policy.selectedFieldIds,
+        ),
       _ => throw const FormatException(
           'Selective cleanup is unavailable for this format',
         ),
@@ -177,6 +183,7 @@ class MetadataRemoverDatasource {
     final valid = switch (extension) {
       'png' => fieldIds.every((id) => id.isPngText),
       'pdf' => fieldIds.every((id) => id.isPdfInfo),
+      'flac' => fieldIds.every((id) => id.isVorbisComment),
       _ => false,
     };
     if (!valid) {
@@ -265,6 +272,73 @@ class MetadataRemoverDatasource {
     );
   }
 
+  Future<MetadataRemovalOutput> _stripSelectiveFlac(
+    String inputPath,
+    String outputDirectory,
+    Set<MetadataFieldId> requestedIds,
+  ) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('FLAC too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('FLAC too large for remover MVP');
+    }
+    final requestedKeys =
+        requestedIds.map((id) => id.vorbisCommentKey!).toSet();
+    final stripped = await runOnWorker(
+      () => stripFlacVorbisCommentsSelective(
+        inputBytes,
+        selectedKeys: requestedKeys,
+      ),
+    );
+    validateFlacSelectivePreservation(
+      inputBytes,
+      stripped.bytes,
+      selectedKeys: requestedKeys,
+    );
+    final output =
+        await _writeCleanCopy(inputPath, stripped.bytes, outputDirectory);
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      final persisted = await _persistedOutputReader(output);
+      validateFlacSelectivePreservation(
+        inputBytes,
+        stripped.bytes,
+        persisted: persisted,
+        selectedKeys: requestedKeys,
+      );
+    }
+    final removedIds =
+        stripped.matchedKeys.map(MetadataFieldId.vorbisComment).toSet();
+    final absentIds = requestedIds.difference(removedIds);
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        requestedFieldIds: requestedIds,
+        removedFieldIds: removedIds,
+        alreadyAbsentFieldIds: absentIds,
+        warnings: isSafOutput
+            ? const [
+                'Generated FLAC bytes were validated, but persisted SAF readback was not performed.'
+              ]
+            : const [],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
   Future<MetadataRemovalOutput> _stripPdfWithReport(
     String inputPath, {
     required String outputDirectory,
@@ -300,8 +374,8 @@ class MetadataRemoverDatasource {
   ///
   /// A null [selectiveLabels] value requests full removal. A non-empty set
   /// requests field-level removal and is accepted only for formats that support
-  /// it (PNG text chunks and PDF Info keys). Empty sets, unsupported formats,
-  /// and unknown field labels are rejected.
+  /// it (PNG text chunks, PDF Info keys, and FLAC Vorbis comment keys). Empty
+  /// sets, unsupported formats, and unknown field labels are rejected.
   Future<File> stripMetadata(
     String inputPath, {
     String? outputDirectory,
@@ -327,6 +401,13 @@ class MetadataRemoverDatasource {
         !selectiveLabels.every(_pdfInfoKeys.contains)) {
       throw const FormatException('Unsupported selective metadata field');
     }
+    if (route == _RemovalRoute.flac && selectiveLabels != null) {
+      try {
+        selectiveLabels.map(MetadataFieldId.normalizeVorbisCommentKey).toSet();
+      } on ArgumentError {
+        throw const FormatException('Unsupported selective metadata field');
+      }
+    }
     return switch (route) {
       _RemovalRoute.jpeg => stripJpegMetadata(
           inputPath,
@@ -344,8 +425,15 @@ class MetadataRemoverDatasource {
         ),
       _RemovalRoute.mp3 =>
         stripMp3Metadata(inputPath, outputDirectory: outputDirectory),
-      _RemovalRoute.flac =>
-        stripFlacMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.flac => selectiveLabels == null
+          ? stripFlacMetadata(inputPath, outputDirectory: outputDirectory)
+          : _stripFlacSelectiveLabels(
+              inputPath,
+              outputDirectory: outputDirectory,
+              selectedKeys: selectiveLabels
+                  .map(MetadataFieldId.normalizeVorbisCommentKey)
+                  .toSet(),
+            ),
       _RemovalRoute.ogg =>
         stripOggMetadata(inputPath, outputDirectory: outputDirectory),
       _RemovalRoute.opus =>
@@ -497,6 +585,48 @@ class MetadataRemoverDatasource {
       'FLAC too large for remover MVP',
       outputDirectory: outputDirectory,
     );
+  }
+
+  Future<File> _stripFlacSelectiveLabels(
+    String inputPath, {
+    required String? outputDirectory,
+    required Set<String> selectedKeys,
+  }) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('FLAC too large for remover MVP');
+    }
+    final bytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('FLAC too large for remover MVP');
+    }
+    final result = await runOnWorker(
+      () => stripFlacVorbisCommentsSelective(bytes, selectedKeys: selectedKeys),
+    );
+    validateFlacSelectivePreservation(
+      bytes,
+      result.bytes,
+      selectedKeys: selectedKeys,
+    );
+    final output =
+        await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
+    if (!output.path.startsWith('content://')) {
+      final persisted = await _persistedOutputReader(output);
+      validateFlacSelectivePreservation(
+        bytes,
+        result.bytes,
+        persisted: persisted,
+        selectedKeys: selectedKeys,
+      );
+    }
+    return output;
   }
 
   Future<File> stripOggMetadata(

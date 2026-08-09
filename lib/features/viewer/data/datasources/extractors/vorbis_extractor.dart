@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 /// Human labels for well-known Vorbis comment keys.
 const Map<String, String> _commentLabels = {
@@ -172,7 +173,16 @@ List<MetadataFieldEntity>? _parseCommentPacket(Uint8List packet) {
 /// whose comment packet spans multiple Ogg pages.
 List<MetadataFieldEntity>? _findCommentFallback(Uint8List bytes) {
   const vorbisComment = [0x03, 0x76, 0x6F, 0x72, 0x62, 0x69, 0x73];
-  const opusTag = [0x4F, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73]; // 'OpusTags'
+  const opusTag = [
+    0x4F,
+    0x70,
+    0x75,
+    0x73,
+    0x54,
+    0x61,
+    0x67,
+    0x73
+  ]; // 'OpusTags'
   for (var i = 0; i + 8 <= bytes.length; i++) {
     if (_startsWith(bytes, vorbisComment, i)) {
       final comment = _parseCommentBlock(
@@ -211,12 +221,14 @@ List<MetadataFieldEntity>? _parseCommentBlock(Uint8List data) {
 
   final fields = <MetadataFieldEntity>[];
   void add(String key, String value) {
-    final label = _commentLabels[key.toUpperCase()] ?? key;
+    final normalizedKey = MetadataFieldId.normalizeVorbisCommentKey(key);
+    final label = _commentLabels[normalizedKey] ?? normalizedKey;
     fields.add(
       MetadataFieldEntity(
         section: 'Audio Vorbis',
         label: label,
         value: truncateMetadataValue(value),
+        id: MetadataFieldId.vorbisComment(normalizedKey),
         isPrivacySensitive: isTextPrivacySensitive(label),
       ),
     );
@@ -231,15 +243,14 @@ List<MetadataFieldEntity>? _parseCommentBlock(Uint8List data) {
     ).getUint32(0, Endian.little);
     offset += 4;
     if (offset + entryLength > data.length) break;
-    final entry = utf8.decode(
-      data.sublist(offset, offset + entryLength),
-      allowMalformed: true,
-    );
+    final entry = utf8.decode(data.sublist(offset, offset + entryLength));
     offset += entryLength;
 
     final equals = entry.indexOf('=');
     if (equals <= 0) continue;
-    final key = entry.substring(0, equals).trim();
+    final key = MetadataFieldId.normalizeVorbisCommentKey(
+      entry.substring(0, equals),
+    );
     final value = entry.substring(equals + 1);
     if (key.isNotEmpty) add(key, value);
   }

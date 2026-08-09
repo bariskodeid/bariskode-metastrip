@@ -119,6 +119,18 @@ void main() {
       expect(jpeg.supportsFullRemoval, isTrue);
       expect(jpeg.supportsSelectiveRemoval, isFalse);
 
+      final flac = registry.lookup('flac')!;
+      expect(flac.supportsExtraction, isTrue);
+      expect(flac.supportsFullRemoval, isTrue);
+      expect(flac.supportsSelectiveRemoval, isTrue);
+
+      for (final extension in ['mp3', 'ogg', 'opus']) {
+        expect(
+          registry.lookup(extension)!.supportsSelectiveRemoval,
+          isFalse,
+        );
+      }
+
       final bmp = registry.lookup('bmp')!;
       expect(bmp.supportsExtraction, isTrue);
       expect(bmp.supportsFullRemoval, isTrue);

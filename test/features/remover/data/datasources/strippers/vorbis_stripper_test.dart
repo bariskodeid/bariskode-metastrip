@@ -5,6 +5,87 @@ import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_str
 
 void main() {
   group('stripVorbisComments - FLAC', () {
+    test('selectively removes every case-insensitive occurrence by key', () {
+      final audio = List<int>.filled(100, 0xAB);
+      final bytes = _flacFile(
+        blocks: [
+          _flacStreamInfoBlock(),
+          _flacCommentBlock(
+            vendor: 'keep-vendor',
+            comments: const [
+              'title=Secret one',
+              'TITLE=Secret two',
+              'ARTIST=Keep artist',
+              'CUSTOM=Keep custom',
+            ],
+          ),
+          _flacPaddingBlock(size: 3),
+        ],
+        audio: audio,
+      );
+      final result = stripFlacVorbisCommentsSelective(
+        bytes,
+        selectedKeys: {'TiTlE'},
+      );
+      expect(result.matchedKeys, {'TITLE'});
+      final resultText = String.fromCharCodes(result.bytes);
+      expect(resultText, isNot(contains('Secret one')));
+      expect(resultText, contains('Keep artist'));
+      expect(resultText, contains('keep-vendor'));
+      expect(result.bytes.sublist(result.bytes.length - audio.length), audio);
+    });
+
+    test('normalizes ASCII whitespace and case in parsed keys', () {
+      final bytes = _flacFile(
+        blocks: [
+          _flacStreamInfoBlock(),
+          _flacCommentBlock(
+            vendor: 'vendor',
+            comments: const [' \tTiTLe\r =Secret', 'ARTIST=Keep'],
+          ),
+        ],
+      );
+      final result = stripFlacVorbisCommentsSelective(
+        bytes,
+        selectedKeys: {' title '},
+      );
+      expect(result.matchedKeys, {'TITLE'});
+      expect(String.fromCharCodes(result.bytes), isNot(contains('Secret')));
+      expect(String.fromCharCodes(result.bytes), contains('ARTIST=Keep'));
+    });
+
+    test('accepts and preserves an empty Vorbis vendor string', () {
+      final bytes = _flacFile(
+        blocks: [
+          _flacStreamInfoBlock(),
+          _flacCommentBlock(
+            vendor: '',
+            comments: const ['TITLE=Remove', 'ARTIST=Keep'],
+          ),
+        ],
+      );
+
+      final result = stripFlacVorbisCommentsSelective(
+        bytes,
+        selectedKeys: {'TITLE'},
+      );
+
+      expect(result.matchedKeys, {'TITLE'});
+      expect(String.fromCharCodes(result.bytes), isNot(contains('Remove')));
+      expect(String.fromCharCodes(result.bytes), contains('ARTIST=Keep'));
+    });
+
+    test('rejects malformed UTF-8 in a comment entry', () {
+      final bytes = _flacFile(
+        blocks: [_flacStreamInfoBlock(), _flacCommentBlock(vendor: 'x')],
+      );
+      bytes[bytes.length - 1] = 0xFF;
+      expect(
+        () => stripFlacVorbisCommentsSelective(bytes, selectedKeys: {'TITLE'}),
+        throwsFormatException,
+      );
+    });
+
     test('strips a comment block and patches the last flag', () {
       final bytes = _flacFile(
         blocks: [
@@ -46,6 +127,63 @@ void main() {
 
       expect(
         () => stripVorbisComments(bytes, extension: 'flac'),
+        throwsFormatException,
+      );
+    });
+
+    test(
+        'rejects a missing final metadata flag even when audio mimics a header',
+        () {
+      final bytes = Uint8List.fromList([
+        ...'fLaC'.codeUnits,
+        ..._flacStreamInfoBlock(isLast: false),
+        // Audio bytes deliberately look like a 34-byte STREAMINFO block.
+        0x00, 0x00, 0x00, 0x22,
+        ...List<int>.filled(34, 0xA5),
+      ]);
+
+      expect(
+        () => stripFlacVorbisCommentsSelective(
+          bytes,
+          selectedKeys: {'TITLE'},
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects every reserved FLAC metadata block type from 7 through 127',
+        () {
+      for (var type = 7; type <= 127; type++) {
+        final bytes = Uint8List.fromList([
+          ...'fLaC'.codeUnits,
+          ..._flacStreamInfoBlock(),
+          0x80 | type,
+          0x00,
+          0x00,
+          0x00,
+        ]);
+
+        expect(
+          () => stripFlacVorbisCommentsSelective(
+            bytes,
+            selectedKeys: {'TITLE'},
+          ),
+          throwsFormatException,
+          reason: 'metadata block type $type must be rejected',
+        );
+      }
+    });
+
+    test('rejects a duplicate STREAMINFO block', () {
+      final bytes = _flacFile(
+        blocks: [
+          _flacStreamInfoBlock(),
+          _flacStreamInfoBlock(isLast: true),
+        ],
+      );
+
+      expect(
+        () => stripFlacVorbisCommentsSelective(bytes, selectedKeys: {'TITLE'}),
         throwsFormatException,
       );
     });

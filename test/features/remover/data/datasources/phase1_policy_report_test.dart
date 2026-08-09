@@ -9,8 +9,114 @@ import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dar
 import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/entities/strip_report.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/png_text_extractor.dart';
+import 'package:metastrip/features/viewer/data/datasources/extractors/vorbis_extractor.dart';
 
 void main() {
+  test('FLAC selective policy reports stable IDs and verifies local output',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('phase1_flac_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}audio.flac');
+    await input.writeAsBytes(_flacSelectiveFixture());
+
+    final title = MetadataFieldId.vorbisComment('title');
+    final result = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: directory.path,
+      policy: StripPolicy.selective(fieldIds: {title}),
+    );
+
+    expect(result.report.requestedFieldIds, {title});
+    expect(result.report.removedFieldIds, {title});
+    expect(result.report.alreadyAbsentFieldIds, isEmpty);
+    expect(
+        result.report.verificationOutcome, StripVerificationOutcome.verified);
+    expect(result.report.outputValidated, isTrue);
+    final fields =
+        await extractVorbis(await result.file.readAsBytes(), extension: 'flac');
+    expect(fields.map((field) => field.label), ['Artist']);
+  });
+
+  test('FLAC malformed selective input fails before creating output', () async {
+    final directory = await Directory.systemTemp.createTemp('phase1_flac_bad_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}audio.flac');
+    await input.writeAsBytes([0x66, 0x4C, 0x61, 0x43, 0x80, 0, 0, 20]);
+
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: directory.path,
+        policy: StripPolicy.selective(
+          fieldIds: {MetadataFieldId.vorbisComment('TITLE')},
+        ),
+      ),
+      throwsFormatException,
+    );
+    expect(
+        directory.listSync().where((entity) => entity.path.contains('_clean')),
+        isEmpty);
+  });
+
+  test('FLAC selective validation rejects non-identical persisted bytes',
+      () async {
+    final directory =
+        await Directory.systemTemp.createTemp('phase1_flac_persisted_bad_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}audio.flac');
+    await input.writeAsBytes(_flacSelectiveFixture());
+    final datasource = MetadataRemoverDatasource(
+      persistedOutputReader: (output) async {
+        final persisted = await output.readAsBytes();
+        final marker = 'ARTIST'.codeUnits;
+        final start = _indexOfBytes(persisted, marker);
+        expect(start, isNonNegative);
+        persisted.setRange(start, start + marker.length, 'artist'.codeUnits);
+        return persisted;
+      },
+    );
+
+    await expectLater(
+      datasource.stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: directory.path,
+        policy: StripPolicy.selective(
+          fieldIds: {MetadataFieldId.vorbisComment('TITLE')},
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('legacy FLAC selective labels use canonical validation and verification',
+      () async {
+    final directory =
+        await Directory.systemTemp.createTemp('phase1_flac_legacy_');
+    addTearDown(() => directory.delete(recursive: true));
+    final input = File('${directory.path}${Platform.pathSeparator}audio.flac');
+    await input.writeAsBytes(_flacSelectiveFixture());
+
+    final output = await MetadataRemoverDatasource().stripMetadata(
+      input.path,
+      outputDirectory: directory.path,
+      selectiveLabels: {' title '},
+    );
+    final fields = await extractVorbis(
+      await output.readAsBytes(),
+      extension: 'flac',
+    );
+    expect(fields.map((field) => field.label), ['Artist']);
+
+    expect(
+      () => MetadataRemoverDatasource().stripMetadata(
+        input.path,
+        outputDirectory: directory.path,
+        selectiveLabels: {'BAD=KEY'},
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('PNG policy reports actual matched IDs and output re-extracts clean',
       () async {
     final directory = await Directory.systemTemp.createTemp('phase1_png_');
@@ -337,6 +443,54 @@ void main() {
       isEmpty,
     );
   });
+}
+
+List<int> _flacSelectiveFixture() {
+  final vendor = 'vendor'.codeUnits;
+  final entries = ['TITLE=Secret', 'ARTIST=Visible'];
+  final payload = <int>[
+    ..._le32(vendor.length),
+    ...vendor,
+    ..._le32(entries.length)
+  ];
+  for (final entry in entries) {
+    final bytes = entry.codeUnits;
+    payload.addAll([..._le32(bytes.length), ...bytes]);
+  }
+  return [
+    ...'fLaC'.codeUnits,
+    0,
+    0,
+    0,
+    34,
+    ...List<int>.filled(34, 0),
+    0x84,
+    (payload.length >> 16) & 0xFF,
+    (payload.length >> 8) & 0xFF,
+    payload.length & 0xFF,
+    ...payload,
+  ];
+}
+
+List<int> _le32(int value) => [
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+      (value >> 16) & 0xFF,
+      (value >> 24) & 0xFF,
+    ];
+
+int _indexOfBytes(List<int> bytes, List<int> pattern) {
+  for (var start = 0; start + pattern.length <= bytes.length; start++) {
+    var matches = true;
+    for (var i = 0; i < pattern.length; i++) {
+      if (bytes[start + i] != pattern[i]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return start;
+  }
+  return -1;
 }
 
 List<int> _pngChunk(String type, List<int> data) {

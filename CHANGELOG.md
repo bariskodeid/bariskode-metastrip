@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### FLAC selective Vorbis comments (2026-08-09)
+
+- Added FLAC-only selective removal using stable, canonical Vorbis comment-key
+  IDs. Keys match case-insensitively and all matching entries are removed.
+- Vendor text, unselected comments, unrelated FLAC metadata blocks, and audio
+  payload are preserved. Malformed FLAC comment data fails closed.
+- MP3, Ogg, and Opus selective removal remain disabled. Local persisted-output
+  verification is covered by tests; Android/iOS device and SAF validation are
+  not claimed and remain pending.
+
 ### ZIP-only cleanup (2026-08-09)
 
 - Added `.zip` as the 20th removable extension. Cleanup removes supported

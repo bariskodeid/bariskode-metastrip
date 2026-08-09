@@ -69,7 +69,8 @@ gif, webp, zip
 ```
 
 The current PDF implementation is best-effort Info dictionary cleanup. Stable-ID
-selective removal is implemented end to end for PNG text and PDF Info fields;
+selective removal is implemented end to end for PNG text, PDF Info fields, and
+FLAC Vorbis comment keys;
 PDF results remain attempted/unverified. The narrowed PDF technology spike now
 validates bounded generated-byte mutations, uses a shared balanced literal
 parser, caps recognized key candidates, and fails closed on malformed supported
@@ -131,7 +132,7 @@ Implemented in `lib/core/format/`:
 - Shared descriptors cover all 41 Viewer-accepted extensions.
 - Removal currently covers the registered 20-extension set, including ZIP-only
   container cleanup; APK and EPUB remain excluded.
-- PNG and basic PDF Info cleanup are the only formats advertising selective
+- PNG, basic PDF Info, and FLAC Vorbis comment-key cleanup are the only formats advertising selective
   capability; no new format was enabled.
 - Lookup normalizes case, whitespace, and leading dots.
 - Viewer and Remover gates query the shared registry.
@@ -258,7 +259,8 @@ image.exif.gpsLatitude
 **Estimate:** Medium to large
 **Dependencies:** Phase 0
 
-**Status:** Complete for PNG text and PDF Info selective flow (2026-08-08).
+**Status:** Complete for PNG text and PDF Info selective flow (2026-08-08),
+plus the FLAC-only Vorbis comment-key slice (2026-08-09).
 Broader formats and modes remain follow-up work.
 
 ### Problem to solve
@@ -298,7 +300,12 @@ verified.
 3. [ ] Add per-property XML removal for DOCX/XLSX/PPTX.
 4. [ ] Add per-property removal for ODT/ODS/ODP.
 5. [ ] Add MP3 frame-level removal.
-6. [ ] Add FLAC/OGG/Opus comment-key removal.
+6. [~] FLAC comment-key removal is implemented with stable, case-insensitive
+   key IDs and structural/comment/persistence validation. Validation requires
+   canonical STREAMINFO ordering, a final metadata block, preservation of the
+   vendor, unselected comments, non-comment block bytes/order, and audio suffix.
+   It does not decode or validate FLAC audio frames. OGG/Opus selective removal
+   remains disabled; device/SAF validation remains pending.
 7. [ ] Add WAV/AIFF field-level removal.
 
 ### Result reporting

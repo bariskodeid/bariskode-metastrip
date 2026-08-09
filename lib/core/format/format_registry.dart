@@ -283,8 +283,27 @@ const List<FormatCapability> _standardCapabilities = [
     knownLimitations: ['Extraction scans a bounded prefix and ID3v1 tail.'],
   ),
   FormatCapability(
-    extensions: {'flac', 'ogg', 'opus'},
-    mimeTypes: {'audio/flac', 'audio/ogg', 'audio/opus'},
+    extensions: {'flac'},
+    mimeTypes: {'audio/flac'},
+    category: FormatCategory.audio,
+    supportsExtraction: true,
+    supportsFullRemoval: true,
+    supportsSelectiveRemoval: true,
+    processingStrategy: ProcessingStrategy.inMemory,
+    extractionHandlerFactory: _handlerDeclaration,
+    removalHandlerFactory: _handlerDeclaration,
+    extractionSizeLimitBytes: AppConstants.maxAudioScanBytes,
+    removalSizeLimitBytes: _memoryLimit,
+    outputValidationStrategy: OutputValidationStrategy.signature,
+    removalCoverage: RemovalCoverage.bestEffort,
+    knownLimitations: [
+      'FLAC selective cleanup removes selected Vorbis comment keys while '
+          'preserving the vendor, other comments, blocks, and audio payload.',
+    ],
+  ),
+  FormatCapability(
+    extensions: {'ogg', 'opus'},
+    mimeTypes: {'audio/ogg', 'audio/opus'},
     category: FormatCategory.audio,
     supportsExtraction: true,
     supportsFullRemoval: true,
@@ -297,8 +316,8 @@ const List<FormatCapability> _standardCapabilities = [
     outputValidationStrategy: OutputValidationStrategy.signature,
     removalCoverage: RemovalCoverage.bestEffort,
     knownLimitations: [
-      'Ogg/Opus cleanup is best effort and scans a bounded page window.',
-      'FLAC cleanup removes supported Vorbis comment blocks.',
+      'Ogg/Opus cleanup is best effort and scans a bounded page window; '
+          'selective removal remains disabled.',
     ],
   ),
   FormatCapability(

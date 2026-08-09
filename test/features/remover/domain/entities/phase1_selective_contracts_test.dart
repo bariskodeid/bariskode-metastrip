@@ -10,6 +10,22 @@ void main() {
       expect(MetadataFieldId.pdfInfoTitle.value, 'pdf.info.title');
     });
 
+    test('uses canonical direct Vorbis comment IDs', () {
+      final id = MetadataFieldId.vorbisComment('  title ');
+      expect(id.value, 'vorbis.comment.TITLE');
+      expect(MetadataFieldId.parse(id.value), id);
+      expect(id.isVorbisComment, isTrue);
+      expect(id.vorbisCommentKey, 'TITLE');
+      expect(
+        () => MetadataFieldId.vorbisComment('bad=key'),
+        throwsArgumentError,
+      );
+      expect(
+        () => MetadataFieldId.parse('vorbis.comment.title'),
+        throwsFormatException,
+      );
+    });
+
     test('round-trips a PNG text keyword through its stable ID', () {
       const keyword = 'Creation Time / v2';
 

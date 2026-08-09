@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:metastrip/features/remover/data/datasources/strippers/flac_validator.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 /// Length of the `fLaC` magic at the start of a FLAC file.
 const int _flacMagicLength = 4;
@@ -43,6 +47,14 @@ const List<int> _opusTagMarker = [
   0x67,
   0x73,
 ]; // 'OpusTags'
+
+class FlacSelectiveStripResult {
+  const FlacSelectiveStripResult(
+      {required this.bytes, required this.matchedKeys});
+
+  final Uint8List bytes;
+  final Set<String> matchedKeys;
+}
 
 /// Strips Vorbis comments from raw [bytes] for the given [extension].
 ///
@@ -95,6 +107,129 @@ Uint8List stripVorbisComments(Uint8List bytes, {required String extension}) {
       throw FormatException('Unsupported extension: $extension');
   }
 }
+
+/// Removes selected FLAC Vorbis comment keys, matching keys case-insensitively.
+/// The FLAC container, vendor, unselected entries, other blocks, and audio are
+/// copied; malformed metadata fails closed before any output is returned.
+FlacSelectiveStripResult stripFlacVorbisCommentsSelective(
+  Uint8List bytes, {
+  required Set<String> selectedKeys,
+}) {
+  if (selectedKeys.isEmpty) {
+    throw const FormatException('No metadata fields selected');
+  }
+  parseFlacStructure(bytes);
+  final wanted =
+      selectedKeys.map(MetadataFieldId.normalizeVorbisCommentKey).toSet();
+  final output = BytesBuilder(copy: false)
+    ..add(Uint8List.sublistView(bytes, 0, 4));
+  final matched = <String>{};
+  var offset = 4;
+  var sawLast = false;
+  while (!sawLast) {
+    if (offset + 4 > bytes.length) {
+      throw const FormatException('Truncated FLAC metadata block');
+    }
+    final flags = bytes[offset];
+    final type = flags & 0x7F;
+    final size = (bytes[offset + 1] << 16) |
+        (bytes[offset + 2] << 8) |
+        bytes[offset + 3];
+    final end = offset + 4 + size;
+    if (end > bytes.length) {
+      throw const FormatException('Truncated FLAC metadata block');
+    }
+    if (type == _flacVorbisCommentType) {
+      output.add(_selectFlacCommentBlock(
+        flags,
+        Uint8List.sublistView(bytes, offset + 4, end),
+        wanted,
+        matched,
+      ));
+    } else {
+      output.add(Uint8List.sublistView(bytes, offset, end));
+    }
+    sawLast = flags & 0x80 != 0;
+    offset = end;
+  }
+  output.add(Uint8List.sublistView(bytes, offset));
+  return FlacSelectiveStripResult(
+      bytes: output.takeBytes(), matchedKeys: matched);
+}
+
+Uint8List _selectFlacCommentBlock(
+  int flags,
+  Uint8List data,
+  Set<String> wanted,
+  Set<String> matched,
+) {
+  if (data.length < 8) {
+    throw const FormatException('Malformed FLAC comment block');
+  }
+  final view = ByteData.sublistView(data);
+  var offset = 0;
+  final vendorLength = view.getUint32(offset, Endian.little);
+  offset += 4;
+  if (vendorLength > data.length - offset ||
+      offset + vendorLength + 4 > data.length) {
+    throw const FormatException('Malformed FLAC comment block');
+  }
+  final vendorEnd = offset + vendorLength;
+  offset = vendorEnd;
+  final count = view.getUint32(offset, Endian.little);
+  offset += 4;
+  final kept = <Uint8List>[];
+  for (var i = 0; i < count; i++) {
+    if (offset + 4 > data.length) {
+      throw const FormatException('Malformed FLAC comment block');
+    }
+    final length = view.getUint32(offset, Endian.little);
+    offset += 4;
+    if (length > data.length - offset) {
+      throw const FormatException('Malformed FLAC comment block');
+    }
+    final entry = Uint8List.sublistView(data, offset, offset + length);
+    offset += length;
+    final equals = entry.indexOf(0x3D);
+    if (equals <= 0) {
+      throw const FormatException('Malformed FLAC comment entry');
+    }
+    final key = MetadataFieldId.normalizeVorbisCommentKey(
+      utf8.decode(Uint8List.sublistView(entry, 0, equals)),
+    );
+    if (wanted.contains(key)) {
+      matched.add(key);
+    } else {
+      kept.add(entry);
+    }
+  }
+  if (offset != data.length) {
+    throw const FormatException('Malformed FLAC comment block');
+  }
+  final body = BytesBuilder(copy: false)
+    ..add(Uint8List.sublistView(data, 0, vendorEnd))
+    ..add(_le32(kept.length));
+  for (final entry in kept) {
+    body
+      ..add(_le32(entry.length))
+      ..add(entry);
+  }
+  final payload = body.takeBytes();
+  return Uint8List.fromList([
+    flags,
+    (payload.length >> 16) & 0xFF,
+    (payload.length >> 8) & 0xFF,
+    payload.length & 0xFF,
+    ...payload,
+  ]);
+}
+
+List<int> _le32(int value) => [
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+      (value >> 16) & 0xFF,
+      (value >> 24) & 0xFF,
+    ];
 
 /// Removes VORBIS_COMMENT metadata blocks from a FLAC stream.
 Uint8List _stripFlac(Uint8List bytes) {

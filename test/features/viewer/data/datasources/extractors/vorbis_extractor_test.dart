@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/vorbis_extractor.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 void main() {
   group('extractVorbis', () {
@@ -23,6 +24,25 @@ void main() {
       expect(byLabel['Artist']?.value, 'Neon Harbor');
       expect(byLabel['Genre']?.value, 'Synthwave');
       expect(byLabel['CUSTOM']?.value, 'hello');
+      expect(byLabel['Title']?.id, MetadataFieldId.vorbisComment('title'));
+      expect(byLabel['CUSTOM']?.id, MetadataFieldId.vorbisComment('custom'));
+    });
+
+    test('normalizes parsed Vorbis IDs with ASCII whitespace and case rules',
+        () async {
+      final bytes = _flacWithComment([' \tTiTLe\r =Secret']);
+      final fields = await extractVorbis(bytes, extension: 'flac');
+
+      expect(fields.single.id, MetadataFieldId.vorbisComment('title'));
+      expect(fields.single.label, 'Title');
+    });
+
+    test('fails closed on malformed UTF-8 in a FLAC key/value', () async {
+      final bytes = _flacWithRawComment([0xFF, 0x3D, 0x78]);
+      final fields = await extractVorbis(bytes, extension: 'flac');
+
+      expect(fields.single.label, 'Status');
+      expect(fields.single.value, 'Unable to parse Vorbis comments');
     });
 
     test('extracts comments from a minimal Ogg Vorbis page', () async {
@@ -69,7 +89,20 @@ void main() {
 
 /// Builds a FLAC stream with a STREAMINFO block and a VORBIS_COMMENT block.
 Uint8List _flacWithComment(List<String> entries) {
-  final payload = _commentPayload(entries);
+  return _flacWithPayload(_commentPayload(entries));
+}
+
+Uint8List _flacWithRawComment(List<int> entry) {
+  final builder = BytesBuilder(copy: false)
+    ..add(_le32('metastrip-test'.length))
+    ..add(latin1.encode('metastrip-test'))
+    ..add(_le32(1))
+    ..add(_le32(entry.length))
+    ..add(entry);
+  return _flacWithPayload(builder.takeBytes());
+}
+
+Uint8List _flacWithPayload(Uint8List payload) {
   final builder = BytesBuilder(copy: false);
   builder.add(latin1.encode('fLaC'));
   // STREAMINFO block: type 0, not last.
