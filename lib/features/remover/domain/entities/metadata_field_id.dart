@@ -56,6 +56,19 @@ extension type const MetadataFieldId._(String value) {
   static const wavInfoIkey = MetadataFieldId._('wav.info.IKEY');
   static const wavInfoIrl = MetadataFieldId._('wav.info.IRL');
 
+  static const odfTitle = MetadataFieldId._('odf.dc.title');
+  static const odfAuthor = MetadataFieldId._('odf.dc.creator');
+  static const odfSubject = MetadataFieldId._('odf.dc.subject');
+  static const odfDescription = MetadataFieldId._('odf.dc.description');
+  static const odfKeywords = MetadataFieldId._('odf.meta.keyword');
+  static const odfGenerator = MetadataFieldId._('odf.meta.generator');
+  static const odfInitialCreator =
+      MetadataFieldId._('odf.meta.initial-creator');
+  static const odfCreationDate = MetadataFieldId._('odf.meta.creation-date');
+  static const odfPrintDate = MetadataFieldId._('odf.meta.print-date');
+  static const odfModificationDate =
+      MetadataFieldId._('odf.meta.modification-date');
+
   /// Normalizes a Vorbis key using ASCII whitespace trimming and ASCII case
   /// folding. Vorbis keys are UTF-8 fields, but the key itself is restricted
   /// to printable ASCII after normalization.
@@ -119,6 +132,8 @@ extension type const MetadataFieldId._(String value) {
     if (openXmlId != null) return openXmlId;
     final wavId = _wavInfoIdsByValue[value];
     if (wavId != null) return wavId;
+    final odfId = _odfIdsByValue[value];
+    if (odfId != null) return odfId;
     if (value.startsWith(_vorbisPrefix)) {
       final parsed = MetadataFieldId.vorbisComment(
         value.substring(_vorbisPrefix.length),
@@ -158,6 +173,10 @@ extension type const MetadataFieldId._(String value) {
   bool get isVorbisComment => value.startsWith(_vorbisPrefix);
   bool get isOpenXml => _openXmlIdsByValue.containsKey(value);
   bool get isWavInfo => _wavInfoIdsByValue.containsKey(value);
+  bool get isOdf => _odfIdsByValue.containsKey(value);
+
+  bool isOdfSupportedFor(String extension) =>
+      isOdf && const {'odt', 'ods', 'odp'}.contains(extension.toLowerCase());
 
   /// Whether this exact Open XML ID is surfaced for [extension].
   bool isOpenXmlSupportedFor(String extension) {
@@ -200,6 +219,19 @@ extension type const MetadataFieldId._(String value) {
     'wav.info.IENG': wavInfoIeng,
     'wav.info.IKEY': wavInfoIkey,
     'wav.info.IRL': wavInfoIrl,
+  };
+
+  static const Map<String, MetadataFieldId> _odfIdsByValue = {
+    'odf.dc.title': odfTitle,
+    'odf.dc.creator': odfAuthor,
+    'odf.dc.subject': odfSubject,
+    'odf.dc.description': odfDescription,
+    'odf.meta.keyword': odfKeywords,
+    'odf.meta.generator': odfGenerator,
+    'odf.meta.initial-creator': odfInitialCreator,
+    'odf.meta.creation-date': odfCreationDate,
+    'odf.meta.print-date': odfPrintDate,
+    'odf.meta.modification-date': odfModificationDate,
   };
 
   String? get pngKeyword {

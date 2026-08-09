@@ -242,6 +242,9 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       'docx' || 'xlsx' || 'pptx' => policy.selectedFieldIds.every(
           (id) => id.isOpenXmlSupportedFor(extension),
         ),
+      'odt' || 'ods' || 'odp' => policy.selectedFieldIds.every(
+          (id) => id.isOdfSupportedFor(extension),
+        ),
       _ => false,
     };
     return matchesFormat

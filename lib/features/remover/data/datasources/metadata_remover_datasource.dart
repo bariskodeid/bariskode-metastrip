@@ -173,6 +173,11 @@ class MetadataRemoverDatasource {
           outputDirectory,
           policy.selectedFieldIds,
         ),
+      'odt' || 'ods' || 'odp' => _stripSelectiveOdf(
+          inputPath,
+          outputDirectory,
+          policy.selectedFieldIds,
+        ),
       'wav' => _stripSelectiveWav(
           inputPath,
           outputDirectory,
@@ -200,6 +205,9 @@ class MetadataRemoverDatasource {
       'xlsx' ||
       'pptx' =>
         fieldIds.every((id) => id.isOpenXmlSupportedFor(extension)),
+      'odt' || 'ods' || 'odp' => fieldIds.every(
+          (id) => id.isOdfSupportedFor(extension),
+        ),
       _ => false,
     };
     if (!valid) {
@@ -412,6 +420,78 @@ class MetadataRemoverDatasource {
             ? StripVerificationOutcome.attemptedUnverified
             : StripVerificationOutcome.verified,
         outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
+  Future<MetadataRemovalOutput> _stripSelectiveOdf(
+    String inputPath,
+    String outputDirectory,
+    Set<MetadataFieldId> requestedIds,
+  ) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file ||
+        stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('ODF document too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('ODF document too large for remover MVP');
+    }
+    final extension = FormatRegistry.normalizeExtension(p.extension(inputPath));
+    final result = await runOnWorker(
+      () => stripOdfSelective(
+        inputBytes,
+        extension: extension,
+        selectedIds: requestedIds,
+      ),
+    );
+    final output =
+        await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      // Capture the installed path's stat before handing it to the readback
+      // hook. Cleanup uses this snapshot to avoid treating a replacement at
+      // the same path as the file this operation created.
+      final installedStat = await output.stat();
+      try {
+        final persisted = await _persistedOutputReader(output);
+        validateOdfSelective(
+          inputBytes,
+          persisted,
+          extension: extension,
+          selectedIds: requestedIds,
+          expectedRemovedIds: result.removedIds,
+        );
+      } catch (_) {
+        // The filename was allocated by this operation. Remove it only when
+        // it still contains the bytes we installed; this avoids deleting a
+        // replacement written by another process after validation failed.
+        await _deleteIfSameBytes(output, result.bytes, installedStat);
+        rethrow;
+      }
+    }
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        requestedFieldIds: requestedIds,
+        removedFieldIds: result.removedIds,
+        alreadyAbsentFieldIds: result.absentIds,
+        warnings: isSafOutput
+            ? const [
+                'Generated ODF bytes were validated, but persisted SAF '
+                    'readback was not performed.',
+              ]
+            : const [],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+        reencoded: result.removedIds.isNotEmpty,
       ),
     );
   }
@@ -1177,6 +1257,42 @@ class MetadataRemoverDatasource {
       }
     }
     throw const FileSystemException('Too many output filename collisions');
+  }
+
+  /// Best-effort cleanup for a failed local-output validation.
+  ///
+  /// Dart does not expose a portable open-handle identity or an atomic
+  /// compare-and-delete operation. We therefore compare the bytes and stat
+  /// attributes captured immediately after installation, then repeat the stat
+  /// check immediately before deleting. This protects against ordinary
+  /// replacement/path races in the trusted output directory, while the small
+  /// final stat-to-delete window remains an unavoidable cross-platform TOCTOU
+  /// limitation. Cleanup must never hide the original validation failure.
+  Future<void> _deleteIfSameBytes(
+    File file,
+    Uint8List expected,
+    FileStat installedStat,
+  ) async {
+    try {
+      final beforeRead = await file.stat();
+      if (!_sameStatAttributes(installedStat, beforeRead)) return;
+      final handle = await file.open();
+      late final Uint8List actual;
+      try {
+        actual = Uint8List.fromList(
+          await handle.read(expected.length + 1),
+        );
+      } finally {
+        await handle.close();
+      }
+      if (!_sameBytes(actual, expected)) return;
+      final immediatelyBeforeDelete = await file.stat();
+      if (_sameStatAttributes(installedStat, immediatelyBeforeDelete)) {
+        await file.delete();
+      }
+    } on Object {
+      // Cleanup is defensive and must not hide the validation failure.
+    }
   }
 
   /// Writes the clean copy into an Android Storage Access Framework grant.

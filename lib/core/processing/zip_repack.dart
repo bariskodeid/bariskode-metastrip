@@ -30,6 +30,7 @@ class ZipPreflightEntry {
     required this.compressionMethod,
     required this.compressedSize,
     required this.uncompressedSize,
+    required this.crc32,
     required this.localHeaderOffset,
     required this.localExtraLength,
   });
@@ -38,6 +39,7 @@ class ZipPreflightEntry {
   final int compressionMethod;
   final int compressedSize;
   final int uncompressedSize;
+  final int crc32;
   final int localHeaderOffset;
   final int localExtraLength;
 }
@@ -505,6 +507,7 @@ List<ZipPreflightEntry> preflightZip(Uint8List bytes) {
       compressionMethod: method,
       compressedSize: compressed,
       uncompressedSize: uncompressed,
+      crc32: crc32,
       localHeaderOffset: localOffset,
       localExtraLength: local.extraLength,
     ));

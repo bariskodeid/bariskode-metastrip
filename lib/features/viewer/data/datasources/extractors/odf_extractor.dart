@@ -4,9 +4,12 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
+import 'package:metastrip/features/remover/domain/entities/odf_property_descriptor.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/zip_extractor.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
+import 'package:xml/xml.dart';
 
 /// Section label shared by every ODF field.
 const String odfSection = 'ODF Document';
@@ -30,8 +33,8 @@ const Set<String> _privacyLabels = {'Author', 'Initial Creator'};
 
 /// Extracts OpenDocument (ODF) metadata from raw [bytes].
 ///
-/// Reads the `meta.xml` entry of the zip container using simple tag matching
-/// with optional namespace prefixes and XML entity decoding. Returns a single
+/// Reads the first `meta.xml` suffix entry of the zip container using XML parsing and
+/// namespace-aware field matching. Returns a single
 /// status field when the bytes are not a valid zip, when `meta.xml` is
 /// missing, or when no recognizable metadata is found; this function never
 /// throws.
@@ -60,7 +63,10 @@ Future<List<MetadataFieldEntity>> extractOdf(Uint8List bytes) async {
       ];
     }
 
-    final fields = _extractMetaFields(content);
+    final fields = _extractMetaFields(
+      content,
+      canonicalMetaPart: normalizeEntryPath(meta.name) == 'meta.xml',
+    );
     if (fields.isEmpty) {
       return [
         statusField(odfSection, 'Status', 'No ODF metadata found'),
@@ -74,17 +80,48 @@ Future<List<MetadataFieldEntity>> extractOdf(Uint8List bytes) async {
   }
 }
 
+String? _readMalformedTagValue(String xml, String tag) {
+  final pattern = RegExp(
+    '<(?:[A-Za-z_][\\w.-]*:)?${_escapeRegex(tag)}(?:\\s[^>]*)?>'
+    '([\\s\\S]*?)</(?:[A-Za-z_][\\w.-]*:)?${_escapeRegex(tag)}\\s*>',
+  );
+  final match = pattern.firstMatch(xml);
+  if (match == null) return null;
+  final value = match
+      .group(1)!
+      .trim()
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&apos;', "'")
+      .replaceAll('&amp;', '&');
+  return value.isEmpty ? null : value;
+}
+
+String _escapeRegex(String value) => value.replaceAllMapped(
+      RegExp(r'[.*+?^${}()|[\]\\]'),
+      (match) => '\\${match.group(0)}',
+    );
+
 /// Extracts metadata fields from the XML of [content].
-List<MetadataFieldEntity> _extractMetaFields(Uint8List content) {
+List<MetadataFieldEntity> _extractMetaFields(
+  Uint8List content, {
+  required bool canonicalMetaPart,
+}) {
   final fields = <MetadataFieldEntity>[];
   final xml = _decodeUtf8(content);
   for (final MapEntry(key: tag, value: label) in _metaLabels.entries) {
-    final value = _readTagValue(xml, tag);
-    if (value == null) continue;
+    final property = _readTagValue(
+      xml,
+      tag,
+      canonicalMetaPart: canonicalMetaPart,
+    );
+    if (property == null) continue;
     fields.add(
       _field(
         label,
-        value,
+        property.value,
+        id: property.id,
         isPrivacySensitive: _privacyLabels.contains(label),
       ),
     );
@@ -96,50 +133,54 @@ List<MetadataFieldEntity> _extractMetaFields(Uint8List content) {
 ///
 /// Matches both prefixed (`dc:title`) and unprefixed (`Title`) tags with
 /// optional attributes on the opening tag.
-String? _readTagValue(String xml, String tag) {
-  final pattern = RegExp(
-    '<(?:[A-Za-z_][\\w.-]*:)?${_escapeRegex(tag)}(?:\\s[^>]*)?>'
-    '([\\s\\S]*?)</(?:[A-Za-z_][\\w.-]*:)?${_escapeRegex(tag)}\\s*>',
-  );
-  final match = pattern.firstMatch(xml);
-  if (match == null) return null;
-  final value = _decodeXmlEntities(match.group(1)!.trim());
-  return value.isEmpty ? null : value;
+({String value, MetadataFieldId? id})? _readTagValue(
+  String xml,
+  String tag, {
+  required bool canonicalMetaPart,
+}) {
+  final descriptor = odfPropertyDescriptors.entries
+      .where((entry) => entry.value.localName == tag)
+      .firstOrNull;
+  try {
+    final document = XmlDocument.parse(xml);
+    String? fallback;
+    for (final element in document.descendants.whereType<XmlElement>()) {
+      if (element.name.local != tag) continue;
+      final value = element.innerText.trim();
+      if (value.isEmpty) continue;
+      if (descriptor != null &&
+          canonicalMetaPart &&
+          _isCanonicalMetaChild(element) &&
+          element.name.namespaceUri == descriptor.value.namespace) {
+        return (value: value, id: descriptor.key);
+      }
+      fallback ??= value;
+    }
+    return fallback == null ? null : (value: fallback, id: null);
+  } on XmlException {
+    final value = _readMalformedTagValue(xml, tag);
+    return value == null ? null : (value: value, id: null);
+  }
 }
 
-/// Decodes the five named XML entities and numeric character references.
-///
-/// `&amp;` is decoded after the other named entities so that sequences such
-/// as `&amp;lt;` stay literal, matching XML parsing semantics.
-String _decodeXmlEntities(String value) {
-  return value
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&apos;', "'")
-      .replaceAll('&amp;', '&')
-      .replaceAllMapped(_hexRefPattern, _decodeHexRef)
-      .replaceAllMapped(_decimalRefPattern, _decodeDecimalRef);
-}
-
-final RegExp _hexRefPattern = RegExp(r'&#x([0-9a-fA-F]+);');
-final RegExp _decimalRefPattern = RegExp(r'&#([0-9]+);');
-
-String _decodeHexRef(Match match) {
-  final code = int.tryParse(match.group(1)!, radix: 16);
-  return code == null ? match.group(0)! : String.fromCharCode(code);
-}
-
-String _decodeDecimalRef(Match match) {
-  final code = int.tryParse(match.group(1)!);
-  return code == null ? match.group(0)! : String.fromCharCode(code);
+bool _isCanonicalMetaChild(XmlElement element) {
+  final parent = element.parent;
+  final root = parent?.parent;
+  return parent is XmlElement &&
+      parent.name.local == 'meta' &&
+      parent.name.namespaceUri ==
+          'urn:oasis:names:tc:opendocument:xmlns:office:1.0' &&
+      root is XmlElement &&
+      root.name.local == 'document-meta' &&
+      root.name.namespaceUri ==
+          'urn:oasis:names:tc:opendocument:xmlns:office:1.0' &&
+      root.parent is XmlDocument;
 }
 
 /// Returns the first entry whose name matches [name] in [archive].
 ///
-/// Names are compared through [normalizeEntryPath] and by `/`-suffixed suffix,
-/// the same rule the remover strippers apply, so metadata stored at a
-/// non-root location such as `a/meta.xml` is found here and stripped there.
+/// Names use the viewer's established exact-or-suffix lookup contract. The
+/// selective remover intentionally uses a narrower canonical-root contract.
 ArchiveFile? _findEntry(Archive archive, String name) {
   for (final file in archive.files) {
     final entryName = normalizeEntryPath(file.name);
@@ -157,20 +198,14 @@ String _decodeUtf8(Uint8List content) {
 MetadataFieldEntity _field(
   String label,
   String value, {
+  MetadataFieldId? id,
   bool isPrivacySensitive = false,
 }) {
   return MetadataFieldEntity(
     section: odfSection,
     label: label,
     value: truncateMetadataValue(value),
+    id: id,
     isPrivacySensitive: isPrivacySensitive,
-  );
-}
-
-/// Escapes regex special characters in [value].
-String _escapeRegex(String value) {
-  return value.replaceAllMapped(
-    RegExp(r'[.*+?^${}()|[\]\\]'),
-    (match) => '\\${match.group(0)}',
   );
 }

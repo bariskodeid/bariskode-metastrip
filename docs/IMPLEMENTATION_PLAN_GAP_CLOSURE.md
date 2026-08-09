@@ -1,6 +1,6 @@
 # MetaStrip — Gap Closure Implementation Plan
 
-**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled, Phase 3 PDF structural cleanup remains pending, and Phase 4 ZIP-only container cleanup is implemented with device/SAF stress validation still pending
+**Status:** In progress — Phases 0-1 complete; Phase 2 BMP subset enabled, the bounded ODF selective slice is enabled, Phase 3 PDF structural cleanup remains pending, and Phase 4 ZIP-only container cleanup is implemented with device/SAF stress validation still pending
 **Version:** 1.1
 **Created:** 2026-08-08
 **Related plan:** [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
@@ -302,7 +302,7 @@ verified.
 3. [x] Add per-property XML removal for DOCX/XLSX/PPTX using stable IDs and
    exact bounded core/app part mutation. Custom and legacy Office properties
    remain outside the allowlist.
-4. [ ] Add per-property removal for ODT/ODS/ODP.
+4. [x] Add per-property removal for ODT/ODS/ODP. The enabled slice targets ten exact standard `dc`/`meta` properties in the canonical root `meta.xml` part, removes every selected repeated keyword, preserves custom properties and all non-meta members, ignores nested `meta.xml` names outside that strict scope, and rejects malformed canonical metadata. This is not comprehensive ODF sanitization.
 5. [ ] Add MP3 frame-level removal.
 6. [~] FLAC comment-key removal is implemented with stable, case-insensitive
    key IDs and structural/comment/persistence validation. Validation requires
@@ -868,7 +868,7 @@ not satisfy this gate.
 - [x] Requested/removed/already-absent/unsupported facts and warnings can be
   represented and reach the result UI; PDF does not claim unverified removals.
 - [ ] Preserved-field reporting and preservation verification are implemented.
-- [ ] Selective removal is expanded beyond PNG text and PDF Info fields.
+- [x] Selective removal is expanded to the bounded standard ODF `meta.xml` property slice; broader ODF sanitization remains out of scope.
 
 ### Comprehensive PDF
 

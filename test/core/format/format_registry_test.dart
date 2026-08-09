@@ -109,6 +109,11 @@ void main() {
       expect(png.supportsFullRemoval, isTrue);
       expect(png.supportsSelectiveRemoval, isTrue);
 
+      final webp = registry.lookup('webp')!;
+      expect(webp.supportsExtraction, isTrue);
+      expect(webp.supportsFullRemoval, isTrue);
+      expect(webp.supportsSelectiveRemoval, isFalse);
+
       final pdf = registry.lookup('pdf')!;
       expect(pdf.supportsExtraction, isTrue);
       expect(pdf.supportsFullRemoval, isTrue);
@@ -145,6 +150,15 @@ void main() {
         zip.outputValidationStrategy,
         OutputValidationStrategy.containerStructure,
       );
+
+      for (final extension in ['odt', 'ods', 'odp']) {
+        final odf = registry.lookup(extension)!;
+        expect(odf.supportsSelectiveRemoval, isTrue);
+        expect(
+          odf.outputValidationStrategy,
+          OutputValidationStrategy.containerStructure,
+        );
+      }
 
       for (final extension in ['tiff', 'tif']) {
         final tiff = registry.lookup(extension)!;

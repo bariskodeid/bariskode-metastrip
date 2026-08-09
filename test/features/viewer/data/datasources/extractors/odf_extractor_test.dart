@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/odf_extractor.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 void main() {
   group('extractOdf', () {
@@ -35,14 +36,34 @@ void main() {
       expect(title, isNotNull);
       expect(title!.section, 'ODF Document');
       expect(title.value, 'Budget 2026');
+      expect(title.id, MetadataFieldId.odfTitle);
 
       expect(byLabel['Author']?.value, 'Jane Doe');
+      expect(byLabel['Author']?.id, MetadataFieldId.odfAuthor);
       expect(byLabel['Author']?.isPrivacySensitive, isTrue);
       expect(byLabel['Initial Creator']?.value, 'Jane Doe');
       expect(byLabel['Initial Creator']?.isPrivacySensitive, isTrue);
       expect(byLabel['Generator']?.value, 'LibreOffice/7.6');
       expect(byLabel['Keywords']?.value, 'finance');
       expect(byLabel['Created']?.value, '2026-01-05T10:00:00');
+      expect(byLabel['Created']?.id, MetadataFieldId.odfCreationDate);
+    });
+
+    test('keeps visible value but withholds ID for a wrong namespace',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'meta.xml',
+          '<office:document-meta xmlns:office="office" xmlns:dc="wrong">'
+              '<office:meta><dc:title>Visible</dc:title></office:meta>'
+              '</office:document-meta>',
+        ),
+      ]);
+
+      final fields = await extractOdf(bytes);
+
+      expect(fields.single.value, 'Visible');
+      expect(fields.single.id, isNull);
     });
 
     test('returns a status field when meta.xml is missing', () async {
@@ -56,6 +77,42 @@ void main() {
       expect(fields.single.section, 'ODF Document');
       expect(fields.single.label, 'Status');
       expect(fields.single.value, 'No ODF metadata found');
+    });
+
+    test('retains viewer suffix lookup for nested meta.xml without stable IDs',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'nested/meta.xml',
+          '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<office:meta><dc:title>Nested title</dc:title></office:meta>'
+              '</office:document-meta>',
+        ),
+      ]);
+
+      final fields = await extractOdf(bytes);
+
+      expect(fields.single.label, 'Title');
+      expect(fields.single.value, 'Nested title');
+      expect(fields.single.id, isNull);
+    });
+
+    test('withholds IDs for metadata decoys outside office:meta', () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'meta.xml',
+          '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<office:meta><x:wrapper xmlns:x="urn:custom"><dc:title>Decoy</dc:title></x:wrapper>'
+              '<dc:title>Canonical</dc:title></office:meta>'
+              '</office:document-meta>',
+        ),
+      ]);
+
+      final fields = await extractOdf(bytes);
+      expect(fields.single.value, 'Canonical');
+      expect(fields.single.id, MetadataFieldId.odfTitle);
     });
 
     test('returns a status field for bytes that are not a zip', () async {

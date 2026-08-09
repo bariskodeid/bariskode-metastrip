@@ -569,6 +569,159 @@ void main() {
     expect(output.report.outputValidated, isTrue);
   });
 
+  test('ODF policy route validates persisted output and reports facts',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('odf_policy_report_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}report.odt');
+    await input.writeAsBytes(_odfZip({
+      'mimetype': 'application/vnd.oasis.opendocument.text',
+      'meta.xml': _odfMetaXml,
+      'content.xml': '<office:document-content>keep</office:document-content>',
+    }));
+
+    final output = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: dir.path,
+      policy: StripPolicy.selective(
+        fieldIds: const {
+          MetadataFieldId.odfAuthor,
+          MetadataFieldId.odfPrintDate,
+        },
+      ),
+    );
+
+    expect(output.report.removedFieldIds, {MetadataFieldId.odfAuthor});
+    expect(output.report.alreadyAbsentFieldIds, {MetadataFieldId.odfPrintDate});
+    expect(output.report.outputValidated, isTrue);
+    expect(
+        output.report.verificationOutcome, StripVerificationOutcome.verified);
+  });
+
+  test('ODF persisted local validation failure fails the operation', () async {
+    final dir = await Directory.systemTemp.createTemp('odf_readback_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}report.odt');
+    await input.writeAsBytes(_odfZip({
+      'mimetype': 'application/vnd.oasis.opendocument.text',
+      'meta.xml': _odfMetaXml,
+      'content.xml': '<office:document-content/>',
+    }));
+    final datasource = MetadataRemoverDatasource(
+      persistedOutputReader: (_) async => Uint8List.fromList('bad'.codeUnits),
+    );
+
+    await expectLater(
+      datasource.stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: StripPolicy.selective(
+          fieldIds: const {MetadataFieldId.odfAuthor},
+        ),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      File('${dir.path}${Platform.pathSeparator}report_clean.odt').existsSync(),
+      isFalse,
+    );
+  });
+
+  test('ODF validation cleanup keeps a replacement at the output path',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('odf_replacement_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}report.odt');
+    await input.writeAsBytes(_odfZip({
+      'mimetype': 'application/vnd.oasis.opendocument.text',
+      'meta.xml': _odfMetaXml,
+      'content.xml': '<office:document-content/>',
+    }));
+    final datasource = MetadataRemoverDatasource(
+      persistedOutputReader: (output) async {
+        // Simulate another writer replacing the allocated path while the
+        // validation callback is running. The replacement deliberately has
+        // different bytes, so a path-only cleanup check would delete it.
+        final replacement = Uint8List.fromList('replacement'.codeUnits);
+        final replacementPath = '${output.path}.replacement';
+        final replacementFile = File(replacementPath);
+        await replacementFile.writeAsBytes(replacement, flush: true);
+        await output.delete();
+        await replacementFile.rename(output.path);
+        return Uint8List.fromList('bad'.codeUnits);
+      },
+    );
+
+    await expectLater(
+      datasource.stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: StripPolicy.selective(
+          fieldIds: const {MetadataFieldId.odfAuthor},
+        ),
+      ),
+      throwsFormatException,
+    );
+    final replacement =
+        File('${dir.path}${Platform.pathSeparator}report_clean.odt');
+    expect(replacement.existsSync(), isTrue);
+    expect(await replacement.readAsString(), 'replacement');
+  });
+
+  test('full ODF datasource cleanup removes nested metadata suffix', () async {
+    final dir = await Directory.systemTemp.createTemp('odf_full_nested_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}nested.odt');
+    await input.writeAsBytes(_odfZip({
+      'mimetype': 'application/vnd.oasis.opendocument.text',
+      'nested/meta.xml': _odfMetaXml,
+      'content.xml': '<office:document-content>keep</office:document-content>',
+    }));
+
+    final output = await MetadataRemoverDatasource().stripMetadata(
+      input.path,
+      outputDirectory: dir.path,
+    );
+    final archive = ZipDecoder().decodeBytes(
+      await output.readAsBytes(),
+      verify: false,
+    );
+
+    expect(archive.findFile('nested/meta.xml'), isNull);
+    expect(
+      String.fromCharCodes(
+        archive.findFile('content.xml')!.content as List<int>,
+      ),
+      '<office:document-content>keep</office:document-content>',
+    );
+  });
+
+  test('ODF policy route validates persisted output and reports stable IDs',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('odf_policy_report_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}report.odt');
+    await input.writeAsBytes(_selectiveOdfZip());
+
+    final output = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: dir.path,
+      policy: StripPolicy.selective(
+        fieldIds: const {
+          MetadataFieldId.odfAuthor,
+          MetadataFieldId.odfPrintDate,
+        },
+      ),
+    );
+
+    expect(output.report.removedFieldIds, {MetadataFieldId.odfAuthor});
+    expect(output.report.alreadyAbsentFieldIds, {MetadataFieldId.odfPrintDate});
+    expect(output.report.outputValidated, isTrue);
+    expect(
+        output.report.verificationOutcome, StripVerificationOutcome.verified);
+    expect(output.report.reencoded, isTrue);
+  });
+
   test('stripMetadata rejects unsupported selective PDF labels', () async {
     final dir = await Directory.systemTemp.createTemp('pdf_unknown_field_');
     addTearDown(() => dir.delete(recursive: true));
@@ -626,6 +779,26 @@ Uint8List _wav(List<(String, List<int>)> chunks) {
   ]);
 }
 
+Uint8List _selectiveOdfZip() {
+  final archive = Archive()
+    ..addFile(
+      ArchiveFile.string(
+        'mimetype',
+        'application/vnd.oasis.opendocument.text',
+      )..compress = false,
+    )
+    ..addFile(ArchiveFile.string('content.xml', '<content/>'))
+    ..addFile(ArchiveFile.string(
+      'meta.xml',
+      '<office:document-meta '
+          'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+          'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+          '<office:meta><dc:creator>Jane</dc:creator></office:meta>'
+          '</office:document-meta>',
+    ));
+  return Uint8List.fromList(ZipEncoder().encode(archive)!);
+}
+
 List<int> _riffChunk(String id, List<int> data) => [
       ...id.padRight(4).codeUnits,
       ..._le32(data.length),
@@ -668,6 +841,22 @@ Uint8List _officeZip(Map<String, String> files) {
   }
   return Uint8List.fromList(ZipEncoder().encode(archive)!);
 }
+
+Uint8List _odfZip(Map<String, String> files) {
+  final archive = Archive();
+  for (final MapEntry(key: name, value: content) in files.entries) {
+    final file = ArchiveFile.string(name, content);
+    if (name == 'mimetype') file.compress = false;
+    archive.addFile(file);
+  }
+  return Uint8List.fromList(ZipEncoder().encode(archive)!);
+}
+
+const _odfMetaXml = '<office:document-meta '
+    'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+    'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    '<office:meta><dc:creator>Jane</dc:creator>'
+    '<dc:title>Keep</dc:title></office:meta></office:document-meta>';
 
 const _docxContentTypes =
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'

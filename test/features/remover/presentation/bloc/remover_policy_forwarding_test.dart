@@ -75,6 +75,27 @@ void main() {
     expect(repository.policiesByPath, isNot(contains(aiff.path)));
     expect(completed.results.last.success, isFalse);
   });
+
+  test('RemoverBloc forwards ODF policy and rejects mismatched IDs', () async {
+    final repository = _CapturingRepository();
+    final bloc = RemoverBloc(
+      repository: repository,
+      outputFolderRepository: const _OutputFolderRepository(),
+      validateInputs: false,
+    );
+    addTearDown(bloc.close);
+    final odt = _file('/input/one.odt', 'odt');
+    final policy = StripPolicy.selective(
+      fieldIds: const {MetadataFieldId.odfAuthor},
+    );
+    bloc.add(RemoverFilesAdded([odt], policiesByPath: {odt.path: policy}));
+    await bloc.stream.firstWhere((state) => state.files.length == 1);
+    bloc.add(const RemoverProcessingStarted());
+    await bloc.stream.firstWhere(
+      (state) => state.status == RemoverStatus.completed,
+    );
+    expect(repository.policiesByPath[odt.path], same(policy));
+  });
 }
 
 class _CapturingRepository implements RemoverRepository {

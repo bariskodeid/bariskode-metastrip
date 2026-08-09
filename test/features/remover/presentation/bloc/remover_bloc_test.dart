@@ -383,6 +383,51 @@ void main() {
       await rejected.close();
     });
 
+    test('accepts exact ODF IDs and rejects cross-format IDs', () async {
+      final repo = _FakeRemoverRepository();
+      final accepted = RemoverBloc(
+        validateInputs: false,
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+        initialState: RemoverState(
+          status: RemoverStatus.idle,
+          files: [_file('document.odt', ext: 'odt')],
+          policiesByPath: {
+            '/tmp/document.odt': StripPolicy.selective(
+              fieldIds: const {MetadataFieldId.odfTitle},
+            ),
+          },
+        ),
+      )..add(const RemoverProcessingStarted());
+      final acceptedState = await _waitFor(
+        accepted,
+        (state) => state.status == RemoverStatus.completed,
+      );
+      expect(acceptedState.results.single.success, isTrue);
+
+      final rejected = RemoverBloc(
+        validateInputs: false,
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+        initialState: RemoverState(
+          status: RemoverStatus.idle,
+          files: [_file('document.odt', ext: 'odt')],
+          policiesByPath: {
+            '/tmp/document.odt': StripPolicy.selective(
+              fieldIds: const {MetadataFieldId.openXmlTitle},
+            ),
+          },
+        ),
+      )..add(const RemoverProcessingStarted());
+      final rejectedState = await _waitFor(
+        rejected,
+        (state) => state.status == RemoverStatus.completed,
+      );
+      expect(rejectedState.results.single.success, isFalse);
+      await accepted.close();
+      await rejected.close();
+    });
+
     test(
         'processes registered formats including supported BMP and reports '
         'supported progress total', () async {

@@ -1,11 +1,31 @@
 # Changelog
 
+### ODF stable-ID selective removal (2026-08-09)
+
+- Added bounded per-property selective removal for ODT/ODS/ODP `meta.xml`.
+- Added exact namespace/local-name descriptors and stable IDs for the ten
+  properties already surfaced by the ODF extractor. Wrong-namespace values
+  remain visible but are not removable.
+- Added strict package validation, duplicate selected-property fail-closed
+  behavior, semantic preservation checks for unknown/unselected properties and
+  all non-metadata entries, generated/local persisted output reporting, and
+  attempted-unverified SAF reporting.
+- Full ODF `stripOdf` behavior remains unchanged. Custom/user-defined and broad
+  ODF metadata cleanup are not supported; no device validation claim is made.
+
 All notable changes to MetaStrip project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+- Added bounded stable-ID selective removal for ODT/ODS/ODP standard `meta.xml`
+  properties. Namespace-aware mutation removes only selected canonical `dc`/`meta`
+  properties, removes every selected repeated keyword, preserves custom properties
+  and non-meta ZIP members, preserves first/stored `mimetype`, and validates local
+  persisted output. Malformed or ambiguous XML/packages fail closed. This does not
+  enable new extensions or claim comprehensive ODF sanitization.
 
 - Added WAV-only stable-ID selective removal for the allowlisted `LIST INFO`
   subchunks `INAM`, `ICOP`, `ICRD`, `IGNR`, `IART`, `ICMT`, `ISFT`, `ISBJ`,

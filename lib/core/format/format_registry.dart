@@ -193,7 +193,9 @@ const List<FormatCapability> _standardCapabilities = [
     extractionSizeLimitBytes: AppConstants.maxInlineExifSizeBytes,
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.signature,
-    knownLimitations: ['Only understood WebP metadata chunks are removed.'],
+    knownLimitations: [
+      'WebP metadata can be removed only through the full-removal route.',
+    ],
   ),
   FormatCapability(
     extensions: {'gif'},
@@ -417,14 +419,20 @@ const List<FormatCapability> _standardCapabilities = [
     category: FormatCategory.document,
     supportsExtraction: true,
     supportsFullRemoval: true,
-    supportsSelectiveRemoval: false,
+    supportsSelectiveRemoval: true,
     processingStrategy: ProcessingStrategy.inMemory,
     extractionHandlerFactory: _handlerDeclaration,
     removalHandlerFactory: _handlerDeclaration,
     extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.containerStructure,
-    knownLimitations: ['Removal covers known ODF package metadata.'],
+    removalCoverage: RemovalCoverage.verifiedSupportedScope,
+    knownLimitations: [
+      'Selective removal is limited to ten exact stable IDs for canonical '
+          'dc/meta properties in one bounded meta.xml part.',
+      'Custom and user-defined ODF properties are not supported.',
+      'SAF persistence is attempted but not read back on device.',
+    ],
   ),
   FormatCapability(
     extensions: {'rtf', 'txt'},
