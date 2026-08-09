@@ -44,6 +44,18 @@ extension type const MetadataFieldId._(String value) {
   static const openXmlTotalTime = MetadataFieldId._('openxml.app.TotalTime');
   static const openXmlSlides = MetadataFieldId._('openxml.app.Slides');
 
+  static const wavInfoInam = MetadataFieldId._('wav.info.INAM');
+  static const wavInfoIcop = MetadataFieldId._('wav.info.ICOP');
+  static const wavInfoIcrd = MetadataFieldId._('wav.info.ICRD');
+  static const wavInfoIgnr = MetadataFieldId._('wav.info.IGNR');
+  static const wavInfoIart = MetadataFieldId._('wav.info.IART');
+  static const wavInfoIcmt = MetadataFieldId._('wav.info.ICMT');
+  static const wavInfoIsft = MetadataFieldId._('wav.info.ISFT');
+  static const wavInfoIsbj = MetadataFieldId._('wav.info.ISBJ');
+  static const wavInfoIeng = MetadataFieldId._('wav.info.IENG');
+  static const wavInfoIkey = MetadataFieldId._('wav.info.IKEY');
+  static const wavInfoIrl = MetadataFieldId._('wav.info.IRL');
+
   /// Normalizes a Vorbis key using ASCII whitespace trimming and ASCII case
   /// folding. Vorbis keys are UTF-8 fields, but the key itself is restricted
   /// to printable ASCII after normalization.
@@ -105,6 +117,8 @@ extension type const MetadataFieldId._(String value) {
     if (pdfId != null) return pdfId;
     final openXmlId = _openXmlIdsByValue[value];
     if (openXmlId != null) return openXmlId;
+    final wavId = _wavInfoIdsByValue[value];
+    if (wavId != null) return wavId;
     if (value.startsWith(_vorbisPrefix)) {
       final parsed = MetadataFieldId.vorbisComment(
         value.substring(_vorbisPrefix.length),
@@ -143,6 +157,7 @@ extension type const MetadataFieldId._(String value) {
   bool get isPdfInfo => _pdfIdsByValue.containsKey(value);
   bool get isVorbisComment => value.startsWith(_vorbisPrefix);
   bool get isOpenXml => _openXmlIdsByValue.containsKey(value);
+  bool get isWavInfo => _wavInfoIdsByValue.containsKey(value);
 
   /// Whether this exact Open XML ID is surfaced for [extension].
   bool isOpenXmlSupportedFor(String extension) {
@@ -171,6 +186,20 @@ extension type const MetadataFieldId._(String value) {
     'openxml.app.AppVersion': openXmlAppVersion,
     'openxml.app.TotalTime': openXmlTotalTime,
     'openxml.app.Slides': openXmlSlides,
+  };
+
+  static const Map<String, MetadataFieldId> _wavInfoIdsByValue = {
+    'wav.info.INAM': wavInfoInam,
+    'wav.info.ICOP': wavInfoIcop,
+    'wav.info.ICRD': wavInfoIcrd,
+    'wav.info.IGNR': wavInfoIgnr,
+    'wav.info.IART': wavInfoIart,
+    'wav.info.ICMT': wavInfoIcmt,
+    'wav.info.ISFT': wavInfoIsft,
+    'wav.info.ISBJ': wavInfoIsbj,
+    'wav.info.IENG': wavInfoIeng,
+    'wav.info.IKEY': wavInfoIkey,
+    'wav.info.IRL': wavInfoIrl,
   };
 
   String? get pngKeyword {

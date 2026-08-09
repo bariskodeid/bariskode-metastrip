@@ -13,7 +13,7 @@
 ## Gap Closure Update (2026-08-09)
 
 Phases 0 and 1 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` are complete within
-the current PNG/PDF/FLAC/Open XML selective scope, and the narrow Phase 2 BMP subset is
+the current PNG/PDF/FLAC/WAV INFO/Open XML selective scope, and the narrow Phase 2 BMP subset is
 enabled. The shared capability registry describes all 41 Viewer extensions and
 the 20 registered Remover extensions, including ZIP-only container cleanup.
 Stable field IDs and a per-file `StripPolicy` now travel from Viewer field
@@ -63,7 +63,8 @@ The executable lanes and acceptance thresholds are in
   bounded-read audio via second isolate read)
 - Privacy field detection for GPS, author, device info
 - Audio: ID3v2.2/2.3/2.4 + ID3v1.1 (MP3), Vorbis Comments (FLAC/OGG/Opus),
-  RIFF INFO (WAV/AIFF); AIF/AIFC are allowlisted for filesystem metadata only
+  RIFF INFO (WAV/AIFF); WAV allowlisted LIST INFO fields carry stable IDs while
+  AIFF selective removal remains disabled; AIF/AIFC are allowlisted for filesystem metadata only
 - PDF: pure-Dart Info dictionary (bounded object scan: max 64 regions and 1MB
   per region) + linear XMP packet scan over the size-capped extraction payload
 - Office: DOCX/XLSX/PPTX core props via archive + ODT/ODS/ODP ODF meta.xml

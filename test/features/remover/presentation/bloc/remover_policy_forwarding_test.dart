@@ -44,6 +44,37 @@ void main() {
     expect(repository.policiesByPath[png.path], same(pngPolicy));
     expect(repository.policiesByPath[pdf.path], same(pdfPolicy));
   });
+
+  test('RemoverBloc accepts WAV IDs but rejects the same IDs for AIFF',
+      () async {
+    final repository = _CapturingRepository();
+    final bloc = RemoverBloc(
+      repository: repository,
+      outputFolderRepository: const _OutputFolderRepository(),
+      validateInputs: false,
+    );
+    addTearDown(bloc.close);
+    final wav = _file('/input/one.wav', 'wav');
+    final aiff = _file('/input/two.aiff', 'aiff');
+    final policy = StripPolicy.selective(
+      fieldIds: const {MetadataFieldId.wavInfoIart},
+    );
+    bloc.add(
+      RemoverFilesAdded(
+        [wav, aiff],
+        policiesByPath: {wav.path: policy, aiff.path: policy},
+      ),
+    );
+    await bloc.stream.firstWhere((state) => state.files.length == 2);
+    bloc.add(const RemoverProcessingStarted());
+    final completed = await bloc.stream.firstWhere(
+      (state) => state.status == RemoverStatus.completed,
+    );
+
+    expect(repository.policiesByPath[wav.path], same(policy));
+    expect(repository.policiesByPath, isNot(contains(aiff.path)));
+    expect(completed.results.last.success, isFalse);
+  });
 }
 
 class _CapturingRepository implements RemoverRepository {

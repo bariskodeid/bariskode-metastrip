@@ -142,7 +142,7 @@ JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC, MP4, MOV, AVI, MKV, WebM, 3GP, 
 The Viewer has registered payload extractors for: JPG/JPEG, TIFF/TIF, PNG, GIF, WebP, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, ZIP, APK, and EPUB. Other allowlisted formats currently surface filesystem fields only. HEIC is allowlisted but filesystem-only; HEIF, RAW, M4V, legacy Office, GZ, and BZ2 are omitted from the current allowlist and parser registry.
 
 ### Remover registry
-The Remover can currently create clean copies for: JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, and ZIP. ZIP support is container-only and non-recursive. APK and EPUB remain unsupported for removal; video, HEIC/HEIF, RAW, legacy Office, and granular audio removal remain deferred.
+The Remover can currently create clean copies for: JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, and ZIP. WAV selective removal is limited to eleven allowlisted `LIST INFO` stable IDs; AIFF selective removal remains disabled. ZIP support is container-only and non-recursive. APK and EPUB remain unsupported for removal; video, HEIC/HEIF, RAW, legacy Office, and broader granular audio removal remain deferred.
 
 
 ## 🔒 Privacy

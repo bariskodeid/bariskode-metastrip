@@ -316,7 +316,14 @@ verified.
      input/output, page, packet, comment, vendor, and entry limits.
     It is not registry/datasource/UI capability, does not cover Opus, and does
     not close the broader OGG/Opus selective-removal gap.
-7. [ ] Add WAV/AIFF field-level removal.
+7. [~] Add WAV-only field-level removal. Stable IDs and descriptors cover the
+   allowlisted WAV `LIST INFO` codes (`INAM`, `ICOP`, `ICRD`, `IGNR`, `IART`,
+   `ICMT`, `ISFT`, `ISBJ`, `IENG`, `IKEY`, `IRL`). Selective mutation removes
+   every selected occurrence and preserves unknown/unselected INFO, non-INFO
+   LIST, `bext`, embedded ID3, `fmt `, `data`, and unrelated chunks. Strict
+   RIFF bounds/padding and generated/local persisted output validation are
+   covered. AIFF selective cleanup remains disabled; SAF/device readback is
+   pending.
 
 ### Result reporting
 

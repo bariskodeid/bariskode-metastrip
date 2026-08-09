@@ -11,6 +11,96 @@ import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 import 'package:metastrip/features/remover/domain/entities/strip_report.dart';
 
 void main() {
+  test('WAV policy route validates local output and reports removals',
+      () async {
+    final dir =
+        await Directory.systemTemp.createTemp('metastrip_wav_selective_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}audio.wav');
+    await input.writeAsBytes(_wav([
+      ('fmt ', List<int>.filled(16, 1)),
+      (
+        'LIST',
+        [
+          ...'INFO'.codeUnits,
+          ..._riffChunk('IART', 'Alice'.codeUnits),
+          ..._riffChunk('INAM', 'Keep title'.codeUnits),
+        ]
+      ),
+      ('bext', 'keep broadcast'.codeUnits),
+      ('data', List<int>.filled(8, 2)),
+    ]));
+
+    final removal = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: dir.path,
+      policy: StripPolicy.selective(
+        fieldIds: const {MetadataFieldId.wavInfoIart},
+      ),
+    );
+
+    final text = String.fromCharCodes(await removal.file.readAsBytes());
+    expect(text, isNot(contains('Alice')));
+    expect(text, contains('Keep title'));
+    expect(text, contains('keep broadcast'));
+    expect(removal.report.removedFieldIds, {MetadataFieldId.wavInfoIart});
+    expect(removal.report.outputValidated, isTrue);
+    expect(
+        removal.report.verificationOutcome, StripVerificationOutcome.verified);
+  });
+
+  test('WAV local persisted readback failure fails the operation', () async {
+    final dir =
+        await Directory.systemTemp.createTemp('metastrip_wav_readback_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}audio.wav');
+    await input.writeAsBytes(_wav([
+      (
+        'LIST',
+        [...'INFO'.codeUnits, ..._riffChunk('INAM', 'Secret'.codeUnits)]
+      ),
+    ]));
+    final datasource = MetadataRemoverDatasource(
+      persistedOutputReader: (_) async => Uint8List.fromList('bad'.codeUnits),
+    );
+
+    await expectLater(
+      datasource.stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: StripPolicy.selective(
+          fieldIds: const {MetadataFieldId.wavInfoInam},
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('legacy WAV selectiveLabels route uses verified selective behavior',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_wav_legacy_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}audio.wav');
+    await input.writeAsBytes(_wav([
+      (
+        'LIST',
+        [...'INFO'.codeUnits, ..._riffChunk('INAM', 'Secret'.codeUnits)]
+      ),
+    ]));
+    final datasource = MetadataRemoverDatasource(
+      persistedOutputReader: (_) async => Uint8List.fromList('bad'.codeUnits),
+    );
+
+    await expectLater(
+      datasource.stripMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: {MetadataFieldId.wavInfoInam.value},
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('stripPngMetadata selective removes only the matching author chunk',
       () async {
     final dir =
@@ -523,6 +613,32 @@ void main() {
     expect(result.success, isTrue);
   });
 }
+
+Uint8List _wav(List<(String, List<int>)> chunks) {
+  final body = <int>[...'WAVE'.codeUnits];
+  for (final chunk in chunks) {
+    body.addAll(_riffChunk(chunk.$1, chunk.$2));
+  }
+  return Uint8List.fromList([
+    ...'RIFF'.codeUnits,
+    ..._le32(body.length),
+    ...body,
+  ]);
+}
+
+List<int> _riffChunk(String id, List<int> data) => [
+      ...id.padRight(4).codeUnits,
+      ..._le32(data.length),
+      ...data,
+      if (data.length.isOdd) 0,
+    ];
+
+List<int> _le32(int value) => [
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+      (value >> 16) & 0xFF,
+      (value >> 24) & 0xFF,
+    ];
 
 class _CapturingDatasource extends MetadataRemoverDatasource {
   StripPolicy? capturedPolicy;

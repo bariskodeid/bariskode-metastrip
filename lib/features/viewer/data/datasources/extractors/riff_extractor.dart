@@ -3,21 +3,8 @@ import 'dart:typed_data';
 
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
-
-/// Human labels for RIFF INFO sub-chunks found inside WAV `LIST INFO` blocks.
-const Map<String, String> _wavInfoLabels = {
-  'INAM': 'Title',
-  'ICOP': 'Copyright',
-  'ICRD': 'Date',
-  'IGNR': 'Genre',
-  'IART': 'Artist',
-  'ICMT': 'Comment',
-  'ISFT': 'Software',
-  'ISBJ': 'Subject',
-  'IENG': 'Engineer',
-  'IKEY': 'Keywords',
-  'IRL': 'URL',
-};
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
+import 'package:metastrip/features/remover/domain/entities/riff_info_descriptor.dart';
 
 /// Human labels for AIFF chunks (four-character code to readable label).
 const Map<String, String> _aiffLabels = {
@@ -166,9 +153,14 @@ void _parseInfoList(Uint8List content, List<MetadataFieldEntity> fields) {
     final dataEnd = dataStart + size;
     if (dataEnd > content.length) break;
 
-    final label = _wavInfoLabels[subId];
-    if (label != null) {
-      _addText(fields, label, content.sublist(dataStart, dataEnd));
+    final descriptor = _wavInfoDescriptor(subId);
+    if (descriptor != null) {
+      _addText(
+        fields,
+        descriptor.$2.label,
+        content.sublist(dataStart, dataEnd),
+        id: descriptor.$1,
+      );
     }
 
     offset = dataEnd;
@@ -180,8 +172,9 @@ void _parseInfoList(Uint8List content, List<MetadataFieldEntity> fields) {
 void _addText(
   List<MetadataFieldEntity> fields,
   String label,
-  Uint8List data,
-) {
+  Uint8List data, {
+  MetadataFieldId? id,
+}) {
   final value = latin1.decode(data).trim();
   if (value.isEmpty) return;
   fields.add(
@@ -189,6 +182,7 @@ void _addText(
       section: 'Audio RIFF',
       label: label,
       value: truncateMetadataValue(value),
+      id: id,
       isPrivacySensitive: isTextPrivacySensitive(label),
     ),
   );
@@ -202,4 +196,11 @@ bool _asciiAt(Uint8List bytes, int offset, String text) {
     if (bytes[offset + i] != codes[i]) return false;
   }
   return true;
+}
+
+(MetadataFieldId, RiffInfoDescriptor)? _wavInfoDescriptor(String code) {
+  for (final entry in wavInfoDescriptors.entries) {
+    if (entry.value.code.padRight(4) == code) return (entry.key, entry.value);
+  }
+  return null;
 }

@@ -238,6 +238,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       'png' => policy.selectedFieldIds.every((id) => id.isPngText),
       'pdf' => policy.selectedFieldIds.every((id) => id.isPdfInfo),
       'flac' => policy.selectedFieldIds.every((id) => id.isVorbisComment),
+      'wav' => policy.selectedFieldIds.every((id) => id.isWavInfo),
       'docx' || 'xlsx' || 'pptx' => policy.selectedFieldIds.every(
           (id) => id.isOpenXmlSupportedFor(extension),
         ),

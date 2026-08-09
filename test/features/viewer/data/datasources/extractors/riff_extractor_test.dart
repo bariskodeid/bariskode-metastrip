@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/riff_extractor.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 void main() {
   group('extractRiff', () {
@@ -23,7 +24,45 @@ void main() {
       expect(byLabel['Title']?.value, 'Dreamscape');
       expect(byLabel['Date']?.value, '2024-01-01');
       expect(byLabel['Copyright']?.value, '2024 Studio West');
+      expect(byLabel['Title']?.id, MetadataFieldId.wavInfoInam);
+      expect(byLabel['Date']?.id, MetadataFieldId.wavInfoIcrd);
+      expect(byLabel['Copyright']?.id, MetadataFieldId.wavInfoIcop);
       expect(byLabel['Title']?.isPrivacySensitive, isFalse);
+    });
+
+    test('assigns stable IDs to every allowlisted WAV INFO code', () async {
+      final entries = {
+        'INAM': 'a',
+        'ICOP': 'b',
+        'ICRD': 'c',
+        'IGNR': 'd',
+        'IART': 'e',
+        'ICMT': 'f',
+        'ISFT': 'g',
+        'ISBJ': 'h',
+        'IENG': 'i',
+        'IKEY': 'j',
+        'IRL': 'k',
+      };
+      final fields = await extractRiff(
+        _wavBytes([_infoList(entries)]),
+        extension: 'wav',
+      );
+
+      expect(fields, hasLength(11));
+      expect(fields.map((field) => field.id).toSet(), {
+        MetadataFieldId.wavInfoInam,
+        MetadataFieldId.wavInfoIcop,
+        MetadataFieldId.wavInfoIcrd,
+        MetadataFieldId.wavInfoIgnr,
+        MetadataFieldId.wavInfoIart,
+        MetadataFieldId.wavInfoIcmt,
+        MetadataFieldId.wavInfoIsft,
+        MetadataFieldId.wavInfoIsbj,
+        MetadataFieldId.wavInfoIeng,
+        MetadataFieldId.wavInfoIkey,
+        MetadataFieldId.wavInfoIrl,
+      });
     });
 
     test('surfaces an embedded ID3 chunk in a WAV file', () async {
@@ -53,6 +92,7 @@ void main() {
 
       expect(fields, hasLength(3));
       expect(byLabel['Title']?.value, 'Aiff Title');
+      expect(byLabel['Title']?.id, isNull);
       expect(byLabel['Author']?.value, 'Jane Doe');
       expect(byLabel['Author']?.isPrivacySensitive, isTrue);
       expect(byLabel['Copyright']?.value, '2024 Jane Doe');
@@ -123,7 +163,7 @@ Uint8List _chunk(
   bool bigEndian = false,
 }) {
   final builder = BytesBuilder(copy: false);
-  builder.add(latin1.encode(id));
+  builder.add(latin1.encode(id.padRight(4)));
   builder.add(bigEndian ? _be32(data.length) : _le32(data.length));
   builder.add(data);
   if (data.length.isOdd) builder.addByte(0);

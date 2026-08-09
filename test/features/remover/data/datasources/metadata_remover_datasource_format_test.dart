@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/features/remover/data/datasources/metadata_remover_datasource.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
 
 void main() {
   test('stripMetadata strips an ID3v2 tag from an mp3', () async {
@@ -84,7 +85,7 @@ void main() {
     expect(String.fromCharCodes(bytes.sublist(0, 6)), 'GIF89a');
   });
 
-  test('stripMetadata removes a WAV LIST INFO chunk', () async {
+  test('supportedCleanup removes WAV LIST, ID3, and bext metadata', () async {
     final dir = await Directory.systemTemp.createTemp('metastrip_wav_test_');
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}audio.wav');
@@ -92,17 +93,35 @@ void main() {
       _wavFile([
         ('fmt ', List<int>.filled(16, 0x10)),
         ('LIST', [...'INFO'.codeUnits, ...'INAM'.codeUnits]),
+        (
+          'ID3 ',
+          [
+            ...'ID3'.codeUnits,
+            ...[1, 2, 3]
+          ]
+        ),
+        (
+          'bext',
+          [
+            ...'Broadcast'.codeUnits,
+            ...[4, 5, 6]
+          ]
+        ),
         ('data', List<int>.filled(64, 0x7F)),
       ]),
     );
 
-    final output = await MetadataRemoverDatasource().stripMetadata(
+    final removal = await MetadataRemoverDatasource().stripMetadataWithPolicy(
       input.path,
       outputDirectory: dir.path,
+      policy: const StripPolicy.supportedCleanup(),
     );
+    final output = removal.file;
     final bytes = await output.readAsBytes();
 
     expect(String.fromCharCodes(bytes), isNot(contains('INFO')));
+    expect(String.fromCharCodes(bytes), isNot(contains('ID3')));
+    expect(String.fromCharCodes(bytes), isNot(contains('Broadcast')));
     expect(String.fromCharCodes(bytes.sublist(0, 4)), 'RIFF');
     expect(
       _indexOf(bytes, [...'data'.codeUnits]),

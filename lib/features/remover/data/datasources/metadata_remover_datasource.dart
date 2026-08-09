@@ -17,6 +17,7 @@ import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_v
 import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_value_parser.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/riff_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_stripper.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/wav_info_selective_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/webp_stripper.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
@@ -172,6 +173,11 @@ class MetadataRemoverDatasource {
           outputDirectory,
           policy.selectedFieldIds,
         ),
+      'wav' => _stripSelectiveWav(
+          inputPath,
+          outputDirectory,
+          policy.selectedFieldIds,
+        ),
       _ => throw const FormatException(
           'Selective cleanup is unavailable for this format',
         ),
@@ -189,6 +195,7 @@ class MetadataRemoverDatasource {
       'png' => fieldIds.every((id) => id.isPngText),
       'pdf' => fieldIds.every((id) => id.isPdfInfo),
       'flac' => fieldIds.every((id) => id.isVorbisComment),
+      'wav' => fieldIds.every((id) => id.isWavInfo),
       'docx' ||
       'xlsx' ||
       'pptx' =>
@@ -409,6 +416,61 @@ class MetadataRemoverDatasource {
     );
   }
 
+  Future<MetadataRemovalOutput> _stripSelectiveWav(
+    String inputPath,
+    String? outputDirectory,
+    Set<MetadataFieldId> requestedIds,
+  ) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('WAV too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('WAV too large for remover MVP');
+    }
+    final result = await runOnWorker(
+      () => stripWavInfoSelective(inputBytes, selectedIds: requestedIds),
+    );
+    final output =
+        await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      final persisted = await _persistedOutputReader(output);
+      validateWavInfoSelective(
+        inputBytes,
+        persisted,
+        selectedIds: requestedIds,
+        expectedRemovedIds: result.removedIds,
+      );
+    }
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        requestedFieldIds: requestedIds,
+        removedFieldIds: result.removedIds,
+        alreadyAbsentFieldIds: result.absentIds,
+        warnings: isSafOutput
+            ? const [
+                'Generated WAV bytes were validated, but persisted SAF '
+                    'readback was not performed.',
+              ]
+            : const [],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
   Future<MetadataRemovalOutput> _stripPdfWithReport(
     String inputPath, {
     required String outputDirectory,
@@ -444,8 +506,8 @@ class MetadataRemoverDatasource {
   ///
   /// A null [selectiveLabels] value requests full removal. A non-empty set
   /// requests field-level removal and is accepted only for formats that support
-  /// it (PNG text chunks, PDF Info keys, FLAC Vorbis comment keys, and standard
-  /// Open XML core/app properties). Empty
+  /// it (PNG text chunks, PDF Info keys, FLAC Vorbis comment keys, WAV LIST
+  /// INFO fields, and standard Open XML core/app properties). Empty
   /// sets, unsupported formats, and unknown field labels are rejected.
   Future<File> stripMetadata(
     String inputPath, {
@@ -476,6 +538,17 @@ class MetadataRemoverDatasource {
       try {
         selectiveLabels.map(MetadataFieldId.normalizeVorbisCommentKey).toSet();
       } on ArgumentError {
+        throw const FormatException('Unsupported selective metadata field');
+      }
+    }
+    Set<MetadataFieldId>? wavIds;
+    if (route == _RemovalRoute.wav && selectiveLabels != null) {
+      try {
+        wavIds = selectiveLabels.map(MetadataFieldId.parse).toSet();
+        if (!wavIds.every((id) => id.isWavInfo)) {
+          throw const FormatException('Unsupported selective metadata field');
+        }
+      } on Object {
         throw const FormatException('Unsupported selective metadata field');
       }
     }
@@ -520,8 +593,13 @@ class MetadataRemoverDatasource {
         stripOggMetadata(inputPath, outputDirectory: outputDirectory),
       _RemovalRoute.opus =>
         stripOpusMetadata(inputPath, outputDirectory: outputDirectory),
-      _RemovalRoute.wav =>
-        stripWavMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.wav => selectiveLabels == null
+          ? stripWavMetadata(inputPath, outputDirectory: outputDirectory)
+          : _stripWavSelectiveIds(
+              inputPath,
+              outputDirectory: outputDirectory,
+              selectedIds: wavIds!,
+            ),
       _RemovalRoute.aiff => stripAiffMetadata(
           inputPath,
           outputDirectory: outputDirectory,
@@ -746,6 +824,22 @@ class MetadataRemoverDatasource {
       'WAV too large for remover MVP',
       outputDirectory: outputDirectory,
     );
+  }
+
+  Future<File> _stripWavSelectiveIds(
+    String inputPath, {
+    required String? outputDirectory,
+    required Set<MetadataFieldId> selectedIds,
+  }) async {
+    // Keep the legacy label API on the same verified path as the policy API.
+    // In particular, never return generated bytes without local persisted
+    // readback validation.
+    final result = await _stripSelectiveWav(
+      inputPath,
+      outputDirectory,
+      selectedIds,
+    );
+    return result.file;
   }
 
   Future<File> stripAiffMetadata(

@@ -68,4 +68,15 @@ void main() {
     expect(MetadataRemoverDatasource.supportsExtension('.ZIP'), isTrue);
     expect(MetadataRemoverDatasource.supportsExtension('mp4'), isFalse);
   });
+
+  test('selective RIFF capability is WAV-only', () {
+    expect(
+      FormatRegistry.standard.lookup('wav')?.supportsSelectiveRemoval,
+      isTrue,
+    );
+    expect(
+      FormatRegistry.standard.lookup('aiff')?.supportsSelectiveRemoval,
+      isFalse,
+    );
+  });
 }

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added WAV-only stable-ID selective removal for the allowlisted `LIST INFO`
+  subchunks `INAM`, `ICOP`, `ICRD`, `IGNR`, `IART`, `ICMT`, `ISFT`, `ISBJ`,
+  `IENG`, `IKEY`, and `IRL`. Every selected occurrence is removed while
+  unknown/unselected INFO, non-INFO LIST, `bext`, embedded ID3, `fmt `, `data`,
+  and unrelated chunks are preserved. Strict RIFF bounds, padding, walk limits,
+  generated-byte validation, and local persisted-output readback are enforced;
+  SAF readback and device validation are not claimed. AIFF selective removal
+  remains disabled and full WAV cleanup is unchanged.
+
 - Added stable-ID selective removal for allowlisted DOCX/XLSX/PPTX standard
   Open XML core and extended properties. Full package cleanup is preserved;
   custom and legacy Office properties remain unsupported, and local output is

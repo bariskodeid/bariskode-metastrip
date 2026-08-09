@@ -321,8 +321,26 @@ const List<FormatCapability> _standardCapabilities = [
     ],
   ),
   FormatCapability(
-    extensions: {'wav', 'aiff'},
-    mimeTypes: {'audio/wav', 'audio/aiff'},
+    extensions: {'wav'},
+    mimeTypes: {'audio/wav'},
+    category: FormatCategory.audio,
+    supportsExtraction: true,
+    supportsFullRemoval: true,
+    supportsSelectiveRemoval: true,
+    processingStrategy: ProcessingStrategy.inMemory,
+    extractionHandlerFactory: _handlerDeclaration,
+    removalHandlerFactory: _handlerDeclaration,
+    extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
+    removalSizeLimitBytes: _memoryLimit,
+    outputValidationStrategy: OutputValidationStrategy.signature,
+    knownLimitations: [
+      'Selective cleanup removes only allowlisted LIST INFO fields; full '
+          'cleanup retains the existing broader WAV metadata cleanup.'
+    ],
+  ),
+  FormatCapability(
+    extensions: {'aiff'},
+    mimeTypes: {'audio/aiff'},
     category: FormatCategory.audio,
     supportsExtraction: true,
     supportsFullRemoval: true,
@@ -333,9 +351,7 @@ const List<FormatCapability> _standardCapabilities = [
     extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.signature,
-    knownLimitations: [
-      'Only understood RIFF/AIFF metadata chunks are removed.'
-    ],
+    knownLimitations: ['Only understood AIFF metadata chunks are removed.'],
   ),
   FormatCapability(
     extensions: {'aac', 'm4a', 'wma', 'aif', 'aifc'},
