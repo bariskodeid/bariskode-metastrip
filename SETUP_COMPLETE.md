@@ -1,7 +1,7 @@
 # MetaStrip Project Progress Report
 
 **Snapshot:** 2026-08-09
-**Overall:** Implemented-scope MVP is usable and mostly complete. Gap-closure Phases 0-1 are implemented, the narrow Phase 2 BMP subset is enabled, and Phase 4 ZIP-only cleanup is implemented; full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
+**Overall:** Implemented-scope MVP is usable and mostly complete. Gap-closure Phases 0-1 are implemented, including the bounded ODF selective slice; the narrow Phase 2 BMP subset and Phase 4 ZIP-only cleanup are enabled. Full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
 **Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
 
 ## Status Definitions
@@ -13,7 +13,7 @@
 ## Gap Closure Update (2026-08-09)
 
 Phases 0 and 1 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` are complete within
-the current PNG/PDF/FLAC/WAV INFO/Open XML selective scope, and the narrow Phase 2 BMP subset is
+the current PNG/PDF/FLAC/WAV INFO/Open XML/ODF selective scope, and the narrow Phase 2 BMP subset is
 enabled. The shared capability registry describes all 41 Viewer extensions and
 the 20 registered Remover extensions, including ZIP-only container cleanup.
 Stable field IDs and a per-file `StripPolicy` now travel from Viewer field
@@ -22,8 +22,9 @@ facts reach the result UI, including warnings and output-validation state.
 Unsupported or mismatched selective requests fail closed per file without a
 silent full-cleanup fallback.
 
-PNG selective text removal is verified for local persisted output: the clean
-copy is read back and reparsed before the report is marked verified. Generated
+PNG selective text removal and bounded ODF property removal are verified for
+local persisted output: each clean copy is read back and reparsed before its
+report is marked verified. Generated
 SAF PNG bytes are validated before writing, but persisted SAF readback remains
 unverified and scheduled for device validation. PDF selective DocInfo cleanup is only attempted by the existing
 best-effort scanner: its report does not claim removed IDs or validated output,
@@ -85,14 +86,17 @@ The executable lanes and acceptance thresholds are in
   WebP (EXIF/XMP chunk + VP8X flag clear), and ZIP container cleanup (EOCD and
   entry comments, DOS timestamps, recognized `0x5455`/`0x000a` extras; member
   compressed payloads preserved; no recursive member cleanup)
-- Stable-ID selective cleanup for PNG tEXt/iTXt (per keyword) and PDF DocInfo
-  (per Info key), FLAC Vorbis comment keys, and standard Open XML core/app
-  properties is wired end to end through a per-file policy. Local PNG output
+- Stable-ID selective cleanup for PNG tEXt/iTXt (per keyword), PDF DocInfo
+  (per Info key), FLAC Vorbis comment keys, standard Open XML core/app
+  properties, and the bounded ODT/ODS/ODP ODF `meta.xml` property slice is wired
+  end to end through a per-file policy. Local PNG and ODF output
   is read back, reparsed, and verified; SAF reports best-effort attempted/
   unverified semantics until persisted readback is tested on device. PDF reports
   best-effort attempted/unverified semantics.
-  Unsupported fields/formats fail closed per file. Anonymize, Preserve
-  Technical, and granular cleanup for other formats remain unavailable.
+  Unsupported fields/formats fail closed per file. ODF selective mutation targets
+  ten exact namespace-aware standard IDs, preserves custom properties and all
+  non-meta members, and is not comprehensive ODF sanitization. Anonymize,
+  Preserve Technical, and granular cleanup for other formats remain unavailable.
 - Output naming: collision-safe `_clean`, `_clean_1`, …; SAF content:// write
 
 - BMP removal for strict canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB,
@@ -108,11 +112,14 @@ The executable lanes and acceptance thresholds are in
 - HEIC/HEIF extraction — requires HEIF container parser, deferred
 - APK and EPUB removal — unsupported; APK stripping would invalidate the signing
   block. ZIP-only container cleanup is implemented and is not recursive.
-- Audio selective strip (MP3 frame-level, Vorbis per-key) — parameter
-  plumbing shipped, stripper implementation pending
+- Audio selective strip (MP3 frame-level and OGG/Opus Vorbis per-key) — parameter
+  plumbing shipped; FLAC and WAV INFO slices are implemented, while MP3, OGG,
+  and Opus selective mutation remains pending
 - Broader Office property removal — selective cleanup is limited to exact
   stable IDs for standard core/app XML properties; custom and legacy Office
-  properties remain unsupported. The general selective UI is still unwired.
+  properties remain unsupported. The detail-screen selective UI is wired only for
+  formats whose registry capability advertises stable IDs; broader batch/mode UI
+  remains unwired.
 - PDF XMP packet stripping — Info-only removal today (best-effort)
 
 ### Phase 3: Viewer UI — Implemented-scope MVP Complete
@@ -210,7 +217,7 @@ claimed.
 
 **Final host verification:**
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: 390 tests completed; 389 passed, 1 skipped
+- `flutter test`: 463 tests completed; 462 passed, 1 skipped
 - Test coverage: not measured in this verification run
 - Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`)
 - Diff check: passed

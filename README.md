@@ -8,7 +8,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 
 **Current Phase:** Implemented-scope MVP ✅ **usable / mostly complete** · Full product-spec MVP and release-readiness work remain pending
 
-Implemented now: onboarding, system file picker, file validation, format-specific metadata extraction where a parser is registered, small-file SHA-256, a 20-extension remover registry with ZIP-only container cleanup, RemoverBloc + ProcessingScreen + ResultScreen, and Settings for themes, output folder, maintenance, portable import/export, and reset.
+Implemented now: onboarding, system file picker, file validation, format-specific metadata extraction where a parser is registered, small-file SHA-256, a 20-extension remover registry with ZIP-only container cleanup, bounded stable-ID selective removal for PNG, PDF, FLAC, WAV INFO, Open XML, and ODF properties, RemoverBloc + ProcessingScreen + ResultScreen, and Settings for themes, output folder, maintenance, portable import/export, and reset.
 
 Planned next: deeper PDF stripping, video/HEIC support, share intent, unexposed processing controls, and e2e hardening.
 
@@ -108,6 +108,7 @@ lib/
 - Settings: 7 preset themes plus a persisted 16-token custom theme builder, output-folder changes synchronized with onboarding/removal, cache status, About/Licenses, portable JSON import/export, and two-step reset
 - Settings export excludes the device-local output folder; import preserves and validates the current device folder
 - Reset clears app settings, theme/output-folder configuration, and onboarding state, then returns to onboarding; generated clean copies are not deleted
+- Stable-ID selective removal is wired for PNG text, PDF Info, FLAC Vorbis comments, WAV `LIST INFO`, standard Open XML core/app properties, and ten exact namespace-aware ODF `meta.xml` properties. ODF custom properties and broader sanitization remain unsupported.
 
 ### 📅 Planned / Follow-up
 
@@ -119,8 +120,8 @@ lib/
 - Mark files/fields for removal
 
 #### 🗑️ Remover
-- Current MVP: registered-format clean-copy stripping; PDF removal is best-effort DocInfo only
-- Planned/unwired removal modes: Full Strip, Selective, Anonymize, Preserve Technical (current pipeline uses the supported-cleanup behavior)
+- Current MVP: registered-format clean-copy stripping; PDF removal is best-effort DocInfo only. The bounded ODF selective slice preserves custom properties and non-meta package members.
+- Planned/unwired batch modes: Full Strip, Anonymize, and Preserve Technical. Selective cleanup is partially wired from the metadata detail screen for registry-supported stable-ID formats; there is no general batch mode selector.
 - Batch processing with the current sequential queue, progress, cancellation, and result log
 - Planned: background processing with notifications
 

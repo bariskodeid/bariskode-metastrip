@@ -65,7 +65,7 @@ Target pengguna: jurnalis, fotografer, aktivis privasi, developer, dan pengguna 
 | `.xlsx` | `archive` + XML parsing | Core/app properties; implemented extractor and remover support |
 | `.pptx` | `archive` + XML parsing | Core/app properties; implemented extractor and remover support |
 | Legacy `.doc` / `.xls` / `.ppt` | Planned legacy Office parser | Not in current Viewer allowlist/parser |
-| `.odt` / `.ods` / `.odp` | `archive` + XML parsing | ODF meta.xml (creator, date, generator, editing-cycles, editing-duration, document-statistics) |
+| `.odt` / `.ods` / `.odp` | `archive` + XML parsing | ODF `meta.xml` (creator, date, generator, editing-cycles, editing-duration, document-statistics); bounded selective removal is implemented for ten exact namespace-aware standard IDs in the canonical root metadata part |
 | `.rtf` | Custom parser | RTF info group (author, company, creatim, revtim, version) |
 | `.txt` | File system only | File system metadata (created, modified, accessed, size, permissions) |
 
@@ -211,7 +211,7 @@ Untuk setiap file (atau batch), pengguna memilih mode:
 |------|-----------|
 | **Supported cleanup (current)** | Clean-copy behavior for the registered remover format; PDF is best-effort DocInfo only |
 | **Full Strip** | Planned/unwired: Hapus semua metadata yang terdeteksi |
-| **Selective Strip** | Planned/unwired; limited PNG/PDF selector parameters exist, but the general UI mode is unavailable |
+| **Selective Strip** | Partially implemented: the detail screen supports per-field selection and handoff for formats whose registry capability advertises stable IDs (PNG, PDF, FLAC, WAV INFO, Open XML, and bounded ODF); broader format coverage and a general batch mode remain unavailable |
 | **Anonymize** | Planned/unwired: Hapus metadata sensitif saja |
 | **Preserve Technical** | Planned/unwired: Hapus user metadata sambil mempertahankan metadata teknis |
 

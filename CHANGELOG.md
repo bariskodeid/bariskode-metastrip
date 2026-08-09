@@ -1,18 +1,5 @@
 # Changelog
 
-### ODF stable-ID selective removal (2026-08-09)
-
-- Added bounded per-property selective removal for ODT/ODS/ODP `meta.xml`.
-- Added exact namespace/local-name descriptors and stable IDs for the ten
-  properties already surfaced by the ODF extractor. Wrong-namespace values
-  remain visible but are not removable.
-- Added strict package validation, duplicate selected-property fail-closed
-  behavior, semantic preservation checks for unknown/unselected properties and
-  all non-metadata entries, generated/local persisted output reporting, and
-  attempted-unverified SAF reporting.
-- Full ODF `stripOdf` behavior remains unchanged. Custom/user-defined and broad
-  ODF metadata cleanup are not supported; no device validation claim is made.
-
 All notable changes to MetaStrip project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -20,12 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ODF stable-ID selective removal (2026-08-09)
+
 - Added bounded stable-ID selective removal for ODT/ODS/ODP standard `meta.xml`
   properties. Namespace-aware mutation removes only selected canonical `dc`/`meta`
   properties, removes every selected repeated keyword, preserves custom properties
   and non-meta ZIP members, preserves first/stored `mimetype`, and validates local
   persisted output. Malformed or ambiguous XML/packages fail closed. This does not
   enable new extensions or claim comprehensive ODF sanitization.
+- Wrong-namespace values remain Viewer-visible but are not removable. SAF output
+  remains attempted/unverified and no device-validation claim is made; full
+  `stripOdf` supported-cleanup behavior is unchanged.
 
 - Added WAV-only stable-ID selective removal for the allowlisted `LIST INFO`
   subchunks `INAM`, `ICOP`, `ICRD`, `IGNR`, `IART`, `ICMT`, `ISFT`, `ISBJ`,
@@ -110,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Remover routes, normalized extension lookup, and per-format removal
   limits.
 - Phase 1 selective removal landed for the existing PNG text and basic PDF Info
-  scope; the registered Remover set now contains 19 extensions because the
+  scope; the registered Remover set then contained 19 extensions because the
   narrow BMP subset is enabled separately from the selective flow.
 - Added stable `MetadataFieldId` values and per-file `StripPolicy` propagation
   through Viewer selection, Remover processing, repository, and datasource
@@ -134,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Project status terminology
 
-- **Implemented-scope MVP:** usable and mostly complete for the registered Viewer extractors and 19 Remover extensions, with documented limitations such as best-effort PDF cleanup and narrow BMP support.
+- **Implemented-scope MVP:** usable and mostly complete for the registered Viewer extractors and 20 Remover extensions, with documented limitations such as best-effort PDF cleanup, narrow BMP support, and non-recursive ZIP cleanup.
 - **Full product-spec MVP:** not complete; several capabilities in `docs/SPECS.md` remain planned, deferred, or unwired.
 - **Release-ready product:** not complete; integration/device testing, performance, accessibility, release-build validation, and release hardening remain pending.
 
@@ -176,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GIF, WebP, BMP extractors; narrow canonical BMP removal is enabled
 - Isolate-worker extraction while the app is foregrounded (single
   `runOnWorker` call for parse + hash); OS background execution is not wired
-- Remover format registry expanded to 19 extensions, including the narrow BMP subset
+- Remover format registry expanded to 19 extensions at this stage, including the narrow BMP subset
   (`RemoverStrippableExtensions`): jpg/jpeg/png/pdf/bmp/mp3/flac/ogg/opus/
   wav/aiff/docx/xlsx/pptx/odt/ods/odp/gif/webp
 - New strippers wired: ID3, Vorbis/FLAC, RIFF (WAV/AIFF), Office core props,
@@ -322,7 +314,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Verification (2026-08-09, latest implementation verification)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: 390 tests completed; 389 passed, 1 skipped
+- `flutter test`: 463 tests completed; 462 passed, 1 skipped
 - Test coverage: not measured in this verification run
 - Debug APK: build verified (`build\app\outputs\flutter-apk\app-debug.apk`); no
   device-install verification is claimed here.
