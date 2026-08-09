@@ -237,6 +237,10 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
     final matchesFormat = switch (extension) {
       'png' => policy.selectedFieldIds.every((id) => id.isPngText),
       'pdf' => policy.selectedFieldIds.every((id) => id.isPdfInfo),
+      'flac' => policy.selectedFieldIds.every((id) => id.isVorbisComment),
+      'docx' || 'xlsx' || 'pptx' => policy.selectedFieldIds.every(
+          (id) => id.isOpenXmlSupportedFor(extension),
+        ),
       _ => false,
     };
     return matchesFormat

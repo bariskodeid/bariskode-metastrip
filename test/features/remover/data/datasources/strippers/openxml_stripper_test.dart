@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/openxml_stripper.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 void main() {
   group('stripOpenXml', () {
@@ -210,8 +211,146 @@ void main() {
 
       expect(() => stripOpenXml(bytes), throwsFormatException);
     });
+
+    test('selectively removes one core property and preserves content', () {
+      final bytes = _officeZip({
+        '[Content_Types].xml': _docxContentTypesWithCoreProperties,
+        'docProps/core.xml': _coreXml,
+        'word/document.xml': '<document>payload</document>',
+      });
+      final result = stripOpenXmlSelective(
+        bytes,
+        extension: 'docx',
+        selectedIds: const {MetadataFieldId.openXmlAuthor},
+      );
+      final archive = ZipDecoder().decodeBytes(result.bytes, verify: false);
+      final core = String.fromCharCodes(
+        archive.findFile('docProps/core.xml')!.content as List<int>,
+      );
+      expect(core, isNot(contains('Jane')));
+      expect(core, contains('Keep me'));
+      expect(result.removedIds, {MetadataFieldId.openXmlAuthor});
+      expect(result.absentIds, isEmpty);
+      expect(
+        String.fromCharCodes(
+          archive.findFile('word/document.xml')!.content as List<int>,
+        ),
+        '<document>payload</document>',
+      );
+    });
+
+    test('rejects a prefix-only Open XML ID', () {
+      expect(
+        () => MetadataFieldId.parse('openxml.core.notAllowlisted'),
+        throwsFormatException,
+      );
+    });
+
+    test('reports an absent allowlisted property without full cleanup', () {
+      final bytes = _officeZip({
+        '[Content_Types].xml': _docxContentTypesWithCoreProperties,
+        'docProps/core.xml': _coreXml,
+        'word/document.xml': '<document/>',
+      });
+      final result = stripOpenXmlSelective(
+        bytes,
+        extension: 'docx',
+        selectedIds: const {MetadataFieldId.openXmlApplication},
+      );
+      expect(result.removedIds, isEmpty);
+      expect(result.absentIds, {MetadataFieldId.openXmlApplication});
+    });
+
+    test('uses the same non-root suffix path as full cleanup', () {
+      final bytes = _officeZip({
+        '[Content_Types].xml': _docxContentTypesWithPrivateProperties,
+        '_rels/.rels': _privatePropertyRelationships,
+        'properties/private.xml': _coreXml,
+        'word/document.xml': '<document/>',
+      });
+      final result = stripOpenXmlSelective(
+        bytes,
+        extension: 'docx',
+        selectedIds: const {MetadataFieldId.openXmlAuthor},
+      );
+      expect(result.removedIds, {MetadataFieldId.openXmlAuthor});
+      final archive = ZipDecoder().decodeBytes(result.bytes, verify: false);
+      expect(
+          String.fromCharCodes(
+            archive.findFile('properties/private.xml')!.content as List<int>,
+          ),
+          isNot(contains('Jane')));
+    });
+
+    for (final format in const {
+      'docx': ('word/document.xml', _docxContentTypes),
+      'xlsx': ('xl/workbook.xml', _xlsxContentTypes),
+      'pptx': ('ppt/presentation.xml', _pptxContentTypes),
+    }.entries) {
+      test('${format.key} removes allowlisted core and app properties', () {
+        final bytes = _officeZip({
+          '[Content_Types].xml': format.value.$2,
+          'docProps/core.xml': _coreXml,
+          'docProps/app.xml': _appXml,
+          format.value.$1: '<main>payload</main>',
+        });
+        final result = stripOpenXmlSelective(
+          bytes,
+          extension: format.key,
+          selectedIds: const {
+            MetadataFieldId.openXmlAuthor,
+            MetadataFieldId.openXmlCompany,
+          },
+        );
+        final archive = ZipDecoder().decodeBytes(result.bytes, verify: false);
+        expect(result.removedIds, {
+          MetadataFieldId.openXmlAuthor,
+          MetadataFieldId.openXmlCompany,
+        });
+        expect(
+          String.fromCharCodes(
+            archive.findFile('docProps/core.xml')!.content as List<int>,
+          ),
+          allOf(isNot(contains('Jane')), contains('Keep me')),
+        );
+        expect(
+          String.fromCharCodes(
+            archive.findFile('docProps/app.xml')!.content as List<int>,
+          ),
+          allOf(isNot(contains('Acme')), contains('MetaStrip Tests')),
+        );
+      });
+    }
+
+    test('rejects ambiguous conventional suffix property parts', () {
+      final bytes = _officeZip({
+        '[Content_Types].xml': _docxContentTypes,
+        'one/docProps/core.xml': _coreXml,
+        'two/docProps/core.xml': _coreXml,
+        'word/document.xml': '<document/>',
+      });
+      expect(
+        () => stripOpenXmlSelective(
+          bytes,
+          extension: 'docx',
+          selectedIds: const {MetadataFieldId.openXmlAuthor},
+        ),
+        throwsFormatException,
+      );
+    });
   });
 }
+
+const _coreXml = '<cp:coreProperties '
+    'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+    'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    '<dc:creator>Jane</dc:creator><dc:title>Keep me</dc:title>'
+    '</cp:coreProperties>';
+
+const _appXml = '<Properties '
+    'xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
+    '<Company>Acme</Company><Application>MetaStrip Tests</Application>'
+    '</Properties>';
 
 const _docxContentTypes =
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
@@ -223,6 +362,12 @@ const _xlsxContentTypes =
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
     '<Override PartName="/xl/workbook.xml" '
     'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+    '</Types>';
+
+const _pptxContentTypes =
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Override PartName="/ppt/presentation.xml" '
+    'ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'
     '</Types>';
 
 const _strictDocxContentTypes =

@@ -13,7 +13,7 @@
 ## Gap Closure Update (2026-08-09)
 
 Phases 0 and 1 of `docs/IMPLEMENTATION_PLAN_GAP_CLOSURE.md` are complete within
-the current PNG/PDF selective scope, and the narrow Phase 2 BMP subset is
+the current PNG/PDF/FLAC/Open XML selective scope, and the narrow Phase 2 BMP subset is
 enabled. The shared capability registry describes all 41 Viewer extensions and
 the 20 registered Remover extensions, including ZIP-only container cleanup.
 Stable field IDs and a per-file `StripPolicy` now travel from Viewer field
@@ -85,7 +85,8 @@ The executable lanes and acceptance thresholds are in
   entry comments, DOS timestamps, recognized `0x5455`/`0x000a` extras; member
   compressed payloads preserved; no recursive member cleanup)
 - Stable-ID selective cleanup for PNG tEXt/iTXt (per keyword) and PDF DocInfo
-  (per Info key) is wired end to end through a per-file policy. Local PNG output
+  (per Info key), FLAC Vorbis comment keys, and standard Open XML core/app
+  properties is wired end to end through a per-file policy. Local PNG output
   is read back, reparsed, and verified; SAF reports best-effort attempted/
   unverified semantics until persisted readback is tested on device. PDF reports
   best-effort attempted/unverified semantics.
@@ -108,8 +109,9 @@ The executable lanes and acceptance thresholds are in
   block. ZIP-only container cleanup is implemented and is not recursive.
 - Audio selective strip (MP3 frame-level, Vorbis per-key) — parameter
   plumbing shipped, stripper implementation pending
-- Granular Office property removal — current Office strippers perform
-  format-level property cleanup rather than per-property selection
+- Broader Office property removal — selective cleanup is limited to exact
+  stable IDs for standard core/app XML properties; custom and legacy Office
+  properties remain unsupported. The general selective UI is still unwired.
 - PDF XMP packet stripping — Info-only removal today (best-effort)
 
 ### Phase 3: Viewer UI — Implemented-scope MVP Complete

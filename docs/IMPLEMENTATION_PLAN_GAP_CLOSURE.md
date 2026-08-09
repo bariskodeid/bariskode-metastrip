@@ -69,8 +69,8 @@ gif, webp, zip
 ```
 
 The current PDF implementation is best-effort Info dictionary cleanup. Stable-ID
-selective removal is implemented end to end for PNG text, PDF Info fields, and
-FLAC Vorbis comment keys;
+selective removal is implemented end to end for PNG text, PDF Info fields,
+FLAC Vorbis comment keys, and exact allowlisted Open XML core/app properties;
 PDF results remain attempted/unverified. The narrowed PDF technology spike now
 validates bounded generated-byte mutations, uses a shared balanced literal
 parser, caps recognized key candidates, and fails closed on malformed supported
@@ -132,8 +132,8 @@ Implemented in `lib/core/format/`:
 - Shared descriptors cover all 41 Viewer-accepted extensions.
 - Removal currently covers the registered 20-extension set, including ZIP-only
   container cleanup; APK and EPUB remain excluded.
-- PNG, basic PDF Info, and FLAC Vorbis comment-key cleanup are the only formats advertising selective
-  capability; no new format was enabled.
+- PNG, basic PDF Info, FLAC Vorbis comment-key, and DOCX/XLSX/PPTX standard
+  core/app property cleanup advertise selective capability.
 - Lookup normalizes case, whitespace, and leading dots.
 - Viewer and Remover gates query the shared registry.
 - Concrete Viewer extraction and Remover route maps are contract-tested against
@@ -260,13 +260,15 @@ image.exif.gpsLatitude
 **Dependencies:** Phase 0
 
 **Status:** Complete for PNG text and PDF Info selective flow (2026-08-08),
-plus the FLAC-only Vorbis comment-key slice (2026-08-09).
+plus the FLAC-only Vorbis comment-key and bounded DOCX/XLSX/PPTX standard
+core/app property slices (2026-08-09).
 Broader formats and modes remain follow-up work.
 
 ### Problem to solve
 
-PNG and PDF now support selected stable field IDs end to end, while other
-formats reject selective requests before processing. Unsupported or mismatched
+PNG, PDF, FLAC, and Open XML now support their documented stable field IDs end
+to end, while other formats reject selective requests before processing.
+Unsupported or mismatched
 requests fail closed per file and do not produce a full-cleanup fallback.
 
 ### Policy semantics
@@ -297,7 +299,9 @@ verified.
 
 1. [x] Migrate PNG keyword selection to field IDs.
 2. [x] Migrate PDF Info-key selection to field IDs.
-3. [ ] Add per-property XML removal for DOCX/XLSX/PPTX.
+3. [x] Add per-property XML removal for DOCX/XLSX/PPTX using stable IDs and
+   exact bounded core/app part mutation. Custom and legacy Office properties
+   remain outside the allowlist.
 4. [ ] Add per-property removal for ODT/ODS/ODP.
 5. [ ] Add MP3 frame-level removal.
 6. [~] FLAC comment-key removal is implemented with stable, case-insensitive
@@ -349,7 +353,10 @@ not claimed.
   implemented PNG/PDF selective behavior.
 - [ ] Preserved fields are identified and verified; no such claim is made by
   the current report.
-- [ ] Per-property selective removal is implemented for Office/audio formats.
+- [x] Per-property selective removal is implemented for Office formats. It is
+  bounded to standard Open XML core/app parts, fails closed on malformed or
+  ambiguous packages, and reports stable-ID removal/absence facts. Audio
+  per-property removal remains deferred.
 - [~] Ogg Vorbis selective removal has a disabled low-level POC only; strict
   synthetic subset tests cover normalized all-occurrence removal, internal
   structural preservation checks, conforming Xiph CRC rewrite with an

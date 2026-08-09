@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added stable-ID selective removal for allowlisted DOCX/XLSX/PPTX standard
+  Open XML core and extended properties. Full package cleanup is preserved;
+  custom and legacy Office properties remain unsupported, and local output is
+  read back and verified without making device/SAF persistence claims.
+
 ### Disabled Ogg Vorbis selective POC (2026-08-09)
 
 - Added an un-routed, low-level bounded parser/writer POC for removing selected
@@ -171,8 +176,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter plumbing shipped, stripper implementation pending.
 - APK and EPUB removal remain unsupported. ZIP-only container cleanup is
   implemented; APK stripping would invalidate the signing block.
-- Granular audio removal and per-property Office removal: deferred; current
-  strippers use format-level cleanup behavior.
+- Granular audio removal remains deferred. Office selective removal is limited
+  to exact stable IDs for standard core/app XML properties; the general UI and
+  custom or legacy Office properties remain unsupported.
 
 ### Phase 3: Viewer UI — Done (2026-07-31)
 **Status:** Implemented-scope MVP complete

@@ -303,7 +303,7 @@ Done:
 - [x] **Phase 3 Viewer UI (2026-07-31): ViewerCubit with multi-file picker, extension filter, dedup, sort/filter (name/size/type/newest), file list items with badges, metadata detail with grouped accordion sections, selectable fields, copy to clipboard, mark visible/clear/send to Remover handoff.**
 - [x] **Phase 4 Remover UI (2026-08-06): RemoverBloc with sequential processing, cancel, queue cap. ProcessingScreen with live progress + cancel. ResultScreen with stats grid. Security hardening: JPEG preserves APP0/JFIF and drops APP1/APP2/APP12/APP13/APP14/COM + EOI truncation; PNG drops text chunks + tIME + eXIf; PDF DocInfo blanking. Error sanitization. SAF output writing. Android package fix.**
 - [x] **Phase 5 Settings (2026-08-07): app-level SettingsCubit persistence, 7 preset themes plus custom 16-token theme builder with live application, output-folder configuration synchronized with onboarding, cache status/action, portable JSON export/import, two-step reset back to onboarding, About, and Licenses.**
-- [x] **Phase 2 implemented-scope MVP complete (2026-08-08): registered image/audio/document/archive extractors, a 20-extension remover registry including narrow canonical BMP removal and ZIP-only cleanup, SHA-256 computation, supported extension allowlist, and MIME lookup. TIFF removal, video, HEIC/HEIF, APK/EPUB removal, recursive archive-member cleanup, granular audio/Office removal, and broader removal modes remain deferred or unwired.**
+- [x] **Phase 2 implemented-scope MVP complete (2026-08-08): registered image/audio/document/archive extractors, a 20-extension remover registry including narrow canonical BMP removal and ZIP-only cleanup, SHA-256 computation, supported extension allowlist, and MIME lookup. TIFF removal, video, HEIC/HEIF, APK/EPUB removal, recursive archive-member cleanup, broader audio removal, and broader removal modes remain deferred or unwired. Office selective removal is limited to exact stable IDs for standard core/app XML properties.**
 - [x] Verification (2026-08-09): `flutter analyze` clean; `flutter test` **390 tests completed; 389 passed, 1 skipped**; debug APK build previously verified. Test coverage was not measured in this verification.
 
 Still pending:
@@ -312,7 +312,7 @@ Still pending:
 - [ ] **PDF removal remains best-effort DocInfo blanking. XMP packets, object streams, JavaScript, embedded files, and other metadata may survive; use a structural PDF parser before making comprehensive-removal claims. (CRITICAL)**
 - [ ] Phase 2 video (MP4/MKV/AVI/WebM/3GP/FLV/WMV): deferred — `ffmpeg_kit_flutter_full_gpl` retired upstream and breaks on Flutter ≥3.29; pending a pure-Dart container parser or a maintained alternative.
 - [ ] Phase 2 HEIC/HEIF extraction: requires a HEIF container parser, deferred.
-- [ ] Phase 2 selective strip for audio (MP3 frame-level, Vorbis per-key) and Office (per XML property): parameter plumbing shipped, stripper implementation pending.
+- [x] Office selective strip for the bounded standard core/app XML property allowlist; the general selective UI and custom/legacy Office properties remain deferred. Audio selective strip (MP3 frame-level, Vorbis per-key) remains deferred.
 - [x] Phase 4 ZIP-only archive cleanup: removes EOCD and entry comments, DOS timestamps, and recognized `0x5455`/`0x000a` timestamp extras while preserving member compressed payloads; cleanup is not recursive. APK and EPUB remain unsupported for removal.
 - [x] Phase 2 BMP subset removal: strict canonical 24/32-bit Windows BITMAPINFOHEADER, BI_RGB, positive dimensions, and `bfOffBits == 54`; preserves header/pixel payload bytes, zeroes reserved fields, normalizes size fields, and discards trailing bytes. This is not comprehensive BMP sanitization.
 - [ ] Phase 2 TIFF/TIF removal: disabled pending a future structural writer/POC.
@@ -390,7 +390,7 @@ Foundation hardening also validates the output folder before use and safely rese
 | Unit tests — extractors | Test per format dengan inline byte fixtures | ✅ |
 
 **Sprint 3 — Metadata Removal**
-**Status:** Implemented-scope MVP complete for 20 registered remover extensions, including the narrow canonical BMP subset and ZIP-only container cleanup; video, APK/EPUB removal, recursive archive-member cleanup, granular audio/Office removal, and the broader removal modes are deferred or unwired. Full product-spec MVP and release readiness remain incomplete.
+**Status:** Implemented-scope MVP complete for 20 registered remover extensions, including the narrow canonical BMP subset and ZIP-only container cleanup; video, APK/EPUB removal, recursive archive-member cleanup, broader audio removal, and the broader removal modes are deferred or unwired. Office selective removal is limited to exact standard core/app IDs and the general selective UI remains unwired. Full product-spec MVP and release readiness remain incomplete.
 
 | Task | Detail | Status |
 |------|--------|--------|

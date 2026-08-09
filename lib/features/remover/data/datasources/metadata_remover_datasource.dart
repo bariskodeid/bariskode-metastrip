@@ -167,6 +167,11 @@ class MetadataRemoverDatasource {
           outputDirectory,
           policy.selectedFieldIds,
         ),
+      'docx' || 'xlsx' || 'pptx' => _stripSelectiveOpenXml(
+          inputPath,
+          outputDirectory,
+          policy.selectedFieldIds,
+        ),
       _ => throw const FormatException(
           'Selective cleanup is unavailable for this format',
         ),
@@ -184,6 +189,10 @@ class MetadataRemoverDatasource {
       'png' => fieldIds.every((id) => id.isPngText),
       'pdf' => fieldIds.every((id) => id.isPdfInfo),
       'flac' => fieldIds.every((id) => id.isVorbisComment),
+      'docx' ||
+      'xlsx' ||
+      'pptx' =>
+        fieldIds.every((id) => id.isOpenXmlSupportedFor(extension)),
       _ => false,
     };
     if (!valid) {
@@ -339,6 +348,67 @@ class MetadataRemoverDatasource {
     );
   }
 
+  Future<MetadataRemovalOutput> _stripSelectiveOpenXml(
+    String inputPath,
+    String outputDirectory,
+    Set<MetadataFieldId> requestedIds,
+  ) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file ||
+        stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException(
+          'Office document too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException(
+          'Office document too large for remover MVP');
+    }
+    final extension = FormatRegistry.normalizeExtension(p.extension(inputPath));
+    final result = await runOnWorker(
+      () => stripOpenXmlSelective(
+        inputBytes,
+        extension: extension,
+        selectedIds: requestedIds,
+      ),
+    );
+    final output =
+        await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      final persisted = await _persistedOutputReader(output);
+      validateOpenXmlSelective(
+        inputBytes,
+        persisted,
+        extension: extension,
+        selectedIds: requestedIds,
+        expectedRemovedIds: result.removedIds,
+      );
+    }
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        requestedFieldIds: requestedIds,
+        removedFieldIds: result.removedIds,
+        alreadyAbsentFieldIds: result.absentIds,
+        warnings: isSafOutput
+            ? const [
+                'Generated Office bytes were validated, but persisted SAF '
+                    'readback was not performed.',
+              ]
+            : const [],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
   Future<MetadataRemovalOutput> _stripPdfWithReport(
     String inputPath, {
     required String outputDirectory,
@@ -374,7 +444,8 @@ class MetadataRemoverDatasource {
   ///
   /// A null [selectiveLabels] value requests full removal. A non-empty set
   /// requests field-level removal and is accepted only for formats that support
-  /// it (PNG text chunks, PDF Info keys, and FLAC Vorbis comment keys). Empty
+  /// it (PNG text chunks, PDF Info keys, FLAC Vorbis comment keys, and standard
+  /// Open XML core/app properties). Empty
   /// sets, unsupported formats, and unknown field labels are rejected.
   Future<File> stripMetadata(
     String inputPath, {
@@ -405,6 +476,17 @@ class MetadataRemoverDatasource {
       try {
         selectiveLabels.map(MetadataFieldId.normalizeVorbisCommentKey).toSet();
       } on ArgumentError {
+        throw const FormatException('Unsupported selective metadata field');
+      }
+    }
+    Set<MetadataFieldId>? openXmlIds;
+    if (route == _RemovalRoute.openXml && selectiveLabels != null) {
+      try {
+        openXmlIds = selectiveLabels.map(MetadataFieldId.parse).toSet();
+        if (!openXmlIds.every((id) => id.isOpenXmlSupportedFor(ext))) {
+          throw const FormatException('Unsupported selective metadata field');
+        }
+      } on Object {
         throw const FormatException('Unsupported selective metadata field');
       }
     }
@@ -447,6 +529,7 @@ class MetadataRemoverDatasource {
       _RemovalRoute.openXml => stripOpenXmlMetadata(
           inputPath,
           outputDirectory: outputDirectory,
+          selectedIds: openXmlIds,
         ),
       _RemovalRoute.odf => stripOdfMetadata(
           inputPath,
@@ -680,12 +763,20 @@ class MetadataRemoverDatasource {
   Future<File> stripOpenXmlMetadata(
     String inputPath, {
     String? outputDirectory,
+    Set<MetadataFieldId>? selectedIds,
   }) {
     return _stripWithBytes(
-      (bytes) => stripOpenXml(
-        bytes,
-        extension: FormatRegistry.normalizeExtension(p.extension(inputPath)),
-      ),
+      (bytes) {
+        final extension =
+            FormatRegistry.normalizeExtension(p.extension(inputPath));
+        return selectedIds == null
+            ? stripOpenXml(bytes, extension: extension)
+            : stripOpenXmlSelective(
+                bytes,
+                extension: extension,
+                selectedIds: selectedIds,
+              ).bytes;
+      },
       inputPath,
       'Office document too large for remover MVP',
       outputDirectory: outputDirectory,

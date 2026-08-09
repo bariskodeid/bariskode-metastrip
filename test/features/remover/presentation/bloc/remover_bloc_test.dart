@@ -334,6 +334,55 @@ void main() {
       bloc.close();
     });
 
+    test('accepts exact selective Office IDs and rejects presentation-only IDs',
+        () async {
+      final repo = _FakeRemoverRepository();
+      final bloc = RemoverBloc(
+        validateInputs: false,
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+        initialState: RemoverState(
+          status: RemoverStatus.idle,
+          files: [_file('document.docx', ext: 'docx')],
+          policiesByPath: {
+            '/tmp/document.docx': StripPolicy.selective(
+              fieldIds: const {MetadataFieldId.openXmlTitle},
+            ),
+          },
+        ),
+      );
+      bloc.add(const RemoverProcessingStarted());
+      final accepted = await _waitFor(
+        bloc,
+        (state) => state.status == RemoverStatus.completed,
+      );
+      expect(accepted.results.single.success, isTrue);
+
+      final rejected = RemoverBloc(
+        validateInputs: false,
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+        initialState: RemoverState(
+          status: RemoverStatus.idle,
+          files: [_file('document.docx', ext: 'docx')],
+          policiesByPath: {
+            '/tmp/document.docx': StripPolicy.selective(
+              fieldIds: const {MetadataFieldId.openXmlSlides},
+            ),
+          },
+        ),
+      );
+      rejected.add(const RemoverProcessingStarted());
+      final failed = await _waitFor(
+        rejected,
+        (state) => state.status == RemoverStatus.completed,
+      );
+      expect(failed.results.single.error,
+          'Selected metadata fields do not match this file type');
+      await bloc.close();
+      await rejected.close();
+    });
+
     test(
         'processes registered formats including supported BMP and reports '
         'supported progress total', () async {

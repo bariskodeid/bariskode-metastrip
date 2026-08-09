@@ -418,7 +418,7 @@ void main() {
     expect(text, isNot(contains('68656C6C6F')));
   });
 
-  test('stripMetadata rejects selective labels for unsupported docx', () async {
+  test('stripMetadata rejects display labels for selective docx', () async {
     final dir = await Directory.systemTemp.createTemp('remap_docx_selective_');
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}report.docx');
@@ -438,6 +438,45 @@ void main() {
       ),
       throwsFormatException,
     );
+  });
+
+  test('Office policy route writes output and reports removed and absent IDs',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('office_policy_report_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}report.docx');
+    await input.writeAsBytes(
+      _officeZip({
+        '[Content_Types].xml': _docxContentTypes,
+        'docProps/core.xml': _officeCoreXml,
+        'word/document.xml': '<w:document/>',
+      }),
+    );
+
+    final output = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: dir.path,
+      policy: StripPolicy.selective(
+        fieldIds: const {
+          MetadataFieldId.openXmlAuthor,
+          MetadataFieldId.openXmlCompany,
+        },
+      ),
+    );
+
+    expect(output.file.path, isNot(input.path));
+    expect(output.report.requestedFieldIds, {
+      MetadataFieldId.openXmlAuthor,
+      MetadataFieldId.openXmlCompany,
+    });
+    expect(output.report.removedFieldIds, {MetadataFieldId.openXmlAuthor});
+    expect(
+      output.report.alreadyAbsentFieldIds,
+      {MetadataFieldId.openXmlCompany},
+    );
+    expect(
+        output.report.verificationOutcome, StripVerificationOutcome.verified);
+    expect(output.report.outputValidated, isTrue);
   });
 
   test('stripMetadata rejects unsupported selective PDF labels', () async {
@@ -519,6 +558,12 @@ const _docxContentTypes =
     '<Override PartName="/word/document.xml" '
     'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
     '</Types>';
+
+const _officeCoreXml = '<cp:coreProperties '
+    'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+    'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    '<dc:creator>Jane</dc:creator><dc:title>Keep me</dc:title>'
+    '</cp:coreProperties>';
 
 List<int> _pngChunk(String type, List<int> data) {
   final length = ByteData(4)..setUint32(0, data.length);

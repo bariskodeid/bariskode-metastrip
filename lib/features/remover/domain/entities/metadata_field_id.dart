@@ -20,6 +20,30 @@ extension type const MetadataFieldId._(String value) {
   static const pdfInfoModDate = MetadataFieldId._('pdf.info.modDate');
   static const pdfInfoTrapped = MetadataFieldId._('pdf.info.trapped');
 
+  // These IDs are the allowlisted local names in the standard core/app
+  // properties parts. They intentionally do not represent custom or legacy
+  // Office properties.
+  static const openXmlTitle = MetadataFieldId._('openxml.core.title');
+  static const openXmlAuthor = MetadataFieldId._('openxml.core.creator');
+  static const openXmlSubject = MetadataFieldId._('openxml.core.subject');
+  static const openXmlKeywords = MetadataFieldId._('openxml.core.keywords');
+  static const openXmlDescription =
+      MetadataFieldId._('openxml.core.description');
+  static const openXmlCreated = MetadataFieldId._('openxml.core.created');
+  static const openXmlModified = MetadataFieldId._('openxml.core.modified');
+  static const openXmlLastModifiedBy =
+      MetadataFieldId._('openxml.core.lastModifiedBy');
+  static const openXmlRevision = MetadataFieldId._('openxml.core.revision');
+  static const openXmlCategory = MetadataFieldId._('openxml.core.category');
+  static const openXmlContentStatus =
+      MetadataFieldId._('openxml.core.contentStatus');
+  static const openXmlApplication =
+      MetadataFieldId._('openxml.app.Application');
+  static const openXmlCompany = MetadataFieldId._('openxml.app.Company');
+  static const openXmlAppVersion = MetadataFieldId._('openxml.app.AppVersion');
+  static const openXmlTotalTime = MetadataFieldId._('openxml.app.TotalTime');
+  static const openXmlSlides = MetadataFieldId._('openxml.app.Slides');
+
   /// Normalizes a Vorbis key using ASCII whitespace trimming and ASCII case
   /// folding. Vorbis keys are UTF-8 fields, but the key itself is restricted
   /// to printable ASCII after normalization.
@@ -79,6 +103,8 @@ extension type const MetadataFieldId._(String value) {
   factory MetadataFieldId.parse(String value) {
     final pdfId = _pdfIdsByValue[value];
     if (pdfId != null) return pdfId;
+    final openXmlId = _openXmlIdsByValue[value];
+    if (openXmlId != null) return openXmlId;
     if (value.startsWith(_vorbisPrefix)) {
       final parsed = MetadataFieldId.vorbisComment(
         value.substring(_vorbisPrefix.length),
@@ -116,6 +142,36 @@ extension type const MetadataFieldId._(String value) {
   bool get isPngText => value.startsWith(_pngPrefix);
   bool get isPdfInfo => _pdfIdsByValue.containsKey(value);
   bool get isVorbisComment => value.startsWith(_vorbisPrefix);
+  bool get isOpenXml => _openXmlIdsByValue.containsKey(value);
+
+  /// Whether this exact Open XML ID is surfaced for [extension].
+  bool isOpenXmlSupportedFor(String extension) {
+    if (!isOpenXml) return false;
+    return switch (extension.toLowerCase()) {
+      'pptx' => true,
+      'docx' || 'xlsx' => this != openXmlTotalTime && this != openXmlSlides,
+      _ => false,
+    };
+  }
+
+  static const Map<String, MetadataFieldId> _openXmlIdsByValue = {
+    'openxml.core.title': openXmlTitle,
+    'openxml.core.creator': openXmlAuthor,
+    'openxml.core.subject': openXmlSubject,
+    'openxml.core.keywords': openXmlKeywords,
+    'openxml.core.description': openXmlDescription,
+    'openxml.core.created': openXmlCreated,
+    'openxml.core.modified': openXmlModified,
+    'openxml.core.lastModifiedBy': openXmlLastModifiedBy,
+    'openxml.core.revision': openXmlRevision,
+    'openxml.core.category': openXmlCategory,
+    'openxml.core.contentStatus': openXmlContentStatus,
+    'openxml.app.Application': openXmlApplication,
+    'openxml.app.Company': openXmlCompany,
+    'openxml.app.AppVersion': openXmlAppVersion,
+    'openxml.app.TotalTime': openXmlTotalTime,
+    'openxml.app.Slides': openXmlSlides,
+  };
 
   String? get pngKeyword {
     if (!isPngText) return null;

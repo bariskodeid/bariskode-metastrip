@@ -378,7 +378,7 @@ const List<FormatCapability> _standardCapabilities = [
     category: FormatCategory.document,
     supportsExtraction: true,
     supportsFullRemoval: true,
-    supportsSelectiveRemoval: false,
+    supportsSelectiveRemoval: true,
     processingStrategy: ProcessingStrategy.inMemory,
     extractionHandlerFactory: _handlerDeclaration,
     removalHandlerFactory: _handlerDeclaration,
@@ -386,7 +386,10 @@ const List<FormatCapability> _standardCapabilities = [
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.containerStructure,
     removalCoverage: RemovalCoverage.verifiedSupportedScope,
-    knownLimitations: ['Removal covers known package metadata parts.'],
+    knownLimitations: [
+      'Selective removal is limited to stable IDs for standard core/app XML '
+          'properties; custom and legacy Office properties are not supported.',
+    ],
   ),
   FormatCapability(
     extensions: {'odt', 'ods', 'odp'},

@@ -99,7 +99,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 ### Remover registry
 `JPG/JPEG` · `PNG` · `PDF` · `BMP` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `GIF` · `WebP`.
 
-HEIC/HEIF, RAW, M4V, legacy Office, GZ/BZ2, video, archives, granular audio removal, and per-property Office removal are not current supported-removal features.
+HEIC/HEIF, RAW, M4V, legacy Office, GZ/BZ2, video, archives, and granular audio removal are not current supported-removal features. Office selective removal is limited to exact stable IDs for standard core/app properties and is currently a data/policy path rather than a general UI mode; custom and legacy Office properties are unsupported.
 
 ---
 

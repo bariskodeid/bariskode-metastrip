@@ -4,9 +4,12 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
+import 'package:metastrip/features/remover/domain/entities/openxml_property_descriptor.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/zip_extractor.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
+import 'package:xml/xml.dart';
 
 /// Section label shared by every Office Open XML field.
 const String openXmlSection = 'Office Document';
@@ -46,8 +49,8 @@ const Set<String> _privacyLabels = {'Author', 'Last Modified By', 'Company'};
 ///
 /// [extension] must be `docx`, `xlsx` or `pptx`; presentation-only properties
 /// are additionally surfaced for `pptx`. Reads the `docProps/core.xml` and
-/// `docProps/app.xml` entries of the zip container using simple tag matching
-/// with optional namespace prefixes and XML entity decoding. Returns a single
+/// `docProps/app.xml` entries of the zip container using exact namespace and
+/// local-name matching. Returns a single
 /// status field when the bytes are not a valid zip, when neither property
 /// entry exists, or when no recognizable properties are found; this function
 /// never throws.
@@ -117,12 +120,17 @@ List<MetadataFieldEntity> _extractCoreProperties(Uint8List content) {
   final fields = <MetadataFieldEntity>[];
   final xml = _decodeUtf8(content);
   for (final MapEntry(key: tag, value: label) in _corePropertyLabels.entries) {
-    final value = _readTagValue(xml, tag);
-    if (value == null) continue;
+    final property = _readTagValue(
+      xml,
+      tag,
+      namespace: _descriptorFor('core', tag)?.namespace,
+    );
+    if (property == null) continue;
     fields.add(
       _field(
         label,
-        value,
+        property.value,
+        id: property.hasRemovableIdentity ? _coreId(tag) : null,
         isPrivacySensitive: _privacyLabels.contains(label),
       ),
     );
@@ -141,12 +149,17 @@ List<MetadataFieldEntity> _extractAppProperties(
   final fields = <MetadataFieldEntity>[];
   final xml = _decodeUtf8(content);
   for (final MapEntry(key: tag, value: label) in _appPropertyLabels.entries) {
-    final value = _readTagValue(xml, tag);
-    if (value == null) continue;
+    final property = _readTagValue(
+      xml,
+      tag,
+      namespace: _descriptorFor('app', tag)?.namespace,
+    );
+    if (property == null) continue;
     fields.add(
       _field(
         label,
-        value,
+        property.value,
+        id: property.hasRemovableIdentity ? _appId(tag) : null,
         isPrivacySensitive: _privacyLabels.contains(label),
       ),
     );
@@ -154,18 +167,58 @@ List<MetadataFieldEntity> _extractAppProperties(
   if (extension != 'pptx') return fields;
   for (final MapEntry(key: tag, value: label)
       in _presentationPropertyLabels.entries) {
-    final value = _readTagValue(xml, tag);
-    if (value == null) continue;
-    fields.add(_field(label, value));
+    final property = _readTagValue(
+      xml,
+      tag,
+      namespace: _descriptorFor('app', tag)?.namespace,
+    );
+    if (property == null) continue;
+    fields.add(
+      _field(
+        label,
+        property.value,
+        id: property.hasRemovableIdentity ? _appId(tag) : null,
+      ),
+    );
   }
   return fields;
 }
 
-/// Returns the trimmed, entity-decoded text of the first [tag] element.
-///
-/// Matches both prefixed (`dc:title`) and unprefixed (`Title`) tags with
-/// optional attributes on the opening tag.
-String? _readTagValue(String xml, String tag) {
+typedef _TagValue = ({String value, bool hasRemovableIdentity});
+
+/// Returns the first local-name match and whether its namespace is removable.
+_TagValue? _readTagValue(
+  String xml,
+  String tag, {
+  required String? namespace,
+}) {
+  if (namespace == null) return null;
+  try {
+    final document = XmlDocument.parse(xml);
+    String? nonRemovableValue;
+    for (final element in document.descendants.whereType<XmlElement>()) {
+      if (element.name.local != tag) continue;
+      final value = element.innerText.trim();
+      if (value.isEmpty) continue;
+      if (element.name.namespaceUri == namespace) {
+        return (
+          value: value,
+          hasRemovableIdentity: true,
+        );
+      }
+      nonRemovableValue ??= value;
+    }
+    if (nonRemovableValue != null) {
+      return (value: nonRemovableValue, hasRemovableIdentity: false);
+    }
+  } on XmlException {
+    final value = _readMalformedTagValue(xml, tag);
+    return value == null ? null : (value: value, hasRemovableIdentity: false);
+  }
+  return null;
+}
+
+String? _readMalformedTagValue(String xml, String tag) {
   final pattern = RegExp(
     '<(?:[A-Za-z_][\\w.-]*:)?${_escapeRegex(tag)}(?:\\s[^>]*)?>'
     '([\\s\\S]*?)</(?:[A-Za-z_][\\w.-]*:)?${_escapeRegex(tag)}\\s*>',
@@ -176,10 +229,6 @@ String? _readTagValue(String xml, String tag) {
   return value.isEmpty ? null : value;
 }
 
-/// Decodes the five named XML entities and numeric character references.
-///
-/// `&amp;` is decoded after the other named entities so that sequences such
-/// as `&amp;lt;` stay literal, matching XML parsing semantics.
 String _decodeXmlEntities(String value) {
   return value
       .replaceAll('&lt;', '<')
@@ -233,17 +282,53 @@ List<MetadataFieldEntity> _invalidStatus() {
 MetadataFieldEntity _field(
   String label,
   String value, {
+  MetadataFieldId? id,
   bool isPrivacySensitive = false,
 }) {
   return MetadataFieldEntity(
     section: openXmlSection,
     label: label,
     value: truncateMetadataValue(value),
+    id: id,
     isPrivacySensitive: isPrivacySensitive,
   );
 }
 
-/// Escapes regex special characters in [value].
+MetadataFieldId? _coreId(String tag) => _descriptorFor('core', tag) == null
+    ? null
+    : const {
+        'title': MetadataFieldId.openXmlTitle,
+        'creator': MetadataFieldId.openXmlAuthor,
+        'subject': MetadataFieldId.openXmlSubject,
+        'keywords': MetadataFieldId.openXmlKeywords,
+        'description': MetadataFieldId.openXmlDescription,
+        'created': MetadataFieldId.openXmlCreated,
+        'modified': MetadataFieldId.openXmlModified,
+        'lastModifiedBy': MetadataFieldId.openXmlLastModifiedBy,
+        'revision': MetadataFieldId.openXmlRevision,
+        'category': MetadataFieldId.openXmlCategory,
+        'contentStatus': MetadataFieldId.openXmlContentStatus,
+      }[tag];
+
+MetadataFieldId? _appId(String tag) => _descriptorFor('app', tag) == null
+    ? null
+    : const {
+        'Application': MetadataFieldId.openXmlApplication,
+        'Company': MetadataFieldId.openXmlCompany,
+        'AppVersion': MetadataFieldId.openXmlAppVersion,
+        'TotalTime': MetadataFieldId.openXmlTotalTime,
+        'Slides': MetadataFieldId.openXmlSlides,
+      }[tag];
+
+OpenXmlPropertyDescriptor? _descriptorFor(String part, String localName) {
+  for (final descriptor in openXmlPropertyDescriptors.values) {
+    if (descriptor.part == part && descriptor.localName == localName) {
+      return descriptor;
+    }
+  }
+  return null;
+}
+
 String _escapeRegex(String value) {
   return value.replaceAllMapped(
     RegExp(r'[.*+?^${}()|[\]\\]'),

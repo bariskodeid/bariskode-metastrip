@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/openxml_extractor.dart';
 
 void main() {
@@ -37,6 +38,7 @@ void main() {
       final title = byLabel['Title'];
       expect(title, isNotNull);
       expect(title!.section, 'Office Document');
+      expect(title.id, MetadataFieldId.openXmlTitle);
       expect(title.value, 'Quarterly & Q2 Report');
       expect(title.isPrivacySensitive, isFalse);
 
@@ -74,9 +76,52 @@ void main() {
       expect(byLabel['Application']?.value, 'Microsoft Office PowerPoint');
       expect(byLabel['Company']?.value, 'Acme Corp');
       expect(byLabel['Company']?.isPrivacySensitive, isTrue);
+      expect(byLabel['Company']?.id, MetadataFieldId.openXmlCompany);
       expect(byLabel['App Version']?.value, '16.0000');
       expect(byLabel['Total Time']?.value, '45');
       expect(byLabel['Slides']?.value, '12');
+    });
+
+    test('does not assign a removable ID to wrong-namespace core tags',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'docProps/core.xml',
+          '<cp:coreProperties '
+              'xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+              'metadata/core-properties" '
+              'xmlns:wrong="urn:not-dublin-core">'
+              '<wrong:creator>Impostor Author</wrong:creator>'
+              '</cp:coreProperties>',
+        ),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+      final author = fields.singleWhere((field) => field.label == 'Author');
+
+      expect(author.value, 'Impostor Author');
+      expect(author.id, isNull);
+    });
+
+    test('does not assign a removable ID to wrong-namespace app tags',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'docProps/app.xml',
+          '<Properties '
+              'xmlns="http://schemas.openxmlformats.org/officeDocument/2006/'
+              'extended-properties" xmlns:wrong="urn:not-extended-props">'
+              '<wrong:Application>Impostor Office</wrong:Application>'
+              '</Properties>',
+        ),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+      final application =
+          fields.singleWhere((field) => field.label == 'Application');
+
+      expect(application.value, 'Impostor Office');
+      expect(application.id, isNull);
     });
 
     test('extracts core.xml properties from a non-root location', () async {
