@@ -117,12 +117,20 @@ void main() {
     expect(find.text('SETTINGS'), findsOneWidget);
     final settingsContext = tester.element(find.text('SETTINGS'));
     expect(settingsContext.read<SettingsCubit>(), same(settingsCubit));
-    expect(find.text('Filename Template'), findsNothing);
-    expect(find.text('Keep original files'), findsNothing);
-    expect(find.text('PROCESSING'), findsNothing);
-    expect(find.text('JPEG Quality'), findsNothing);
-    expect(find.text('Concurrent Files'), findsNothing);
-    expect(find.text('Auto-confirm'), findsNothing);
+    expect(find.text('Filename Template'), findsOneWidget);
+    expect(find.text('Keep originals'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('PROCESSING'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('PROCESSING'), findsOneWidget);
+    expect(find.text('JPEG Quality'), findsOneWidget);
+    expect(find.text('Concurrent Files'), findsOneWidget);
+    expect(find.text('Auto-confirm'), findsOneWidget);
   });
 
   testWidgets('saved settings hydrate output folder and apply theme',

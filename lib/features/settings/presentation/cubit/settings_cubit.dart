@@ -178,14 +178,11 @@ class SettingsCubit extends Cubit<SettingsState> {
     );
   }
 
-  /// Updates keep original toggle.
-  Future<void> updateKeepOriginal(bool value) => _resetBarrier
-      ? Future<void>.value()
-      : _mutate(
-          (current) => current.copyWith(
-            storage: current.storage.copyWith(keepOriginal: value),
-          ),
-        );
+  /// Preserves the clean-copy invariant for legacy callers.
+  Future<void> updateKeepOriginal(bool value) {
+    if (_resetBarrier || value) return Future<void>.value();
+    return _rejectUpdate('Original files are always kept');
+  }
 
   /// Updates JPEG quality (70-100).
   Future<void> updateJpegQuality(int quality) {

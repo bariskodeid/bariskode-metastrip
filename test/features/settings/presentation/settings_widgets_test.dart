@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/shared_preferences_storage.dart';
 import 'package:metastrip/features/settings/data/datasources/settings_local_datasource.dart';
 import 'package:metastrip/features/settings/data/repositories/settings_repository_impl.dart';
@@ -11,6 +12,7 @@ import 'package:metastrip/features/settings/domain/usecases/import_settings.dart
 import 'package:metastrip/features/settings/domain/usecases/reset_settings.dart';
 import 'package:metastrip/features/settings/domain/usecases/save_settings.dart';
 import 'package:metastrip/features/settings/presentation/cubit/settings_cubit.dart';
+import 'package:metastrip/features/settings/presentation/screens/settings_screen.dart';
 import 'package:metastrip/features/settings/presentation/screens/theme_picker_screen.dart';
 import 'package:metastrip/features/settings/presentation/widgets/concurrent_files_slider.dart';
 import 'package:metastrip/features/settings/presentation/widgets/jpeg_quality_slider.dart';
@@ -18,6 +20,71 @@ import 'package:metastrip/features/settings/presentation/widgets/naming_template
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('SettingsScreen renders persisted output and processing controls',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'app_settings_v1': '{"storage":{"namingTemplate":"{name}_private",'
+          '"folderStructure":"nested","keepOriginal":true},'
+          '"processing":{"jpegQuality":88,"concurrentFiles":6,'
+          '"autoConfirm":true}}',
+      AppConstants.keyOutputFolderPath: '/persisted/output',
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final storage = SharedPreferencesStorage(preferences);
+    final repository =
+        SettingsRepositoryImpl(SettingsLocalDataSourceImpl(storage));
+    final cubit = SettingsCubit(
+      getSettings: GetSettings(repository),
+      saveSettings: SaveSettings(repository),
+      resetSettings: ResetSettings(repository),
+      exportSettings: ExportSettings(repository),
+      importSettings: ImportSettings(repository, storage: storage),
+      clearCache: ClearCache(storage),
+      storage: storage,
+      validator: (path) async => path,
+    );
+    addTearDown(cubit.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(
+          value: cubit,
+          child: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('/persisted/output'), findsOneWidget);
+    expect(find.text('{name}_private'), findsOneWidget);
+    expect(find.text('Nested'), findsOneWidget);
+    final keepOriginalTile = find.ancestor(
+      of: find.text('Keep originals'),
+      matching: find.byType(ListTile),
+    );
+    final keepOriginalSwitch = find.descendant(
+      of: keepOriginalTile,
+      matching: find.byType(Switch),
+    );
+    expect(tester.widget<Switch>(keepOriginalSwitch).value, isTrue);
+    expect(tester.widget<Switch>(keepOriginalSwitch).onChanged, isNull);
+
+    await tester.scrollUntilVisible(
+      find.text('88%'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('88%'), findsOneWidget);
+    expect(find.text('6 files'), findsOneWidget);
+    expect(find.text('Auto-confirm'), findsOneWidget);
+    expect(
+      find.textContaining('current remover does not re-encode JPEGs'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('JPEG slider persists once when a drag ends', (tester) async {
     final values = <int>[];
     await tester.pumpWidget(

@@ -139,7 +139,7 @@ class StorageSettingsEntity extends Equatable {
       StorageSettingsEntity(
         namingTemplate: namingTemplate ?? this.namingTemplate,
         folderStructure: folderStructure ?? this.folderStructure,
-        keepOriginal: keepOriginal ?? this.keepOriginal,
+        keepOriginal: true,
         outputFolderPath: clearOutputFolderPath
             ? null
             : outputFolderPath ?? this.outputFolderPath,
@@ -158,8 +158,9 @@ class StorageSettingsEntity extends Equatable {
             AppConstants.defaultNamingTemplate,
         folderStructure: json['folderStructure'] as String? ??
             AppConstants.defaultFolderStructure,
-        keepOriginal:
-            json['keepOriginal'] as bool? ?? AppConstants.defaultKeepOriginal,
+        // Original deletion is unsupported. Keep accepting the legacy field,
+        // but never hydrate an unsafe value into application state.
+        keepOriginal: true,
         outputFolderPath: json['outputFolderPath'] as String?,
       );
 

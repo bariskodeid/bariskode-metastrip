@@ -77,6 +77,48 @@ void main() {
     expect(find.byType(FilledButton), findsNothing);
   });
 
+  testWidgets('RAW METADATA renders but is not selectively selectable',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MetadataDetailScreen(
+          file: _file('document.pdf', 'pdf'),
+          metadataLoader: (_, {required computeHash}) async =>
+              const MetadataEntity(
+            fields: [
+              MetadataFieldEntity(
+                section: 'PDF Document',
+                label: 'Author',
+                value: 'Ada',
+                id: MetadataFieldId.pdfInfoAuthor,
+              ),
+              MetadataFieldEntity(
+                section: '  raw metadata  ',
+                label: 'Raw packet',
+                value: '<raw>',
+                id: MetadataFieldId.pdfInfoTitle,
+              ),
+            ],
+          ),
+          onSelectiveCleanup: (_) async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('  RAW METADATA  '), findsOneWidget);
+    expect(find.text('Raw packet'), findsOneWidget);
+    expect(find.byType(Checkbox), findsOneWidget);
+    final rawFieldTile = find.ancestor(
+      of: find.text('Raw packet'),
+      matching: find.byType(ListTile),
+    );
+    expect(
+      find.descendant(of: rawFieldTile, matching: find.byType(Checkbox)),
+      findsNothing,
+    );
+  });
+
   testWidgets('selective handoff ignores a rapid second tap', (tester) async {
     var handoffs = 0;
     final routeCompletion = Completer<void>();

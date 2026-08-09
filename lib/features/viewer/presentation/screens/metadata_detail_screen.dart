@@ -115,7 +115,8 @@ class _MetadataDetailScreenState extends State<MetadataDetailScreen> {
                       (entry) => _SectionCard(
                         title: entry.key,
                         fields: entry.value,
-                        selectable: canSelect,
+                        selectable: canSelect &&
+                            entry.key.trim().toUpperCase() != 'RAW METADATA',
                         selectedFieldIds: _selectedFieldIds,
                         onSelectionChanged: (id, selected) {
                           setState(() {

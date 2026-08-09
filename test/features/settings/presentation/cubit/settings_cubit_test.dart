@@ -139,9 +139,9 @@ void main() {
     await Future.wait([first, second]);
 
     expect(cubit.state.settings?.storage.namingTemplate, '{name}_private');
-    expect(cubit.state.settings?.storage.keepOriginal, isFalse);
+    expect(cubit.state.settings?.storage.keepOriginal, isTrue);
     expect(repository.settings.storage.namingTemplate, '{name}_private');
-    expect(repository.settings.storage.keepOriginal, isFalse);
+    expect(repository.settings.storage.keepOriginal, isTrue);
   });
 
   test('invalid direct updates do not reach persistence', () async {
@@ -221,7 +221,7 @@ void main() {
     expect(await cubit.resetAllData(), isFalse);
     await cubit.updateKeepOriginal(false);
 
-    expect(repository.settings.storage.keepOriginal, isFalse);
+    expect(repository.settings.storage.keepOriginal, isTrue);
   });
 
   test('successful reset re-enables and persists mutations', () async {
@@ -234,8 +234,8 @@ void main() {
     expect(await cubit.resetAllData(), isTrue);
     await cubit.updateKeepOriginal(false);
 
-    expect(cubit.state.settings?.storage.keepOriginal, isFalse);
-    expect(repository.settings.storage.keepOriginal, isFalse);
+    expect(cubit.state.settings?.storage.keepOriginal, isTrue);
+    expect(repository.settings.storage.keepOriginal, isTrue);
   });
 
   test('custom theme update persists a complete color map', () async {

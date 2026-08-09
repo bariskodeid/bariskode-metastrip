@@ -10,11 +10,16 @@ import 'package:metastrip/features/settings/presentation/screens/about_screen.da
 import 'package:metastrip/features/settings/presentation/screens/licenses_screen.dart';
 import 'package:metastrip/features/settings/presentation/screens/theme_picker_screen.dart';
 import 'package:metastrip/features/settings/presentation/widgets/cache_size_widget.dart';
+import 'package:metastrip/features/settings/presentation/widgets/concurrent_files_slider.dart';
 import 'package:metastrip/features/settings/presentation/widgets/export_import_dialog.dart';
+import 'package:metastrip/features/settings/presentation/widgets/folder_structure_selector.dart';
+import 'package:metastrip/features/settings/presentation/widgets/jpeg_quality_slider.dart';
+import 'package:metastrip/features/settings/presentation/widgets/naming_template_field.dart';
 import 'package:metastrip/features/settings/presentation/widgets/output_folder_picker_widget.dart';
 import 'package:metastrip/features/settings/presentation/widgets/reset_data_dialog.dart';
 import 'package:metastrip/features/settings/presentation/widgets/settings_section.dart';
 import 'package:metastrip/features/settings/presentation/widgets/theme_selector_widget.dart';
+import 'package:metastrip/features/settings/presentation/widgets/toggle_setting_tile.dart';
 import 'package:metastrip/features/settings/presentation/widgets/version_info_tile.dart';
 
 /// Settings screen entry point (Cubit provided by app.dart).
@@ -88,6 +93,49 @@ class _SettingsView extends StatelessWidget {
                         await cubit.updateOutputFolder(folder);
                       }
                     },
+                  ),
+                  NamingTemplateField(
+                    initialValue: s.storage.namingTemplate,
+                    onChanged: cubit.updateNamingTemplate,
+                  ),
+                  FolderStructureSelector(
+                    currentValue: s.storage.folderStructure,
+                    onChanged: cubit.updateFolderStructure,
+                  ),
+                  const ToggleSettingTile(
+                    title: 'Keep originals',
+                    subtitle: 'MetaStrip always creates a clean copy and never '
+                        'deletes the original.',
+                    value: true,
+                    onChanged: null,
+                  ),
+                ],
+              ),
+
+              SettingsSection(
+                title: 'PROCESSING',
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Text(
+                      'These preferences are saved for future processing '
+                      'modes. The current remover does not re-encode JPEGs '
+                      'and processes files sequentially.',
+                    ),
+                  ),
+                  JpegQualitySlider(
+                    value: s.processing.jpegQuality,
+                    onChanged: cubit.updateJpegQuality,
+                  ),
+                  ConcurrentFilesSlider(
+                    value: s.processing.concurrentFiles,
+                    onChanged: cubit.updateConcurrentFiles,
+                  ),
+                  ToggleSettingTile(
+                    title: 'Auto-confirm',
+                    subtitle: 'Saved for a future confirmation workflow.',
+                    value: s.processing.autoConfirm,
+                    onChanged: cubit.updateAutoConfirm,
                   ),
                 ],
               ),
