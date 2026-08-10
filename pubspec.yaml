@@ -57,6 +57,7 @@ dev_dependencies:
   bloc_test: ^9.1.7
   flutter_lints: ^4.0.0
   very_good_analysis: ^6.0.0
+  test: any
 
 flutter:
   uses-material-design: true
