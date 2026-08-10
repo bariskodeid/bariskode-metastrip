@@ -2,7 +2,7 @@
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
 **Stack:** Flutter 3.22+ / Dart 3.4+  
-**Last Updated:** 2026-08-09
+**Last Updated:** 2026-08-10
 
 ---
 
@@ -283,9 +283,9 @@ dev_dependencies:
 
 ## 3. Development Phases & Sprint Plan
 
-### Implementation Status (updated 2026-08-09)
+### Implementation Status (updated 2026-08-10)
 
-**Overall: Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is 10/11; the bounded ODF selective slice, narrow BMP subset, and ZIP-only Phase 4 cleanup are implemented, while remaining Phase 2 follow-ups and Phase 6 remain.**
+**Overall: Implemented-scope MVP is usable and mostly complete; full product-spec MVP and release readiness are not complete. Phase 0 is now 100% complete (11/11) with dev/prod flavors enabled. The bounded ODF selective slice, narrow BMP subset, and ZIP-only Phase 4 cleanup are implemented, while remaining Phase 2 follow-ups and Phase 6 remain.**
 
 ### Status terminology
 
@@ -294,7 +294,7 @@ dev_dependencies:
 - **Release-ready product:** full product-spec MVP plus integration/device, performance, accessibility, release-build, and release-hardening verification; not complete.
 
 Done:
-- [x] **Phase 0 MVP foundation: 90.9% complete (10/11 roadmap tasks).** The only deferred task is dev/prod flavor configuration; flavors are deliberately unnecessary for the current single-binary MVP.
+- [x] **Phase 0 MVP foundation: 100% complete (11/11 roadmap tasks).** Dev/prod flavors are now implemented: Android productFlavors (`dev` with `.dev` suffix and "MetaStrip Dev" name, `prod` default with "MetaStrip" name), iOS flavor xcconfig files with bundle ID per flavor, and `main_dev.dart`/`main_prod.dart` Flutter entry points.
 - [x] App composition root initializes the storage abstraction and wires repositories/use cases with direct constructor injection. A DI container and declarative router remain intentional post-MVP options, not missing foundation work.
 - [x] Startup initialization is retryable; onboarding persistence and the configured output folder are accessed through the local-storage abstraction.
 - [x] Output handling validates the configured folder before processing, fails clearly when it is unavailable, and reserves collision-free output paths without the previous check-then-write race. Originals remain untouched.
@@ -307,7 +307,6 @@ Done:
 - [x] Verification (2026-08-09): `flutter analyze` clean; `flutter test` **463 tests completed; 462 passed, 1 skipped**; debug APK build verified. Test coverage was not measured in this verification.
 
 Still pending:
-- [ ] Dev/prod flavors (the remaining Phase 0 roadmap task) when separate environments are actually needed.
 - [ ] DI container and declarative router only if app complexity outgrows the intentional manual-constructor/`MaterialApp`/`Navigator` MVP approach.
 - [ ] **PDF removal remains best-effort DocInfo blanking. XMP packets, object streams, JavaScript, embedded files, and other metadata may survive; use a structural PDF parser before making comprehensive-removal claims. (CRITICAL)**
 - [ ] Phase 2 video (MP4/MKV/AVI/WebM/3GP/FLV/WMV): deferred — `ffmpeg_kit_flutter_full_gpl` retired upstream and breaks on Flutter ≥3.29; pending a pure-Dart container parser or a maintained alternative.
@@ -325,7 +324,7 @@ Still pending:
 ### Phase 0: Project Setup (1 minggu)
 **Sprint 0 — Foundation**
 
-**Status:** 90.9% complete (10/11). Dev/prod flavors are deliberately deferred for the single-binary MVP. Manual constructor injection and `MaterialApp`/`Navigator` routing are intentional MVP decisions; the composition root owns storage initialization and dependency wiring.
+**Status:** 100% complete (11/11). Dev/prod flavors are now implemented with Android productFlavors and iOS xcconfig per flavor. Manual constructor injection and `MaterialApp`/`Navigator` routing are intentional MVP decisions; the composition root owns storage initialization and dependency wiring.
 
 | Status | Task | Current implementation | Est. |
 |--------|------|------------------------|------|
@@ -339,7 +338,7 @@ Still pending:
 | [x] | Router setup | Intentional `MaterialApp`/`Navigator` flow; declarative router deferred | 2h |
 | [x] | Storage setup | Abstract local storage backed by SharedPreferences; retryable startup initialization | 2h |
 | [x] | Platform file access | System picker/app-scoped access on Android and iOS; no broad permissions | 3h |
-| [ ] | Dev/prod flavors | Deliberately deferred until separate environments are needed | 1h |
+| [x] | Dev/prod flavors | Android productFlavors (dev `.dev` suffix, prod default), iOS xcconfig per flavor, `main_dev.dart`/`main_prod.dart` entry points | 1h |
 
 Foundation hardening also validates the output folder before use and safely reserves collision-free clean-copy paths. Verification (2026-08-07): **248 tests passed, 1 skipped**, clean analyzer, and debug APK build verified. Coverage was not measured, and this report does not claim device-install verification.
 

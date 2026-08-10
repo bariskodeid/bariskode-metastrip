@@ -176,23 +176,31 @@ flutter analyze
 
 ### Build
 ```bash
-# Debug APK
+# Debug APK (default flavor = prod)
 flutter build apk --debug
 
-# Release APK
+# Dev flavor
+flutter run --flavor dev -t lib/main_dev.dart
+flutter build apk --flavor dev -t lib/main_dev.dart
+
+# Prod flavor
+flutter run --flavor prod -t lib/main_prod.dart
+flutter build apk --flavor prod -t lib/main_prod.dart
+
+# Release APK (requires keystore env vars)
 flutter build apk --release
 ```
 
 ## 📈 Development Roadmap
 
-### 🟡 Phase 0: Project Setup (10/11, 90.9% complete; flavors deferred)
+### 🟢 Phase 0: Project Setup (11/11, 100% complete)
 - Flutter project initialization
 - Folder structure
 - Dependencies configuration
 - Theme system
 - Shared widgets
 - Basic tests
-- Deferred: Android/iOS flavor configuration
+- Dev/prod flavors: Android productFlavors (`dev` with `.dev` suffix, `prod` default), iOS xcconfig per flavor, `main_dev.dart`/`main_prod.dart` entry points
 
 ### ✅ Phase 1: Onboarding (COMPLETE)
 - Onboarding wizard
