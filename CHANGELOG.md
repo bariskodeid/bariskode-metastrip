@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dev/Prod Flavors (2026-08-10)
+
+- Added Android product flavors: `dev` (applicationId `com.bariskode.metastrip.dev`, app name "MetaStrip Dev") and `prod` (applicationId `com.bariskode.metastrip`, app name "MetaStrip").
+- Added iOS flavor xcconfig files (`Debug-dev.xcconfig`, `Debug-prod.xcconfig`, `Release-dev.xcconfig`, `Release-prod.xcconfig`) with flavor-specific `PRODUCT_BUNDLE_IDENTIFIER`.
+- Added `lib/main_dev.dart` and `lib/main_prod.dart` Flutter entry points.
+- Updated `AndroidManifest.xml` to use `@string/app_name` for flavor-specific app names.
+- Added default `strings.xml` in `android/app/src/main/res/values/`.
+- **Phase 0 is now 100% complete** (11/11 tasks).
+
 ### ODF stable-ID selective removal (2026-08-09)
 
 - Added bounded stable-ID selective removal for ODT/ODS/ODP standard `meta.xml`

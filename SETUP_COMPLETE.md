@@ -1,7 +1,7 @@
 # MetaStrip Project Progress Report
 
-**Snapshot:** 2026-08-09
-**Overall:** Implemented-scope MVP is usable and mostly complete. Gap-closure Phases 0-1 are implemented, including the bounded ODF selective slice; the narrow Phase 2 BMP subset and Phase 4 ZIP-only cleanup are enabled. Full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
+**Snapshot:** 2026-08-10
+**Overall:** Implemented-scope MVP is usable and mostly complete. Phase 0 is now 100% complete with dev/prod flavors enabled. Gap-closure Phases 0-1 are implemented, including the bounded ODF selective slice; the narrow Phase 2 BMP subset and Phase 4 ZIP-only cleanup are enabled. Full product-spec MVP, device/SAF validation, stress testing, and release readiness are not complete.
 **Device:** Samsung SM M205G (Android 8.1), serial `3201fbb0c40a1615`
 
 ## Status Definitions
@@ -38,14 +38,14 @@ The executable lanes and acceptance thresholds are in
 
 ## Completed Phases
 
-### Phase 0: MVP Foundation — 90.9% (10/11 tasks)
+### Phase 0: MVP Foundation — Complete (11/11 tasks)
 - Flutter project init, Clean Architecture feature-first layout, git setup
 - Theme system: 7 presets, typography, spacing, system font fallbacks
 - Shared widgets: PrimaryButton, SecondaryButton, StatusPanel
 - Storage abstraction: SharedPreferences wrapper, retryable bootstrap init
 - Platform access: system picker + SAF; no broad storage/media permissions
 - DI: direct constructor composition; router: MaterialApp/Navigator
-- Dev/prod flavors deliberately deferred for single-binary MVP
+- Dev/prod flavors: Android productFlavors (dev `.dev` suffix, prod default), iOS xcconfig per flavor, `main_dev.dart`/`main_prod.dart` entry points, flavor-specific app names via `resValue`/`PRODUCT_BUNDLE_IDENTIFIER`
 
 ### Phase 1: Onboarding — Complete
 - 5-slide onboarding: Welcome, Viewer Feature, Remover Feature, Folder Setup, Permissions

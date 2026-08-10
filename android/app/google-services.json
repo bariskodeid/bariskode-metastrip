@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "809181919903",
+    "project_id": "bariskode-metastrip",
+    "storage_bucket": "bariskode-metastrip.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:809181919903:android:0c641a0f32b1c86b0b40aa",
+        "android_client_info": {
+          "package_name": "com.bariskode.metastrip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8xPqJzjzGgeNeXKyW3Xu1oXjdUYOLssE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

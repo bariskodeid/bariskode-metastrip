@@ -1,0 +1,4 @@
+#include "Debug.xcconfig"
+
+// Dev flavor bundle identifier
+PRODUCT_BUNDLE_IDENTIFIER = com.bariskode.metastrip.dev
