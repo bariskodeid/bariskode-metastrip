@@ -84,7 +84,26 @@ class RemoverRepositoryImpl implements RemoverRepository {
       return 'Output folder unavailable or unwritable';
     }
     if (error is FileSystemException) {
+      if (error.osError?.errorCode == 28) {
+        return 'Storage full. Free up space and retry.';
+      }
+      final msg = error.message.toLowerCase();
+      if (msg.contains('no space') ||
+          msg.contains('disk full') ||
+          msg.contains('insufficient storage') ||
+          msg.contains('not enough space')) {
+        return 'Storage full. Free up space and retry.';
+      }
       return 'File system error: unreadable or unwritable';
+    }
+    if (error is IOException) {
+      // IOException has no message property; fall back to toString
+      final msg = error.toString().toLowerCase();
+      if (msg.contains('no space') ||
+          msg.contains('disk full') ||
+          msg.contains('insufficient storage')) {
+        return 'Storage full. Free up space and retry.';
+      }
     }
     return 'Unexpected processing error';
   }

@@ -253,6 +253,9 @@ flutter run
 flutter build apk --debug
 ```
 
-Android release builds additionally require `KEYSTORE_PATH`,
-`KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` in the environment. Keep
-the keystore and credential values outside the repository.
+Android release builds require all four signing values from either the ignored
+`android/key.properties` file (`storeFile`, `storePassword`, `keyAlias`, and
+`keyPassword`) or the environment (`KEYSTORE_PATH`, `KEYSTORE_PASSWORD`,
+`KEY_ALIAS`, and `KEY_PASSWORD`). The properties file takes precedence when
+complete. Incomplete configuration fails release builds; debug builds are
+unaffected. Keep the keystore and credential values outside the repository.

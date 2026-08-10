@@ -1317,6 +1317,10 @@ class MetadataRemoverDatasource {
         bytes,
       );
       return File(document.uri);
+    } on FileSystemException {
+      rethrow;
+    } on SafIoException catch (error) {
+      throw FileSystemException(error.message);
     } catch (_) {
       throw const FileSystemException('SAF output write failed');
     }

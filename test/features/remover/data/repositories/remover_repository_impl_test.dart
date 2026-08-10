@@ -21,6 +21,58 @@ void main() {
     expect(result.error, isNot(contains('/private')));
   });
 
+  test('no-space file system exception reports storage full', () async {
+    final repository = RemoverRepositoryImpl(
+      _FileSystemThrowingDatasource(
+        const FileSystemException('No space left on device'),
+      ),
+    );
+
+    final result = await repository.stripFile(
+      '/input/photo.jpg',
+      outputDirectory: '/output',
+      policy: const StripPolicy.supportedCleanup(),
+    );
+
+    expect(result.error, 'Storage full. Free up space and retry.');
+  });
+
+  test('errno 28 file system exception reports storage full', () async {
+    final repository = RemoverRepositoryImpl(
+      _FileSystemThrowingDatasource(
+        const FileSystemException(
+          'write failed',
+          '/output/photo_clean.jpg',
+          OSError('No error details', 28),
+        ),
+      ),
+    );
+
+    final result = await repository.stripFile(
+      '/input/photo.jpg',
+      outputDirectory: '/output',
+      policy: const StripPolicy.supportedCleanup(),
+    );
+
+    expect(result.error, 'Storage full. Free up space and retry.');
+  });
+
+  test('ordinary file system exception remains generic', () async {
+    final repository = RemoverRepositoryImpl(
+      _FileSystemThrowingDatasource(
+        const FileSystemException('Permission denied'),
+      ),
+    );
+
+    final result = await repository.stripFile(
+      '/input/photo.jpg',
+      outputDirectory: '/output',
+      policy: const StripPolicy.supportedCleanup(),
+    );
+
+    expect(result.error, 'File system error: unreadable or unwritable');
+  });
+
   test('post-write output stat failure keeps a successful result', () async {
     final repository = RemoverRepositoryImpl(
       _SuccessfulDatasource(),
@@ -47,6 +99,21 @@ class _ThrowingDatasource extends MetadataRemoverDatasource {
     required StripPolicy policy,
   }) {
     throw StateError('secret at /private/input.jpg');
+  }
+}
+
+class _FileSystemThrowingDatasource extends MetadataRemoverDatasource {
+  _FileSystemThrowingDatasource(this.exception);
+
+  final FileSystemException exception;
+
+  @override
+  Future<MetadataRemovalOutput> stripMetadataWithPolicy(
+    String inputPath, {
+    required String outputDirectory,
+    required StripPolicy policy,
+  }) {
+    throw exception;
   }
 }
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Android release signing (2026-08-10)
+
+- Android release builds accept a complete signing configuration from either
+  the ignored `android/key.properties` file or CI environment variables, with
+  the properties file taking precedence. Incomplete configuration fails
+  release builds without affecting debug builds.
+
 ### Dev/Prod Flavors (2026-08-10)
 
 - Added Android product flavors: `dev` (applicationId `com.bariskode.metastrip.dev`, app name "MetaStrip Dev") and `prod` (applicationId `com.bariskode.metastrip`, app name "MetaStrip").

@@ -1247,10 +1247,12 @@ void main() {
 
 ### Build
 
-Android release builds require a signing keystore and these environment
-variables: `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and
-`KEY_PASSWORD`. Do not store their values in the repository. Debug builds do
-not require them.
+Android release builds require all four signing values from either the ignored
+`android/key.properties` file (`storeFile`, `storePassword`, `keyAlias`, and
+`keyPassword`) or the environment (`KEYSTORE_PATH`, `KEYSTORE_PASSWORD`,
+`KEY_ALIAS`, and `KEY_PASSWORD`). The properties file takes precedence when
+complete. Incomplete configuration fails release builds; debug builds are
+unaffected. Do not store signing secrets in the repository.
 
 ```bash
 # Release build Android

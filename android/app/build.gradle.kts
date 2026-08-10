@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("com.google.gms.google-services")
@@ -5,6 +8,28 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Load signing config from key.properties (standard Flutter pattern)
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
+}
+
+val propertySigningValues = listOf(
+    keystoreProperties["storeFile"] as? String,
+    keystoreProperties["storePassword"] as? String,
+    keystoreProperties["keyAlias"] as? String,
+    keystoreProperties["keyPassword"] as? String,
+)
+val environmentSigningValues = listOf(
+    System.getenv("KEYSTORE_PATH"),
+    System.getenv("KEYSTORE_PASSWORD"),
+    System.getenv("KEY_ALIAS"),
+    System.getenv("KEY_PASSWORD"),
+)
+val hasPropertySigning = propertySigningValues.all { !it.isNullOrBlank() }
+val hasEnvironmentSigning = environmentSigningValues.all { !it.isNullOrBlank() }
 
 dependencies {
   // Import the Firebase BoM
@@ -46,28 +71,37 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-            val keyAliasValue = System.getenv("KEY_ALIAS")
-            val keyPasswordValue = System.getenv("KEY_PASSWORD")
-
-            if (!keystorePath.isNullOrBlank()) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                keyAlias = keyAliasValue
-                keyPassword = keyPasswordValue
+            // Primary: read from key.properties
+            if (hasPropertySigning) {
+                storeFile = file(propertySigningValues[0]!!)
+                storePassword = propertySigningValues[1]
+                keyAlias = propertySigningValues[2]
+                keyPassword = propertySigningValues[3]
+            } else if (hasEnvironmentSigning) {
+                storeFile = file(environmentSigningValues[0]!!)
+                storePassword = environmentSigningValues[1]
+                keyAlias = environmentSigningValues[2]
+                keyPassword = environmentSigningValues[3]
             }
         }
     }
 
     buildTypes {
         release {
-            val signingVars = listOf("KEYSTORE_PATH", "KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD")
-            val missingSigningVars = signingVars.filter { System.getenv(it).isNullOrBlank() }
             val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
-            if (isReleaseTask && missingSigningVars.isNotEmpty()) {
-                throw GradleException("Missing release signing env vars: ${missingSigningVars.joinToString(", ")}")
+            if (isReleaseTask && !hasPropertySigning && !hasEnvironmentSigning) {
+                throw GradleException(
+                    "Incomplete release signing config: provide storeFile, storePassword, keyAlias, and keyPassword in key.properties or the matching environment variables"
+                )
             }
+            isDebuggable = false
+            // Obfuscation untuk release build (IMPLEMENTATION_PLAN Phase 6)
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("release")
         }
     }
