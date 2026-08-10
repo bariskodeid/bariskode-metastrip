@@ -11,24 +11,24 @@
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey">
 </p>
 
-MetaStrip adalah aplikasi mobile untuk melihat dan menghapus metadata dari foto, audio, dokumen, dan arsip secara offline. Aplikasi membuat clean copy tanpa mengubah file asli, menjaga privasi Anda sepenuhnya di perangkat.
+MetaStrip is a mobile application for viewing and removing metadata from photos, audio, documents, and archives offline. The app creates clean copies without modifying the original files, keeping your privacy entirely on-device.
 
 ---
 
-## Fitur Utama
+## Main Features
 
 ### Viewer
-- Pilih file melalui system picker dan lihat metadata terstruktur
-- Ekstraksi metadata filesystem, EXIF, audio tags, properti dokumen, dan entri arsip
-- Salin nilai metadata ke clipboard
-- Tandai file atau field tertentu untuk penghapusan selective
+- Select files via system picker and view structured metadata
+- Extract filesystem metadata, EXIF, audio tags, document properties, and archive entries
+- Copy metadata values to clipboard
+- Mark specific files or fields for selective removal
 
 ### Remover
-- Buat clean copy untuk format yang didukung
-- Penghapusan full cleanup dan selective removal untuk stable-ID metadata
-- Proses berurutan dengan progress, log per-file, dan cancel
-- Output collision-safe dengan suffix `_clean`
-- File asli tetap tidak diubah
+- Create clean copies for supported formats
+- Full cleanup and selective removal for stable-ID metadata
+- Sequential processing with progress, per-file log, and cancel
+- Collision-safe output with `_clean` suffix
+- Original files remain untouched
 
 ### Selective Removal
 - PNG text chunks
@@ -39,40 +39,40 @@ MetaStrip adalah aplikasi mobile untuk melihat dan menghapus metadata dari foto,
 - ODF meta.xml
 
 ### Settings
-- 7 preset tema + custom theme builder
-- Output folder sinkronisasi antar onboarding dan remover
+- 7 preset themes + custom theme builder
+- Output folder synchronization between onboarding and remover
 - Portable JSON export/import
-- Reset dua langkah tanpa menghapus clean copy
-- About, version, licenses, dan cache status
+- Two-step reset without deleting clean copies
+- About, version, licenses, and cache status
 
 ---
 
-## Format yang Didukung
+## Supported Formats
 
-### Ekstraksi Viewer
-- **Gambar:** JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC
+### Viewer Extraction
+- **Images:** JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC
 - **Video:** MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV
 - **Audio:** MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF, AIF, AIFC
-- **Dokumen:** PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT
-- **Arsip:** ZIP, TAR, APK, EPUB
+- **Documents:** PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT
+- **Archives:** ZIP, TAR, APK, EPUB
 
 ### Clean Copy Removal
 JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP
 
 ---
 
-## Privasi
+## Privacy
 
-- Semua pemrosesan terjadi di perangkat Anda
-- Tidak ada upload ke server
-- Tidak ada analytics atau tracking
-- Tidak ada iklan
-- File asli tidak diubah
+- All processing happens on your device
+- No upload to servers
+- No analytics or tracking
+- No ads
+- Original files are not modified
 - Open source
 
 ---
 
-## Arsitektur
+## Architecture
 
 - **Pattern:** Clean Architecture + Feature-first
 - **State Management:** BLoC / Cubit
@@ -99,14 +99,14 @@ lib/
 
 ---
 
-## Memulai
+## Getting Started
 
-### Prasyarat
+### Prerequisites
 - Flutter SDK 3.22+
 - Dart SDK 3.4+
-- Android Studio / VS Code dengan Flutter extension
+- Android Studio / VS Code with Flutter extension
 
-### Instalasi
+### Installation
 
 ```bash
 git clone https://github.com/bariskodeid/bariskode-metastrip.git
@@ -114,7 +114,7 @@ cd metastrip
 flutter pub get
 ```
 
-### Menjalankan Aplikasi
+### Running the App
 
 ```bash
 flutter run
@@ -126,7 +126,7 @@ flutter run
 # Debug APK
 flutter build apk --debug
 
-# Release APK (memerlukan signing config)
+# Release APK (requires signing config)
 flutter build apk --release
 ```
 
@@ -139,64 +139,64 @@ flutter test
 
 ---
 
-## Dokumentasi
+## Documentation
 
-- [SPECS.md](docs/SPECS.md) — Spesifikasi produk
-- [DESIGN.md](docs/DESIGN.md) — Sistem desain
-- [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) — Rencana implementasi
-- [SETUP_COMPLETE.md](SETUP_COMPLETE.md) — Laporan progres MVP
-- [DEVICE_AND_STRESS_TEST_PLAN.md](docs/DEVICE_AND_STRESS_TEST_PLAN.md) — Rencana pengujian device dan stress
-- [RELEASE_SIGNING_CHECKLIST.md](docs/RELEASE_SIGNING_CHECKLIST.md) — Checklist signing release
-- [PLAY_STORE_LISTING.md](docs/PLAY_STORE_LISTING.md) — Deskripsi Google Play
+- [SPECS.md](docs/SPECS.md) — Product specification
+- [DESIGN.md](docs/DESIGN.md) — Design system
+- [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) — Implementation plan
+- [SETUP_COMPLETE.md](SETUP_COMPLETE.md) — MVP progress report
+- [DEVICE_AND_STRESS_TEST_PLAN.md](docs/DEVICE_AND_STRESS_TEST_PLAN.md) — Device and stress test plan
+- [RELEASE_SIGNING_CHECKLIST.md](docs/RELEASE_SIGNING_CHECKLIST.md) — Release signing checklist
+- [PLAY_STORE_LISTING.md](docs/PLAY_STORE_LISTING.md) — Google Play description
 
 ---
 
-## Status Proyek
+## Project Status
 
-**Fase Saat Ini:** Implemented-scope MVP — usable dan sebagian besar selesai.
+**Current Phase:** Implemented-scope MVP — usable and mostly complete.
 
-### Yang Sudah Diimplementasikan
+### Implemented
 - Onboarding + output folder setup
-- System picker + SAF, tanpa broad storage permission
-- Viewer: ekstraksi metadata untuk format terdaftar
-- Remover: clean copy untuk 20 ekstensi terdaftar
-- Selective removal untuk PNG, PDF, FLAC, WAV INFO, Open XML, ODF
+- System picker + SAF, without broad storage permission
+- Viewer: metadata extraction for registered formats
+- Remover: clean copy for 20 registered extensions
+- Selective removal for PNG, PDF, FLAC, WAV INFO, Open XML, ODF
 - Remover UI: queue, processing, result
-- Settings: tema, output folder, import/export, reset
+- Settings: themes, output folder, import/export, reset
 - ZIP hardening, PDF linear scan, error sanitization
 
-### Yang Direncanakan
-- Video dan HEIC/HEIF support
+### Planned
+- Video and HEIC/HEIF support
 - Share intent
-- Background processing + notifikasi
-- Mode penghapusan: Full Strip, Anonymize, Preserve Technical
-- Device/SAF validation dan stress testing
-- Performance dan accessibility verification
+- Background processing + notifications
+- Removal modes: Full Strip, Anonymize, Preserve Technical
+- Device/SAF validation and stress testing
+- Performance and accessibility verification
 
 ---
 
-## Kontribusi
+## Contributing
 
-Kontribusi sangat diterima! Silakan buka issue atau pull request.
+Contributions are welcome! Please open an issue or pull request.
 
-1. Fork repositori
-2. Buat branch fitur (`git checkout -b feature/amazing-feature`)
-3. Commit perubahan (`git commit -m 'Add amazing feature'`)
-4. Push ke branch (`git push origin feature/amazing-feature`)
-5. Buka Pull Request
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
-## Lisensi
+## License
 
-MIT License — lihat file [LICENSE](LICENSE) untuk detail.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Credits
 
-- [Lucide Icons](https://lucide.dev/) — Ikon
-- Flutter BLoC pattern oleh Felix Angelov
+- [Lucide Icons](https://lucide.dev/) — Icons
+- Flutter BLoC pattern by Felix Angelov
 
 ---
 
