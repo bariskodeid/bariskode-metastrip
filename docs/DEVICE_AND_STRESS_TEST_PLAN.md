@@ -103,24 +103,148 @@ Do not describe generic ZIP Viewer parsing as ZIP metadata removal.
 Use a consistent sampling interval and include idle baseline, pre-operation,
 peak operation, post-operation, and post-batch recovery samples.
 
-### Android
+### Android — Samsung SM M205G / Android 8.1
 
-1. Package/process lookup command: `<fill after confirming debug application ID>`.
-2. Primary RSS command/tool: `<fill: adb dumpsys meminfo/procrank/Perfetto method>`.
-3. Sampling interval and automation command: `<fill>`.
+Target thresholds for this device:
+- Baseline RSS: < 80 MB
+- Peak RSS for boundary case: < 180 MB
+- Recovery: < 10% from baseline within 30 seconds
+
+1. Package/process lookup command:
+   ```bash
+   adb -s 3201fbb0c40a1615 shell pidof com.bariskode.metastrip
+   ```
+   Fallback:
+   ```bash
+   adb -s 3201fbb0c40a1615 shell ps -A | rg metastrip
+   ```
+
+2. Primary RSS command/tool:
+   ```bash
+   adb -s 3201fbb0c40a1615 shell dumpsys meminfo com.bariskode.metastrip
+   ```
+   Sample the `TOTAL` PSS/RSS values. For a lighter single-PID view:
+   ```bash
+   adb -s 3201fbb0c40a1615 shell procrank | rg metastrip
+   ```
+   If Perfetto profiling is desired, use:
+   ```bash
+   adb -s 3201fbb0c40a1615 perfetto --out /data/local/tmp/metastrip.perfetto -t 30s -b 64k \
+     -o memory_config.pb
+   adb -s 3201fbb0c40a1615 pull /data/local/tmp/metastrip.perfetto .
+   ```
+   On Android 8.1 the shell `dumpsys meminfo` path is the most reliable.
+
+3. Sampling interval and automation command:
+   ```bash
+   adb -s 3201fbb0c40a1615 shell "while true; do dumpsys meminfo com.bariskode.metastrip | rg TOTAL; sleep 2; done"
+   ```
+   Redirect to a timestamped file:
+   ```bash
+   adb -s 3201fbb0c40a1615 shell "while true; do echo $(date '+%Y-%m-%d %H:%M:%S'); dumpsys meminfo com.bariskode.metastrip | rg TOTAL; sleep 2; done" > peak-rss-samsung-m205g.txt
+   ```
+
 4. Capture native heap, Dart heap where available, total PSS/RSS, device free
    memory, and process death/LMK evidence.
+   - Native heap: `Native Heap` row from `dumpsys meminfo`.
+   - Dart heap: not directly exposed on Android 8.1; infer from `TOTAL` minus
+     native + graphics + stack when needed.
+   - Total PSS/RSS: use `TOTAL` line from `dumpsys meminfo`.
+   - Device free memory:
+     ```bash
+     adb -s 3201fbb0c40a1615 shell cat /proc/meminfo | rg MemFree\|Buffers\|Cached
+     ```
+   - Process death/LMK evidence:
+     ```bash
+     adb -s 3201fbb0c40a1615 logcat -d -s ActivityManager:V
+     ```
+     Look for `low_memory`, `kill`, or `OOM` messages against the app PID.
 
 ### iOS
 
-1. Simulator method: `<fill: Instruments Allocations/VM Tracker or equivalent>`.
-2. Physical-device method: `<fill: Xcode Instruments profile and template>`.
-3. Sampling interval/export procedure: `<fill>`.
+1. Simulator method:
+   ```bash
+   xcrun simctl spawn booted log stream --predicate 'subsystem == "com.apple.memory"'
+   ```
+   Instruments template: Xcode > Open Developer Tool > Instruments > Allocations.
+   Choose the MetaStrip process and enable "Record reference counts".
+
+2. Physical-device method:
+   Xcode > Product > Profile > Instruments > Allocations / VM Tracker. Attach
+   to MetaStrip on the connected device. Enable "Mark Heap" before each batch.
+
+3. Sampling interval/export procedure:
+   - Instruments: set sample interval to 1000 ms.
+   - Export: after each run, choose File > Export and save `.trace` plus CSV.
+   - For CLI capture on a connected device:
+     ```bash
+     xcrun xctrace record --device '<device name>' --time-limit 30m --template 'Allocations' --output metastrip-allocations.trace
+     ```
+
 4. Capture footprint/RSS, allocation peak, memory warning events, jetsam/device
    termination evidence, and post-batch recovery.
+   - Footprint/RSS: Xcode Debug Navigator during run or `memory_pressure` log
+     stream.
+   - Memory warning events:
+     ```bash
+     xcrun simctl spawn booted log stream --predicate 'eventMessage contains "memory warning"'
+     ```
+     or physical device Console.app filter `memory warning`.
+   - Jetsam/device termination: `log show --predicate 'eventMessage contains "jetsam"'`.
+   - Post-batch recovery: record RSS at 5-second intervals for 30 seconds after
+     the final batch finishes.
 
 Measurement placeholders must be resolved and trialed before the stress lane is
 marked In progress. Record tooling versions with results.
+
+### Run Record Template
+
+| Lane | Operator | Build/commit | Device | Date | Result | Peak RSS evidence | Functional evidence | Issues |
+|---|---|---|---|---|---|---|---|---|
+| Samsung SM M205G / Android 8.1 |  |  | 3201fbb0c40a1615 |  |  | `<fill: path to peak-rss-*.txt or trace>` | `<fill: path to logs/screenshots>` |  |
+| Modern Android physical |  |  |  |  |  |  |  |  |
+| iOS simulator |  |  |  |  |  |  |  |  |
+| iOS physical |  |  |  |  |  |  |  |  |
+
+### Fixture Manifest Template
+
+Store one manifest per run. Reuse the same manifest revision across lanes
+unless fixtures change.
+
+```
+fixture_manifest_version: 1
+generated_at: YYYY-MM-DDTHH:MM:SSZ
+generator: scripts/generate_device_fixtures.py
+git_commit: <git rev-parse HEAD>
+fixtures:
+  - name: png_text_selective_01.png
+    path: test/fixtures/png_text_selective_01.png
+    sha256: <sha256>
+    size_bytes: <int>
+    extensions:
+      - png
+    scenario: D06 PNG selective
+  - name: pdf_docinfo_selective_01.pdf
+    path: test/fixtures/pdf_docinfo_selective_01.pdf
+    sha256: <sha256>
+    size_bytes: <int>
+    extensions:
+      - pdf
+    scenario: D07 full cleanup
+  - name: zip_openxml_32mb_docx.zip
+    path: test/fixtures/zip_openxml_32mb_docx.zip
+    sha256: <sha256>
+    size_bytes: <int>
+    extensions:
+      - zip
+      - docx
+    scenario: Z02 boundary
+  # Add remaining fixtures here
+manifest_sha256: <sha256 of this file>
+```
+
+Update this manifest and record its checksum in the run record before executing
+any lane.
 
 ## 6. Pass/Fail Thresholds
 
@@ -139,10 +263,13 @@ these thresholds:
 - Picker grants, output writing, reopening, cancellation, and retry match the
   functional matrix without silent fallback.
 - Peak RSS is recorded for every boundary and sequential-batch case. Numeric
-  RSS ceilings remain `<fill after baseline run>`; until approved thresholds
-  are filled, the memory lane cannot be marked Passed even if no OOM occurs.
-- Sequential batches return to `<fill: approved recovery delta/percentage>` of
-  post-warmup baseline within `<fill: recovery interval>`.
+  RSS ceilings:
+  - Baseline RSS: < 80 MB
+  - Peak RSS (boundary case): < 180 MB
+  - Recovery: RSS returns to within 10% of post-warmup baseline within 30
+    seconds after the final batch.
+- Sequential batches return to within 10% of post-warmup baseline within 30
+  seconds after the final batch.
 
 Any failure blocks the corresponding device/stress gate. Triage it as product,
 fixture, or harness failure, link the issue, and rerun the affected row plus its

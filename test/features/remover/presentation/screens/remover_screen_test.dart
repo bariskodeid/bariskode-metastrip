@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
@@ -9,7 +11,87 @@ import 'package:metastrip/features/remover/domain/repositories/remover_repositor
 import 'package:metastrip/features/remover/presentation/screens/remover_screen.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 
+class _FakeRemoverRepository implements RemoverRepository {
+  const _FakeRemoverRepository();
+
+  @override
+  Future<ProcessingResultEntity> stripFile(
+    String path, {
+    required String outputDirectory,
+    required StripPolicy policy,
+  }) async =>
+      ProcessingResultEntity.success(
+        inputPath: path,
+        outputPath: '$outputDirectory/${path.split('/').last}_clean',
+      );
+}
+
+class _FakeOutputFolderRepository implements OutputFolderRepository {
+  const _FakeOutputFolderRepository();
+
+  @override
+  Future<String> getValidOutputFolder() {
+    throw StateError('getValidOutputFolder should not be called by this test');
+  }
+}
+
+Future<void> _pumpScreen(
+  WidgetTester tester, {
+  List<FileItemEntity> files = const [],
+  Map<String, StripPolicy> policiesByPath = const {},
+  Future<List<PlatformFile>?> Function()? picker,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: RemoverScreen(
+        initialFiles: files,
+        initialPoliciesByPath: policiesByPath,
+        outputFolderRepository: const _FakeOutputFolderRepository(),
+        removerRepository: const _FakeRemoverRepository(),
+        pickFiles: picker ?? (() async => null),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
+PlatformFile _platformFile(String path, {required String name, required int size}) =>
+    PlatformFile(name: name, size: size, path: path);
+
+FileItemEntity _file(String name, String extension) => FileItemEntity(
+      path: '/fixtures/$name',
+      name: name,
+      extension: extension,
+      sizeBytes: 100,
+      addedAt: DateTime(2026),
+    );
+
 void main() {
+  testWidgets('renders remover screen scaffold', (tester) async {
+    await _pumpScreen(tester);
+
+    expect(find.byType(RemoverScreen), findsOneWidget);
+    expect(find.byType(Scaffold), findsOneWidget);
+  });
+
+  testWidgets('renders queued files', (tester) async {
+    final files = <FileItemEntity>[
+      _file('a.jpg', 'jpg'),
+      _file('b.pdf', 'pdf'),
+    ];
+
+    await _pumpScreen(tester, files: files);
+
+    expect(find.text('a.jpg'), findsOneWidget);
+    expect(find.text('b.pdf'), findsOneWidget);
+  });
+
+  testWidgets('shows empty state prompt when queue is empty', (tester) async {
+    await _pumpScreen(tester);
+
+    expect(find.widgetWithText(FilledButton, 'ADD FILES'), findsOneWidget);
+  });
+
   testWidgets('counts only supported files for cleanup', (tester) async {
     await _pumpScreen(
       tester,
@@ -26,7 +108,9 @@ void main() {
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(find.byIcon(Icons.block), findsOneWidget);
     expect(
-        find.widgetWithText(FilledButton, 'CLEAN 1 FILE(S)'), findsOneWidget);
+      find.widgetWithText(FilledButton, 'CLEAN 1 FILE(S)'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows an explicit selective policy seeded for one file',
@@ -207,54 +291,4 @@ void main() {
       findsOneWidget,
     );
   });
-}
-
-Future<void> _pumpScreen(
-  WidgetTester tester, {
-  List<FileItemEntity> files = const [],
-  Map<String, StripPolicy> policiesByPath = const {},
-  Future<List<PlatformFile>?> Function()? picker,
-}) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      home: RemoverScreen(
-        initialFiles: files,
-        initialPoliciesByPath: policiesByPath,
-        outputFolderRepository: _UnexpectedOutputFolderRepository(),
-        removerRepository: _UnexpectedRemoverRepository(),
-        pickFiles: picker ?? (() async => null),
-      ),
-    ),
-  );
-  await tester.pump();
-}
-
-PlatformFile _platformFile(String path,
-        {required String name, required int size}) =>
-    PlatformFile(name: name, size: size, path: path);
-
-FileItemEntity _file(String name, String extension) => FileItemEntity(
-      path: '/fixtures/$name',
-      name: name,
-      extension: extension,
-      sizeBytes: 100,
-      addedAt: DateTime(2026),
-    );
-
-class _UnexpectedRemoverRepository implements RemoverRepository {
-  @override
-  Future<ProcessingResultEntity> stripFile(
-    String path, {
-    required String outputDirectory,
-    required StripPolicy policy,
-  }) {
-    throw StateError('stripFile should not be called by this test');
-  }
-}
-
-class _UnexpectedOutputFolderRepository implements OutputFolderRepository {
-  @override
-  Future<String> getValidOutputFolder() {
-    throw StateError('getValidOutputFolder should not be called by this test');
-  }
 }

@@ -97,9 +97,9 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 `JPG/JPEG` · `TIFF/TIF` · `PNG` · `GIF` · `WebP` · `BMP` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `PDF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `ZIP/APK/EPUB`.
 
 ### Remover registry
-`JPG/JPEG` · `PNG` · `PDF` · `BMP` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `GIF` · `WebP`.
+`JPG/JPEG` · `PNG` · `PDF` · `BMP` · `MP3` · `FLAC` · `OGG` · `Opus` · `WAV` · `AIFF` · `DOCX/XLSX/PPTX` · `ODT/ODS/ODP` · `GIF` · `WebP` · `ZIP/APK/EPUB`.
 
-HEIC/HEIF, RAW, M4V, legacy Office, GZ/BZ2, video, archives, and granular audio removal are not current supported-removal features. Office selective removal is limited to exact stable IDs for standard core/app properties and is currently a data/policy path rather than a general UI mode; custom and legacy Office properties are unsupported.
+Container-only cleanup is applied for ZIP/APK/EPUB. APK output invalidates signatures and is not installable. EPUB output preserves the required `mimetype` entry. Member metadata inside archives is not recursively cleaned.
 
 ---
 

@@ -2,7 +2,7 @@ name: metastrip
 description: Metadata Viewer & Remover — strip the invisible, own your files.
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -61,7 +61,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   # assets:
   #   - assets/fonts/
   #   - assets/illustrations/

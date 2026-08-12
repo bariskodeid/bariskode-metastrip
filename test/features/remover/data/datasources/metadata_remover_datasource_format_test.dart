@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/features/remover/data/datasources/metadata_remover_datasource.dart';
 import 'package:metastrip/features/remover/domain/entities/strip_policy.dart';
+import 'package:metastrip/features/remover/domain/entities/strip_report.dart';
 
 void main() {
   test('stripMetadata strips an ID3v2 tag from an mp3', () async {
@@ -279,6 +280,144 @@ void main() {
       isTrue,
     );
   });
+
+  test('APK cleanup rewrites container metadata and warns about installability',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_apk_test_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}app.apk');
+    await input.writeAsBytes(_officeZip({
+      'AndroidManifest.xml': '<manifest/>',
+      'classes.dex': 'dex',
+    }));
+
+    final removal = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: dir.path,
+      policy: const StripPolicy.supportedCleanup(),
+    );
+    final output = removal.file;
+    final bytes = await output.readAsBytes();
+
+    expect(output.path, endsWith('app_clean.apk'));
+    expect(rewriteZipMetadata(bytes), bytes);
+    final archive = ZipDecoder().decodeBytes(bytes, verify: true);
+    expect(archive.files.map((file) => file.name), {
+      'AndroidManifest.xml',
+      'classes.dex',
+    });
+    expect(
+      removal.report.warnings,
+      contains(
+        'APK signing is invalidated; output is not installable.',
+      ),
+    );
+    expect(removal.report.verificationOutcome,
+        StripVerificationOutcome.verified);
+  });
+
+  test('EPUB cleanup preserves the required mimetype entry', () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_epub_test_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}book.epub');
+    await input.writeAsBytes(
+      _epubZip({
+        'mimetype': 'application/epub+zip',
+        'OEBPS/content.opf': '<package/>',
+      }),
+    );
+
+    final removal = await MetadataRemoverDatasource().stripMetadataWithPolicy(
+      input.path,
+      outputDirectory: dir.path,
+      policy: const StripPolicy.supportedCleanup(),
+    );
+    final output = removal.file;
+    final bytes = await output.readAsBytes();
+
+    expect(output.path, endsWith('book_clean.epub'));
+    expect(rewriteZipMetadata(bytes), bytes);
+    final archive = ZipDecoder().decodeBytes(bytes, verify: true);
+    expect(archive.files.map((file) => file.name), {
+      'mimetype',
+      'OEBPS/content.opf',
+    });
+    final mimetypeBytes = archive
+        .files
+        .singleWhere((file) => file.name == 'mimetype')
+        .content as List<int>;
+    expect(String.fromCharCodes(mimetypeBytes), 'application/epub+zip');
+    expect(
+      removal.report.warnings,
+      contains('EPUB mimetype was preserved; container metadata was cleaned.'),
+    );
+    expect(removal.report.verificationOutcome,
+        StripVerificationOutcome.verified);
+  });
+
+  test('EPUB cleanup rejects archives missing the required mimetype entry',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_epub_no_mt_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}book.epub');
+    await input.writeAsBytes(
+      _epubZip({
+        'OEBPS/content.opf': '<package/>',
+      }),
+    );
+
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: const StripPolicy.supportedCleanup(),
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('EPUB cleanup rejects archives with non-epub mimetype content', () async {
+    final dir =
+        await Directory.systemTemp.createTemp('metastrip_epub_bad_mt_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}book.epub');
+    await input.writeAsBytes(
+      _epubZip({
+        'mimetype': 'application/zip',
+        'OEBPS/content.opf': '<package/>',
+      }),
+    );
+
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: const StripPolicy.supportedCleanup(),
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+}
+
+Uint8List _epubZip(Map<String, String> files) {
+  final archive = Archive();
+  final ordered = <String, String>{};
+  if (files.containsKey('mimetype')) {
+    ordered['mimetype'] = files['mimetype']!;
+  }
+  ordered.addAll(files);
+  for (final entry in ordered.entries) {
+    final file = ArchiveFile(
+      entry.key,
+      entry.value.length,
+      entry.value.codeUnits,
+    );
+    if (entry.key == 'mimetype') {
+      file.compress = false;
+    }
+    archive.addFile(file);
+  }
+  return Uint8List.fromList(ZipEncoder().encode(archive)!);
 }
 
 Uint8List _officeZip(Map<String, String> files) {

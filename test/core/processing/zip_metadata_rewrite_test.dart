@@ -120,10 +120,10 @@ void main() {
           throwsFormatException);
     });
 
-    test('does not add APK or EPUB to the ZIP-only remover contract', () {
+    test('adds APK and EPUB to the archive remover contract', () {
       expect(RemoverStrippableExtensions.contains('zip'), isTrue);
-      expect(RemoverStrippableExtensions.contains('apk'), isFalse);
-      expect(RemoverStrippableExtensions.contains('epub'), isFalse);
+      expect(RemoverStrippableExtensions.contains('apk'), isTrue);
+      expect(RemoverStrippableExtensions.contains('epub'), isTrue);
     });
   });
 }

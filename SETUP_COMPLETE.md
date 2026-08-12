@@ -211,22 +211,29 @@ claimed.
 
 ## Not Started
 
-### Phase 6: Polish & Testing — Release-readiness work
+### Phase 6: Polish & Testing — Device Execution
+**Status:** Host verification complete; device lanes scheduled in
+`docs/DEVICE_AND_STRESS_TEST_PLAN.md`. Remaining work: SAF persisted-artifact
+readback, Android/iOS device tests, ZIP stress validation, performance,
+accessibility, and release-build validation on physical devices.
 
-## Verification Snapshot (2026-08-09)
+## Verification Snapshot (2026-08-11)
 
-**Final host verification:**
+**Latest host verification:**
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: 463 tests completed; 462 passed, 1 skipped
-- Test coverage: not measured in this verification run
-- Debug APK: passed (`build\app\outputs\flutter-apk\app-debug.apk`)
+- `flutter test`: 485 tests completed
+- Test coverage: 86.0%
+- Release APK: built with obfuscation (`flutter build apk --release` using
+  `proguard-rules.pro`, `split-debug-info`, and shrinker)
 - Diff check: passed
-- Local PNG persisted output is verified. SAF persisted-artifact read-back and
-  Android/iOS device tests remain scheduled/pending. PDF selective cleanup
-  remains attempted/unverified.
+- These host checks verify build and test health. SAF persisted-artifact
+  readback, Android/iOS device tests, and ZIP stress validation remain
+  scheduled/pending. PDF selective cleanup remains attempted/unverified.
 - These checks do not establish full product-spec completion or release
-  readiness. ZIP stress testing, integration/device testing, performance,
-  accessibility, and release-build verification remain outstanding.
+  readiness. Device/SAF testing, performance, accessibility, and release-build
+  validation remain outstanding.
+
+## Verification Snapshot (2026-08-09, previous host verification)
 
 ## Dependencies
 

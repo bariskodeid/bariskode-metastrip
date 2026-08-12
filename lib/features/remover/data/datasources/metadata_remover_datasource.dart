@@ -42,6 +42,8 @@ enum _RemovalRoute {
   webp,
   bmp,
   zip,
+  apk,
+  epub,
 }
 
 /// Successful datasource output with value-free cleanup facts.
@@ -91,6 +93,8 @@ class MetadataRemoverDatasource {
     'webp': _RemovalRoute.webp,
     'bmp': _RemovalRoute.bmp,
     'zip': _RemovalRoute.zip,
+    'apk': _RemovalRoute.apk,
+    'epub': _RemovalRoute.epub,
   };
 
   static Set<String> get handlerExtensions => Set.unmodifiable(_routes.keys);
@@ -130,8 +134,25 @@ class MetadataRemoverDatasource {
           outputDirectory: outputDirectory,
         );
       }
-      if (extension == 'zip') {
-        return _stripZipWithReport(
+      if (extension == 'zip' || extension == 'apk') {
+        return _stripArchiveWithReport(
+          inputPath,
+          outputDirectory: outputDirectory,
+          rewrite: rewriteZipMetadata,
+          warning: switch (extension) {
+            'apk' => const [
+                'APK signing is invalidated; output is not installable.',
+                'Archive member metadata was not recursively cleaned.',
+              ],
+            _ => const [
+                'ZIP container metadata was cleaned; metadata inside archive members was not recursively cleaned.',
+              ],
+          },
+          verificationOutcome: StripVerificationOutcome.verified,
+        );
+      }
+      if (extension == 'epub') {
+        return _stripEpubWithReport(
           inputPath,
           outputDirectory: outputDirectory,
         );
@@ -701,6 +722,10 @@ class MetadataRemoverDatasource {
         stripBmpMetadata(inputPath, outputDirectory: outputDirectory),
       _RemovalRoute.zip =>
         stripZipMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.apk =>
+        stripApkMetadata(inputPath, outputDirectory: outputDirectory),
+      _RemovalRoute.epub =>
+        stripEpubMetadata(inputPath, outputDirectory: outputDirectory),
     };
   }
 
@@ -1018,6 +1043,209 @@ class MetadataRemoverDatasource {
       outputDirectory: outputDirectory,
     );
     return result.file;
+  }
+
+  Future<File> stripApkMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) async {
+    final result = await _stripArchiveWithReport(
+      inputPath,
+      outputDirectory: outputDirectory,
+      rewrite: rewriteZipMetadata,
+      warning: const [
+        'APK signing is invalidated; output is not installable.',
+        'Archive member metadata was not recursively cleaned.',
+      ],
+      verificationOutcome: StripVerificationOutcome.verified,
+    );
+    return result.file;
+  }
+
+  Future<File> stripEpubMetadata(
+    String inputPath, {
+    String? outputDirectory,
+  }) async {
+    final result = await _stripEpubWithReport(
+      inputPath,
+      outputDirectory: outputDirectory,
+    );
+    return result.file;
+  }
+
+  Future<MetadataRemovalOutput> _stripEpubWithReport(
+    String inputPath,
+    {
+    required String? outputDirectory,
+  }) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('EPUB too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('EPUB too large for remover MVP');
+    }
+    final mimetypeBytes = _extractEpubMimetypeBytes(inputBytes);
+    if (mimetypeBytes == null) {
+      throw const FormatException(
+        'EPUB is missing the required mimetype entry',
+      );
+    }
+    final expected = 'application/epub+zip'.codeUnits;
+    if (!_sameBytes(mimetypeBytes, expected)) {
+      throw const FormatException(
+        'EPUB mimetype entry does not contain application/epub+zip',
+      );
+    }
+    final outputBytes = await runOnWorker(
+      () => rewriteZipMetadata(inputBytes),
+    );
+    _validateGeneratedZip(outputBytes);
+    final output = await _writeCleanCopy(
+      inputPath,
+      outputBytes,
+      outputDirectory,
+    );
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      FileStat? installedStat;
+      try {
+        installedStat = await output.stat();
+        if (installedStat.type != FileSystemEntityType.file ||
+            installedStat.size != outputBytes.length) {
+          throw const FormatException('EPUB persisted output size changed');
+        }
+        final persisted = await _persistedOutputReader(output);
+        final validatedStat = await output.stat();
+        if (!_sameStatAttributes(installedStat, validatedStat)) {
+          throw const FormatException('EPUB persisted output changed');
+        }
+        _validateGeneratedZip(persisted);
+        if (!_sameBytes(persisted, outputBytes)) {
+          throw const FormatException('EPUB persisted output differs');
+        }
+      } on Object {
+        if (installedStat == null) {
+          throw const FormatException(
+            'Output validation failed; unverified copy may remain',
+          );
+        }
+        rethrow;
+      }
+    }
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        warnings: const [
+          'EPUB mimetype was preserved; container metadata was cleaned.',
+          'Archive member metadata was not recursively cleaned.',
+        ],
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : StripVerificationOutcome.verified,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
+  Future<MetadataRemovalOutput> _stripArchiveWithReport(
+    String inputPath,
+    {
+    required String? outputDirectory,
+    required Uint8List Function(Uint8List) rewrite,
+    required List<String> warning,
+    required StripVerificationOutcome verificationOutcome,
+  }) async {
+    final input = File(inputPath);
+    final stat = await input.stat();
+    if (stat.type != FileSystemEntityType.file) {
+      throw const FileSystemException('Input is not a file');
+    }
+    if (stat.size > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('Archive too large for remover MVP');
+    }
+    final inputBytes = await _readBoundedBytes(
+      input,
+      AppConstants.maxRemoverFileSizeBytes + 1,
+    );
+    if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
+      throw const FileSystemException('Archive too large for remover MVP');
+    }
+    final outputBytes = await runOnWorker(() => rewrite(inputBytes));
+    _validateGeneratedZip(outputBytes);
+    final output = await _writeCleanCopy(
+      inputPath,
+      outputBytes,
+      outputDirectory,
+    );
+    final isSafOutput = output.path.startsWith('content://');
+    if (!isSafOutput) {
+      FileStat? installedStat;
+      try {
+        installedStat = await output.stat();
+        if (installedStat.type != FileSystemEntityType.file ||
+            installedStat.size != outputBytes.length) {
+          throw const FormatException('Archive persisted output size changed');
+        }
+        final persisted = await _persistedOutputReader(output);
+        final validatedStat = await output.stat();
+        if (!_sameStatAttributes(installedStat, validatedStat)) {
+          throw const FormatException('Archive persisted output changed');
+        }
+        _validateGeneratedZip(persisted);
+        if (!_sameBytes(persisted, outputBytes)) {
+          throw const FormatException('Archive persisted output differs');
+        }
+      } on Object {
+        if (installedStat == null) {
+          throw const FormatException(
+            'Output validation failed; unverified copy may remain',
+          );
+        }
+        rethrow;
+      }
+    }
+    return MetadataRemovalOutput(
+      file: output,
+      report: StripReport.snapshot(
+        warnings: warning,
+        verificationOutcome: isSafOutput
+            ? StripVerificationOutcome.attemptedUnverified
+            : verificationOutcome,
+        outputValidated: !isSafOutput,
+      ),
+    );
+  }
+
+  Uint8List? _extractEpubMimetypeBytes(Uint8List bytes) {
+    try {
+      final entries = preflightZip(bytes);
+      for (final entry in entries) {
+        if (normalizeEntryPath(entry.name) == 'mimetype') {
+          final localNameLength =
+              bytes[entry.localHeaderOffset + 26] |
+                  (bytes[entry.localHeaderOffset + 27] << 8);
+          final start = entry.localHeaderOffset +
+              30 +
+              localNameLength +
+              entry.localExtraLength;
+          final end = start + entry.compressedSize;
+          if (end > bytes.length) return null;
+          return Uint8List.fromList(bytes.sublist(start as int, end as int));
+        }
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
   }
 
   Future<MetadataRemovalOutput> _stripZipWithReport(

@@ -323,23 +323,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Maintenance and information UI: cache status/action (currently 0-byte no-op), About, version, and Licenses
 - Naming template, folder structure, keep-original, JPEG quality, concurrency, and auto-confirm remain persistence/import fields only; their controls are not exposed or wired to processing
 
-### Phase 6: Polish & Testing — Not Started
-**Status:** Pending after implemented-scope MVP completion; this phase covers release-readiness work and does not imply that the full product-spec MVP is complete.
+### Phase 6: Polish & Testing — Host Verification Complete (2026-08-11)
+
+- Host verification passed: `flutter analyze` clean, 485 tests, 86.0% coverage.
+- Release APK built with obfuscation (`flutter build apk --release`) using
+  `proguard-rules.pro`, `split-debug-info`, and shrinker.
+- Device and stress test plan prepared (`docs/DEVICE_AND_STRESS_TEST_PLAN.md`);
+  device lanes are scheduled but not yet executed.
+
+### Phase 6: Polish & Testing — Not Started (device execution)
+**Status:** Host verification done; device lanes scheduled in
+`docs/DEVICE_AND_STRESS_TEST_PLAN.md`. This phase covers release-readiness work
+and does not imply full product-spec MVP completion.
 
 ---
 
-## Verification (2026-08-09, latest implementation verification)
+## Verification (2026-08-11, latest host verification)
 - `flutter analyze`: clean (0 issues)
-- `flutter test`: 463 tests completed; 462 passed, 1 skipped
-- Test coverage: not measured in this verification run
-- Debug APK: build verified (`build\app\outputs\flutter-apk\app-debug.apk`); no
-  device-install verification is claimed here.
+- `flutter test`: 485 tests completed
+- Test coverage: 86.0%
+- Release APK: built with obfuscation (`flutter build apk --release`)
 - Diff check: passed
-- These host checks verify the local persisted PNG output path within the
-  implemented scope. SAF persisted-artifact read-back and Android/iOS device
-  tests remain scheduled/pending; PDF selective cleanup remains
-  attempted/unverified. ZIP stress testing and release readiness are not
-  claimed.
+- These host checks verify build and test health. SAF persisted-artifact
+  readback, Android/iOS device tests, and ZIP stress validation remain
+  scheduled/pending.
+
+## Verification (2026-08-09, previous host verification)
 
 ## Known Risks
 - **PDF removal is best-effort DocInfo blanking.** XMP, object streams, JavaScript,
@@ -349,8 +358,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moving it to `shared/domain/` remains future cleanup.
 - Custom font declarations disabled; asset folders empty; runtime uses system fallbacks.
 - No background processing or notification support yet.
-- Release signing is environment-configured but has not been validated with
-  production credentials; crash reporting and obfuscation are not configured.
+- Release signing is environment-configured; release APK with obfuscation is
+  built but has not been validated on physical devices. Crash reporting is not
+  configured. Device/SAF validation and ZIP stress testing remain pending.
 
 ## Historical Baseline
 

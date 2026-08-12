@@ -68,6 +68,8 @@ void main() {
     'webp',
     'bmp',
     'zip',
+    'apk',
+    'epub',
   };
 
   group('shared format capability registry', () {
@@ -86,7 +88,7 @@ void main() {
 
     test('advertises exactly the Phase 4 removable extensions', () {
       expect(FormatRegistry.standard.removableExtensions, removerExtensions);
-      expect(FormatRegistry.standard.removableExtensions, hasLength(20));
+      expect(FormatRegistry.standard.removableExtensions, hasLength(22));
     });
 
     test('normalizes case, whitespace, and any leading dots', () {

@@ -6,8 +6,8 @@
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
 
-## MetaStrip: keep model classes for JSON serialization
--keep class com.bariskode.metastrip.** { *; }
+## MetaStrip: no code-generated reflection models in use.
+## Widened keep removed; obfuscation now covers app classes.
 
 ## Firebase
 -keep class com.google.firebase.** { *; }

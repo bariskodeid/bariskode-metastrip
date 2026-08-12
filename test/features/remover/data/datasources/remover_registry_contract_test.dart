@@ -27,6 +27,8 @@ void main() {
       'webp',
       'bmp',
       'zip',
+      'apk',
+      'epub',
     });
   });
 
