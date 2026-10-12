@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
@@ -29,10 +30,11 @@ class OnboardingScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const SizedBox(height: AppSpacing.md),
-                  Expanded(child: _OnboardingSlide(
-                      index: index,
-                      directoryPicker: directoryPicker,
-                    )),
+                  Expanded(
+                      child: _OnboardingSlide(
+                    index: index,
+                    directoryPicker: directoryPicker,
+                  )),
                   _ProgressDots(index: index),
                   if (state.persistenceError != null) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -149,16 +151,64 @@ class _BasicSlide extends StatelessWidget {
   }
 }
 
-class _FolderSlide extends StatelessWidget {
+class _FolderSlide extends StatefulWidget {
   const _FolderSlide({required this.directoryPicker});
 
   final DirectoryPicker directoryPicker;
+
+  @override
+  State<_FolderSlide> createState() => _FolderSlideState();
+}
+
+class _FolderSlideState extends State<_FolderSlide> {
+  static const _iosFolderLabel =
+      'Saved to Files \u203a On My iPhone \u203a MetaStrip';
+
+  bool get _isIos => defaultTargetPlatform == TargetPlatform.iOS;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isIos) {
+      // iOS has no folder picker: fill in the app Documents/MetaStrip folder.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            context.read<OnboardingCubit>().state.outputFolderPath == null) {
+          _chooseFolder();
+        }
+      });
+    }
+  }
+
+  Future<void> _chooseFolder() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final cubit = context.read<OnboardingCubit>();
+    var failed = false;
+    String? directory;
+    try {
+      directory = await widget.directoryPicker(onError: (_) => failed = true);
+    } catch (_) {
+      failed = true;
+    }
+    if (failed) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Folder selection failed')),
+      );
+      return;
+    }
+    if (directory != null && directory.trim().isNotEmpty) {
+      await cubit.setOutputFolder(directory);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<OnboardingCubit, OnboardingStateEntity>(
       builder: (context, state) {
         final path = state.outputFolderPath;
+        final body = _isIos && path != null
+            ? _iosFolderLabel
+            : path ?? 'Choose where cleaned files will be saved.';
 
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -166,36 +216,12 @@ class _FolderSlide extends StatelessWidget {
             _BasicSlide(
               icon: Icons.folder_outlined,
               title: 'OUTPUT FOLDER',
-              body: path ?? 'Choose where cleaned files will be saved.',
+              body: body,
             ),
             const SizedBox(height: AppSpacing.lg),
             SecondaryButton(
               label: 'CHOOSE FOLDER',
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                var failed = false;
-                String? directory;
-                try {
-                  directory = await directoryPicker(
-                    onError: (_) => failed = true,
-                  );
-                } catch (_) {
-                  failed = true;
-                }
-                if (failed) {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Folder selection failed')),
-                  );
-                  return;
-                }
-                if (directory != null &&
-                    directory.trim().isNotEmpty &&
-                    context.mounted) {
-                  await context
-                      .read<OnboardingCubit>()
-                      .setOutputFolder(directory);
-                }
-              },
+              onPressed: _chooseFolder,
             ),
           ],
         );

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -110,20 +111,24 @@ void main() {
   });
 
   testWidgets(
-      'default picker failure surfaces the error snackbar and keeps the '
-      'old folder', (tester) async {
-    final cubit = await _cubit('/old/folder');
-    addTearDown(cubit.close);
-    await cubit.load();
-    await _pumpSettings(tester, cubit, null);
+      'default picker failure on an unsupported platform surfaces the '
+      'error snackbar and keeps the old folder', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    try {
+      final cubit = await _cubit('/old/folder');
+      addTearDown(cubit.close);
+      await cubit.load();
+      await _pumpSettings(tester, cubit, null);
 
-    await tester.tap(find.text('CHOOSE FOLDER'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('CHOOSE FOLDER'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Folder selection failed'), findsOneWidget);
-    expect(cubit.state.settings!.storage.outputFolderPath, '/old/folder');
-  }, skip: Platform.isAndroid // Android opens the real SAF picker.
-  );
+      expect(find.text('Folder selection failed'), findsOneWidget);
+      expect(cubit.state.settings!.storage.outputFolderPath, '/old/folder');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 
   testWidgets(
       'picker reporting through onError shows the error snackbar',

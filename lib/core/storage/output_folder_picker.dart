@@ -1,5 +1,7 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Directory;
 
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:saf/saf.dart';
 
 /// Opens a folder picker and returns the chosen output folder, or `null`.
@@ -17,16 +19,26 @@ typedef DirectoryPicker = Future<String?> Function({
 /// reported through [onError], and returned as `null`; a cancelled pick also
 /// returns `null` without calling [onError].
 ///
+/// On iOS there is no folder picker; the output folder is
+/// `<app Documents>/MetaStrip`, created on demand. It is visible in the Files
+/// app under On My iPhone because the Info.plist enables file sharing.
+///
 /// Other platforms are not supported yet: [onError] receives an
 /// [UnsupportedError] and the result is `null`.
 Future<String?> pickOutputFolder({void Function(Object error)? onError}) async {
   try {
-    if (Platform.isAndroid) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       final directory = await Saf().pickDirectory(
         writePermission: true,
         persistablePermission: true,
       );
       return directory?.uri;
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final documents = await getApplicationDocumentsDirectory();
+      final folder = Directory('${documents.path}/MetaStrip');
+      await folder.create(recursive: true);
+      return folder.path;
     }
     throw UnsupportedError(
       'Output folder selection is not supported on this platform.',

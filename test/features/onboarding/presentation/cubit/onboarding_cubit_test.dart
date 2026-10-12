@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -155,17 +154,78 @@ void main() {
     return cubit;
   }
 
-  testWidgets('default picker failure shows a snackbar on the folder slide',
+  testWidgets(
+      'default picker failure on an unsupported platform shows a snackbar',
       (tester) async {
-    final cubit = await pumpFolderSlide(tester, const OnboardingScreen());
+    try {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      final cubit = await pumpFolderSlide(tester, const OnboardingScreen());
 
-    await tester.tap(find.text('CHOOSE FOLDER'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('CHOOSE FOLDER'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Folder selection failed'), findsOneWidget);
-    expect(cubit.state.outputFolderPath, isNull);
-  }, skip: Platform.isAndroid // Android opens the real SAF picker.
-  );
+      expect(find.text('Folder selection failed'), findsOneWidget);
+      expect(cubit.state.outputFolderPath, isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('iOS folder slide shows the Files location and auto-fills it',
+      (tester) async {
+    try {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final cubit = await pumpFolderSlide(
+        tester,
+        OnboardingScreen(
+          directoryPicker: ({onError}) async => '/docs/MetaStrip',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(cubit.state.outputFolderPath, '/docs/MetaStrip');
+      expect(
+        find.text('Saved to Files \u203a On My iPhone \u203a MetaStrip'),
+        findsOneWidget,
+      );
+      expect(find.text('Folder selection failed'), findsNothing);
+
+      cubit.nextSlide();
+      await cubit.requestPermissions();
+      await tester.pumpAndSettle();
+      final done = tester.widget<ElevatedButton>(
+        find.ancestor(
+          of: find.text('DONE'),
+          matching: find.byType(ElevatedButton),
+        ),
+      );
+      expect(done.onPressed, isNotNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('iOS auto-fill failure shows a snackbar and leaves no folder',
+      (tester) async {
+    try {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final cubit = await pumpFolderSlide(
+        tester,
+        OnboardingScreen(
+          directoryPicker: ({onError}) async {
+            onError?.call(StateError('no documents'));
+            return null;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Folder selection failed'), findsOneWidget);
+      expect(cubit.state.outputFolderPath, isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 
   testWidgets('thrown picker exception shows a snackbar', (tester) async {
     final cubit = await pumpFolderSlide(
