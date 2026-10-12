@@ -88,6 +88,30 @@ class _GatedRemoverRepository implements RemoverRepository {
   }
 }
 
+/// Records each call and throws for every path in [throwFor], as an
+/// implementation the [RemoverRepository] interface does not forbid.
+class _ThrowingRemoverRepository implements RemoverRepository {
+  _ThrowingRemoverRepository({required this.throwFor});
+
+  final Set<String> throwFor;
+  final List<String> calls = [];
+
+  @override
+  Future<ProcessingResultEntity> stripFile(
+    String path, {
+    required String outputDirectory,
+    required StripPolicy policy,
+  }) async {
+    calls.add(path);
+    if (throwFor.contains(path)) throw StateError('repository blew up');
+    return ProcessingResultEntity.success(
+      inputPath: path,
+      outputPath: '$path.clean',
+      bytesWritten: 42,
+    );
+  }
+}
+
 /// Waits for the BLoC to emit a state matching [predicate].
 Future<RemoverState> _waitFor(
   RemoverBloc bloc,
@@ -613,10 +637,12 @@ void main() {
   group('RemoverBloc batch concurrency', () {
     late _FakeRemoverRepository repo;
     late _GatedRemoverRepository gatedRepo;
+    late _ThrowingRemoverRepository throwingRepo;
 
     setUp(() {
       repo = _FakeRemoverRepository();
       gatedRepo = _GatedRemoverRepository();
+      throwingRepo = _ThrowingRemoverRepository(throwFor: {'/tmp/a.jpg'});
     });
 
     Matcher hasStatus(RemoverStatus status) =>
@@ -688,6 +714,50 @@ void main() {
         expect(bloc.state.files.map((f) => f.path), ['/tmp/a.jpg']);
         expect(bloc.state.progress, isNull);
         expect(gatedRepo.calls, ['/tmp/a.jpg']);
+      },
+    );
+
+    blocTest<RemoverBloc, RemoverState>(
+      'a throwing repository fails that file, ends the batch, and a later '
+      'start runs again',
+      build: () => RemoverBloc(
+        validateInputs: false,
+        repository: throwingRepo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      ),
+      act: (bloc) async {
+        bloc
+          ..add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]))
+          ..add(const RemoverProcessingStarted());
+        await _waitFor(bloc, (s) => s.status == RemoverStatus.completed)
+            .timeout(const Duration(seconds: 2));
+        final again = _waitFor(
+          bloc,
+          (s) => s.status == RemoverStatus.completed,
+        ).timeout(const Duration(seconds: 2));
+        bloc.add(const RemoverProcessingStarted());
+        await again;
+      },
+      verify: (bloc) {
+        expect(throwingRepo.calls, [
+          '/tmp/a.jpg',
+          '/tmp/b.png',
+          '/tmp/a.jpg',
+          '/tmp/b.png',
+        ]);
+        expect(bloc.state.status, RemoverStatus.completed);
+        expect(bloc.state.progress, isNull);
+        expect(bloc.state.results, [
+          ProcessingResultEntity.failure(
+            inputPath: '/tmp/a.jpg',
+            error: 'Unexpected processing error',
+          ),
+          ProcessingResultEntity.success(
+            inputPath: '/tmp/b.png',
+            outputPath: '/tmp/b.png.clean',
+            bytesWritten: 42,
+          ),
+        ]);
       },
     );
 

@@ -208,11 +208,21 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
         emit(state.copyWith(results: [...results]));
         continue;
       }
-      final result = await _repository.stripFile(
-        file.path,
-        outputDirectory: outputDirectory,
-        policy: policy!,
-      );
+      ProcessingResultEntity result;
+      try {
+        result = await _repository.stripFile(
+          file.path,
+          outputDirectory: outputDirectory,
+          policy: policy!,
+        );
+      } on Object {
+        // The repository contract does not promise to catch; a throw must
+        // fail this file, not leave the batch stuck in `processing`.
+        result = ProcessingResultEntity.failure(
+          inputPath: file.path,
+          error: 'Unexpected processing error',
+        );
+      }
       if (!isCurrent()) return;
       results.add(result);
       emit(state.copyWith(results: [...results]));

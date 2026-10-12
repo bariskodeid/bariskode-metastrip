@@ -57,8 +57,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       builder: (context, state) {
         // System back must not leave the batch running unseen: it requests
         // cancel, and the listener pops once the bloc reports `cancelled`.
+        // Outside `processing` (e.g. idle after Clear) back pops directly.
         return PopScope(
-          canPop: false,
+          canPop: state.status != RemoverStatus.processing,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) context.read<RemoverBloc>().requestCancel();
           },
