@@ -2,11 +2,16 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
+import 'package:metastrip/features/viewer/data/datasources/extractors/exif_extractor.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
 
-/// Extracts text chunks (tEXt / iTXt) from raw PNG [bytes].
+/// Maximum inflated size of a compressed text chunk value.
+const int _maxInflatedTextBytes = 1024 * 1024;
+
+/// Extracts text chunks (tEXt / zTXt / iTXt) and the eXIf chunk from raw PNG [bytes].
 ///
 /// Returns a single status field when the bytes lack a PNG signature, when
 /// no text metadata is found, or when the chunk stream cannot be parsed.
@@ -32,6 +37,11 @@ Future<List<MetadataFieldEntity>> extractPngText(Uint8List bytes) async {
         fields.addAll(
           _parseInternationalTextChunk(bytes.sublist(dataStart, dataEnd)),
         );
+      } else if (type == 'zTXt') {
+        fields.addAll(
+            _parseCompressedTextChunk(bytes.sublist(dataStart, dataEnd)));
+      } else if (type == 'eXIf') {
+        fields.addAll(await _parseExifChunk(bytes.sublist(dataStart, dataEnd)));
       }
 
       if (fields.length >= AppConstants.maxPngTextChunks) break;
@@ -68,21 +78,15 @@ List<MetadataFieldEntity> _parseTextChunk(Uint8List data) {
   if (separator <= 0) return const [];
   final keyword = String.fromCharCodes(data.sublist(0, separator));
   final value = String.fromCharCodes(data.sublist(separator + 1));
-  return [
-    MetadataFieldEntity(
-      section: 'PNG Text',
-      label: truncateMetadataValue(keyword),
-      value: truncateMetadataValue(value),
-      id: _selectableId(keyword),
-      isPrivacySensitive: isTextPrivacySensitive(keyword),
-    ),
-  ];
+  return [_textField(keyword, value)];
 }
 
 List<MetadataFieldEntity> _parseInternationalTextChunk(Uint8List data) {
   final keywordEnd = data.indexOf(0);
   if (keywordEnd <= 0 || keywordEnd + 2 >= data.length) return const [];
-  if (data[keywordEnd + 1] != 0) return const []; // compressed text skipped
+  final compressed = data[keywordEnd + 1] == 1;
+  if (data[keywordEnd + 1] > 1) return const [];
+  if (compressed && data[keywordEnd + 2] != 0) return const [];
 
   var cursor = keywordEnd + 3;
   final languageEnd = data.indexOf(0, cursor);
@@ -93,16 +97,70 @@ List<MetadataFieldEntity> _parseInternationalTextChunk(Uint8List data) {
   cursor = translatedEnd + 1;
 
   final keyword = String.fromCharCodes(data.sublist(0, keywordEnd));
-  final value = utf8.decode(data.sublist(cursor), allowMalformed: true);
-  return [
-    MetadataFieldEntity(
+  final raw = data.sublist(cursor);
+  if (!compressed) {
+    return [_textField(keyword, utf8.decode(raw, allowMalformed: true))];
+  }
+  return [_inflatedField(keyword, raw, utf8)];
+}
+
+List<MetadataFieldEntity> _parseCompressedTextChunk(Uint8List data) {
+  final keywordEnd = data.indexOf(0);
+  if (keywordEnd <= 0 || keywordEnd + 1 >= data.length) return const [];
+  if (data[keywordEnd + 1] != 0) return const []; // unknown method
+  final keyword = String.fromCharCodes(data.sublist(0, keywordEnd));
+  return [_inflatedField(keyword, data.sublist(keywordEnd + 2), latin1)];
+}
+
+MetadataFieldEntity _textField(String keyword, String value) {
+  return MetadataFieldEntity(
+    section: 'PNG Text',
+    label: truncateMetadataValue(keyword),
+    value: truncateMetadataValue(value),
+    id: _selectableId(keyword),
+    isPrivacySensitive: isTextPrivacySensitive(keyword),
+  );
+}
+
+/// Inflates [compressed] under [_maxInflatedTextBytes]; oversized or invalid
+/// streams yield a status value instead of throwing.
+MetadataFieldEntity _inflatedField(
+  String keyword,
+  Uint8List compressed,
+  Encoding encoding,
+) {
+  try {
+    final inflated = inflateZlibBounded(
+      compressed,
+      maxBytes: _maxInflatedTextBytes,
+    );
+    return _textField(keyword, encoding.decode(inflated));
+  } on FormatException catch (error) {
+    final tooLarge = error.message.contains('exceeds');
+    return MetadataFieldEntity(
       section: 'PNG Text',
       label: truncateMetadataValue(keyword),
-      value: truncateMetadataValue(value),
+      value: tooLarge
+          ? 'Compressed value exceeds 1 MiB; not shown'
+          : 'Compressed value could not be decoded',
       id: _selectableId(keyword),
       isPrivacySensitive: isTextPrivacySensitive(keyword),
-    ),
-  ];
+    );
+  }
+}
+
+/// Surfaces an eXIf chunk: parsed EXIF tags when readable, plus a presence
+/// field so the user knows the chunk will be removed.
+Future<List<MetadataFieldEntity>> _parseExifChunk(Uint8List data) async {
+  final presence = MetadataFieldEntity(
+    section: 'PNG Text',
+    label: 'EXIF',
+    value: 'eXIf chunk present (${data.length} bytes)',
+    isPrivacySensitive: true,
+  );
+  final parsed = await extractExif(data);
+  final tags = parsed.where((f) => f.label != 'Status').toList();
+  return [presence, ...tags];
 }
 
 MetadataFieldId? _selectableId(String keyword) {

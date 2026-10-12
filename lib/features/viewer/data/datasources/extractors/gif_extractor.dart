@@ -93,8 +93,28 @@ int _scanExtension(
         ),
       );
     }
+  } else if (label == 0xFF && _isXmpApplication(bytes, cursor)) {
+    // The first sub-block is the 11-byte application identifier; the XMP
+    // packet follows as further sub-blocks.
+    final data = BytesBuilder(copy: false);
+    cursor = _skipSubBlocks(bytes, cursor, data);
+    final all = data.takeBytes();
+    final packet = utf8
+        .decode(all.sublist(all.length < 11 ? all.length : 11),
+            allowMalformed: true)
+        .trim();
+    fields.add(
+      MetadataFieldEntity(
+        section: _gifSection,
+        label: 'XMP',
+        value: truncateMetadataValue(
+          packet.isEmpty ? 'XMP packet present' : packet,
+        ),
+        isPrivacySensitive: true,
+      ),
+    );
   } else {
-    // Graphic control (0xF9), application (0xFF) and plain text (0x01)
+    // Graphic control (0xF9), other application (0xFF) and plain text (0x01)
     // extensions all share the sub-block framing.
     cursor = _skipSubBlocks(bytes, cursor, null);
   }
@@ -128,4 +148,15 @@ int _skipSubBlocks(Uint8List bytes, int offset, BytesBuilder? sink) {
   }
   if (cursor < bytes.length) cursor++; // zero-length terminator
   return cursor;
+}
+
+/// Whether the sub-block at [offset] is the `XMP DataXMP` application id.
+bool _isXmpApplication(Uint8List bytes, int offset) {
+  const magic = 'XMP DataXMP';
+  if (offset + 1 + magic.length > bytes.length) return false;
+  if (bytes[offset] != magic.length) return false;
+  for (var i = 0; i < magic.length; i++) {
+    if (bytes[offset + 1 + i] != magic.codeUnitAt(i)) return false;
+  }
+  return true;
 }

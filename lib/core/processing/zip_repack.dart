@@ -847,6 +847,24 @@ Uint8List? decodeZipEntrySafely(
   }
 }
 
+/// Inflates a zlib stream (2-byte header plus deflate data) with a hard output
+/// cap enforced while decompressing.
+///
+/// Throws [FormatException] when the output would exceed [maxBytes] or the
+/// stream is malformed.
+Uint8List inflateZlibBounded(List<int> zlibBytes, {required int maxBytes}) {
+  if (zlibBytes.length < 2) throw const FormatException('Invalid zlib stream');
+  final output = _BoundedOutputStream(maxBytes);
+  try {
+    Inflate.stream(InputStream(zlibBytes.sublist(2)), output);
+    return Uint8List.fromList(output.getBytes());
+  } on FormatException {
+    rethrow;
+  } catch (_) {
+    throw const FormatException('Invalid zlib stream');
+  }
+}
+
 class _BoundedOutputStream extends OutputStream {
   _BoundedOutputStream(this.maxBytes) : super(size: 1024);
 

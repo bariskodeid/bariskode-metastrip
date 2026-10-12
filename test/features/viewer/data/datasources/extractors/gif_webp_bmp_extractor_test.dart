@@ -7,6 +7,21 @@ import 'package:metastrip/features/viewer/data/datasources/extractors/gif_extrac
 import 'package:metastrip/features/viewer/data/datasources/extractors/webp_extractor.dart';
 
 void main() {
+  test('GIF XMP DataXMP application extension is surfaced', () async {
+    final xmp = latin1.encode('<x:xmpmeta>hello</x:xmpmeta>');
+    final ext = BytesBuilder()
+      ..add([0x21, 0xFF, 11])
+      ..add(latin1.encode('XMP DataXMP'))
+      ..addByte(xmp.length)
+      ..add(xmp)
+      ..addByte(0);
+    final fields = await extractGif(_gifBytes([ext.takeBytes()]));
+
+    final xmpField = fields.singleWhere((f) => f.label == 'XMP');
+    expect(xmpField.value, contains('hello'));
+    expect(xmpField.isPrivacySensitive, isTrue);
+  });
+
   group('extractGif', () {
     test('extracts a comment extension from a GIF89a file', () async {
       final bytes = _gifBytes([_gifComment('Sample GIF comment')]);
