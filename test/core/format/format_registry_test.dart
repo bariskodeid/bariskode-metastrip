@@ -265,6 +265,16 @@ void main() {
     }
   });
 
+  test('PDF limitations disclose keyword false rejections and validation', () {
+    final limitations =
+        FormatRegistry.standard.lookup('pdf')!.knownLimitations.join('\n');
+    // M-d: keywords inside content streams or strings fail safe.
+    expect(limitations, contains('trailer'));
+    expect(limitations, contains('may be rejected'));
+    // M-b: the output check re-applies the cleaner's own plan.
+    expect(limitations, contains('not an independent check'));
+  });
+
   group('advertised-handler consistency', () {
     test('detects advertised extraction without an extraction handler', () {
       final registry = FormatRegistry(

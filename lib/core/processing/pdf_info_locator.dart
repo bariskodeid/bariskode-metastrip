@@ -8,7 +8,9 @@
 ///
 /// Only plain-text PDF syntax is understood. Objects stored inside
 /// compressed object streams are not visible, so an Info reference whose
-/// object lives in one is skipped.
+/// object lives in one is rejected with a [FormatException]. Keywords are
+/// matched without excluding content streams or literal strings, so such
+/// text can also make a valid PDF fail safe (see `_scanTrailers`).
 library;
 
 /// Half-open range `[start, end)` of code units in PDF text.
@@ -302,6 +304,11 @@ const _maxObjectNumberDigits = 10;
 const _maxGenerationDigits = 5;
 
 /// Feeds the dictionary after every `trailer` keyword to [collect].
+///
+/// Known limitation: the keyword is matched anywhere in the text, including
+/// inside uncompressed content streams and literal strings. Text such as
+/// `(trailer << x)` then makes [_scanDictionary] throw, so a valid PDF is
+/// rejected (fails safe: no output, or an "Unable to parse" viewer status).
 void _scanTrailers(String text, void Function(_PdfDictionary) collect) {
   const keyword = 'trailer';
   var from = 0;
@@ -328,7 +335,8 @@ void _scanTrailers(String text, void Function(_PdfDictionary) collect) {
 /// /XRef` hit is matched with the nearest preceding object header without
 /// any backward search. Each object dictionary is scanned at most once and
 /// hits inside an already scanned dictionary are skipped, keeping the pass
-/// linear.
+/// linear. Like [_scanTrailers], hits inside uncompressed content streams or
+/// literal strings are not excluded and can make a valid PDF fail safe.
 void _scanXrefStreams(String text, void Function(_PdfDictionary) collect) {
   const name = '/XRef';
   var pendingObj = text.indexOf('obj');

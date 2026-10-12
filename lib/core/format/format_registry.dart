@@ -389,10 +389,17 @@ const List<FormatCapability> _standardCapabilities = [
     outputValidationStrategy: OutputValidationStrategy.bestEffort,
     removalCoverage: RemovalCoverage.bestEffort,
     knownLimitations: [
-      'Removal is best-effort PDF Info cleanup, not comprehensive sanitization.',
+      'Removal is best-effort PDF Info cleanup, not comprehensive '
+          'sanitization.',
       'Only the trailer-referenced Info dictionaries are cleaned.',
-      'Info dictionaries stored in compressed object streams are not supported and are rejected.',
+      'Info dictionaries stored in compressed object streams are not '
+          'supported and are rejected.',
       'Selective removal applies only to supported PDF Info keys.',
+      'A valid PDF may be rejected when "trailer" or "/Type /XRef" text '
+          'appears inside uncompressed page content or a string; this fails '
+          'safe and writes no output.',
+      'The output check re-applies the cleaner\'s own Info plan to the '
+          'input, so it is not an independent check of that plan.',
     ],
   ),
   FormatCapability(

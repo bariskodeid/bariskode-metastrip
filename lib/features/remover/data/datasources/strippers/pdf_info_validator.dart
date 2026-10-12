@@ -23,6 +23,9 @@ const pdfInfoValidationKeys = <String>[
 /// The expected bytes are derived from [findPdfInfoValueMutations], the same
 /// trailer-scoped Info plan (including resolved indirect string objects) the
 /// scrubber applies, so any byte outside that plan must be unchanged.
+/// Because it re-runs that plan rather than deriving the Info ranges
+/// independently, it is not an independent oracle: a planning bug would
+/// pass here and is guarded only by the locator and validator unit tests.
 ///
 /// This intentionally does not validate PDF structure, xrefs, streams,
 /// rendering, signatures, or any metadata surface outside the supported Info
