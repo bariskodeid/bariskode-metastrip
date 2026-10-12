@@ -331,6 +331,53 @@ void main() {
       );
     });
 
+    test('non-flagged UTF-8 non-ASCII name decodes and repacks', () {
+      final bytes = _zip({'caf\u00e9.txt': 'one', 'b.txt': 'two'});
+      _clearUtf8Flag(bytes);
+      expect(() => decodeGuardedZip(bytes), returnsNormally);
+      final out = repackZipWithoutEntries(bytes, skipPaths: const {'b.txt'});
+      expect(
+        ZipDecoder().decodeBytes(out).files.map((f) => f.name),
+        ['caf\u00e9.txt'],
+      );
+    });
+
+    test('backslash-separated entry name decodes and repacks', () {
+      final bytes = _zip({'dir/a.txt': 'one', 'b.txt': 'two'});
+      _replaceNameByte(bytes, 'dir/a.txt', 3, 0x5c);
+      expect(() => decodeGuardedZip(bytes), returnsNormally);
+      final out = repackZipWithoutEntries(bytes, skipPaths: const {'b.txt'});
+      expect(
+        ZipDecoder().decodeBytes(out).files.map((f) => f.name),
+        ['dir/a.txt'],
+      );
+    });
+
+    test('forged second directory with equal names but other size is '
+        'rejected', () {
+      final bytes = _zip({'a.txt': 'one', 'b.txt': 'two'});
+      final eocd = bytes.length - 22;
+      final cdOffset = ByteData.sublistView(bytes)
+          .getUint32(eocd + 16, Endian.little);
+      final cdSize = ByteData.sublistView(bytes)
+          .getUint32(eocd + 12, Endian.little);
+      final forged = Uint8List.fromList(bytes.sublist(cdOffset, eocd));
+      // Forge the first record's uncompressed size (offset 24).
+      _patchUint32(forged, 24, 2);
+      final forgedOffset = bytes.length;
+      final fakeEocd = Uint8List(22);
+      ByteData.sublistView(fakeEocd)
+        ..setUint32(0, 0x06054b50, Endian.little)
+        ..setUint16(8, 2, Endian.little)
+        ..setUint16(10, 2, Endian.little)
+        ..setUint32(12, cdSize, Endian.little)
+        ..setUint32(16, forgedOffset, Endian.little);
+      final tail = [...forged, ...fakeEocd, 0x58];
+      final hostile = Uint8List.fromList([...bytes, ...tail]);
+      _patchUint16(hostile, eocd + 20, tail.length);
+      expect(() => decodeGuardedZip(hostile), throwsFormatException);
+    });
+
     test('repacked entries carry the normalized DOS timestamp', () {
       final bytes = _zip({
         '[Content_Types].xml': _docxContentTypes,
@@ -535,6 +582,37 @@ int _centralOffset(Uint8List bytes) {
     }
   }
   throw StateError('Central directory not found');
+}
+
+/// Clears general-purpose flag 0x800 in every local and central header.
+void _clearUtf8Flag(Uint8List bytes) {
+  final data = ByteData.sublistView(bytes);
+  for (var i = 0; i <= bytes.length - 10; i++) {
+    final sig = data.getUint32(i, Endian.little);
+    final flagOffset = sig == 0x04034b50
+        ? i + 6
+        : sig == 0x02014b50
+            ? i + 8
+            : -1;
+    if (flagOffset < 0) continue;
+    data.setUint16(
+      flagOffset,
+      data.getUint16(flagOffset, Endian.little) & ~0x800,
+      Endian.little,
+    );
+  }
+}
+
+/// Overwrites one byte of [name] in every local and central header.
+void _replaceNameByte(Uint8List bytes, String name, int index, int value) {
+  final needle = name.codeUnits;
+  for (var i = 0; i <= bytes.length - needle.length; i++) {
+    var match = true;
+    for (var j = 0; j < needle.length && match; j++) {
+      match = bytes[i + j] == needle[j];
+    }
+    if (match) bytes[i + index] = value;
+  }
 }
 
 void _patchUint16(Uint8List bytes, int offset, int value) {

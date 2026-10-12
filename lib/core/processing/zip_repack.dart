@@ -38,7 +38,15 @@ class ZipPreflightEntry {
     required this.crc32,
     required this.localHeaderOffset,
     required this.localExtraLength,
-  });
+    String? decoderName,
+  }) : _decoderName = decoderName;
+
+  final String? _decoderName;
+
+  /// The entry name as `package:archive` reports it: decoded as UTF-8 with a
+  /// Latin-1 fallback regardless of general-purpose flag 0x800, with `\`
+  /// rewritten to `/`.
+  String get decoderName => _decoderName ?? name.replaceAll('\\', '/');
 
   final String name;
   final int compressionMethod;
@@ -411,6 +419,18 @@ void _set32List(List<int> bytes, int offset, int value) {
   }
 }
 
+/// Mirrors `package:archive` 3.6.1 name decoding: UTF-8 first, Latin-1 when
+/// the bytes are not valid UTF-8, then `\` rewritten to `/`.
+String _archiveDecodedName(List<int> nameBytes) {
+  String name;
+  try {
+    name = utf8.decode(nameBytes, allowMalformed: false);
+  } catch (_) {
+    name = String.fromCharCodes(nameBytes);
+  }
+  return name.replaceAll('\\', '/');
+}
+
 /// Decodes [bytes] after structural ZIP validation.
 ///
 /// The decoded entry names must match the preflight directory exactly, so a
@@ -429,7 +449,12 @@ Archive decodeGuardedZip(Uint8List bytes) {
     throw const FormatException('ZIP directory mismatch');
   }
   for (var i = 0; i < files.length; i++) {
-    if (files[i].name != descriptors[i].name) {
+    final file = files[i];
+    final expected = descriptors[i];
+    if (file.name != expected.decoderName ||
+        file.size != expected.uncompressedSize ||
+        file.crc32 != expected.crc32 ||
+        file.compressionType != expected.compressionMethod) {
       throw const FormatException('ZIP directory mismatch');
     }
   }
@@ -529,6 +554,7 @@ List<ZipPreflightEntry> preflightZip(Uint8List bytes) {
       crc32: crc32,
       localHeaderOffset: localOffset,
       localExtraLength: local.extraLength,
+      decoderName: _archiveDecodedName(nameBytes),
     ));
     cursor += recordLength;
   }
