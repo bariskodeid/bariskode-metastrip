@@ -89,6 +89,133 @@ void main() {
       expect(fields.single.value, 'No ID3 metadata found');
     });
 
+    test('UTF-16 COMM with description decodes text', () async {
+      final comm = Uint8List.fromList([
+        1, // UTF-16 with BOM
+        ...latin1.encode('eng'),
+        ..._utf16LeBom('desc'),
+        0, 0, // description terminator
+        ..._utf16LeBom('Hello'),
+      ]);
+      final bytes = _id3v2File(version: 3, frames: [_frame23('COMM', comm)]);
+
+      final fields = await extractId3(bytes);
+
+      expect(fields.single.label, 'Comment');
+      expect(fields.single.value, 'Hello');
+    });
+
+    test('v2.3 extended header is skipped', () async {
+      final ext = [0, 0, 0, 6, 0, 0, 0, 0, 0, 0]; // size excludes itself
+      final bytes = _id3v2File(
+        version: 3,
+        flags: 0x40,
+        prefix: ext,
+        frames: [_frame23('TIT2', _textFrame(0, latin1.encode('After Ext')))],
+      );
+
+      final fields = await extractId3(bytes);
+
+      expect(fields.single.value, 'After Ext');
+    });
+
+    test('v2.4 extended header (synchsafe, self-inclusive size) is skipped',
+        () async {
+      final ext = [..._synchsafe(6), 1, 0]; // size includes itself
+      final bytes = _id3v2File(
+        version: 4,
+        flags: 0x40,
+        prefix: ext,
+        frames: [_frame24('TIT2', _textFrame(0, latin1.encode('After Ext')))],
+      );
+
+      final fields = await extractId3(bytes);
+
+      expect(fields.single.value, 'After Ext');
+    });
+
+    test('unsynchronised tag is de-unsynchronised', () async {
+      // Logical frame: UTF-16LE BOM (FF FE) + 'A'. v2.3 frame sizes are the
+      // pre-unsync size; the stored body has FF followed by an inserted 00.
+      final logical = Uint8List.fromList([
+        ...latin1.encode('TIT2'),
+        ..._be32(5),
+        0,
+        0,
+        1,
+        0xFF,
+        0xFE,
+        0x41,
+        0x00,
+      ]);
+      final stored = _unsynchronise(logical);
+      expect(stored.length, logical.length + 1);
+      final bytes = _id3v2File(version: 3, flags: 0x80, frames: [stored]);
+
+      final fields = await extractId3(bytes);
+
+      expect(fields.single.label, 'Title');
+      expect(fields.single.value, 'A');
+    });
+
+    test('v2.4 per-frame unsynchronisation uses stored frame sizes', () async {
+      final stored =
+          _unsynchronise(Uint8List.fromList([1, 0xFF, 0xFE, 0x41, 0]));
+      final frame = Uint8List.fromList([
+        ...latin1.encode('TIT2'),
+        ..._synchsafe(stored.length), // stored size
+        0x00, 0x02, // frame format flag: unsynchronised
+        ...stored,
+      ]);
+      final bytes = _id3v2File(version: 4, frames: [frame]);
+
+      final fields = await extractId3(bytes);
+
+      expect(fields.single.value, 'A');
+    });
+
+    test('ID3v1.0 comment reads 30 bytes', () async {
+      final tag = List<int>.filled(128, 0);
+      tag.setRange(0, 3, 'TAG'.codeUnits);
+      _setFixed(tag, 97, 'A comment of thirty chars...');
+      tag[125] = 0x2E; // part of a 30-byte comment, not a v1.1 marker
+      tag[126] = 0x21;
+      tag[127] = 255;
+
+      final fields = await extractId3(Uint8List.fromList(tag));
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(byLabel['Comment']?.value, 'A comment of thirty chars...' '.!');
+      expect(byLabel.containsKey('Track'), isFalse);
+    });
+
+    test('genre 255 is omitted', () async {
+      final tag = List<int>.filled(128, 0);
+      tag.setRange(0, 3, 'TAG'.codeUnits);
+      _setFixed(tag, 3, 'Song');
+      tag[127] = 255;
+
+      final fields = await extractId3(Uint8List.fromList(tag));
+
+      expect(fields.map((field) => field.label), isNot(contains('Genre')));
+    });
+
+    test('ID3v1 is read even when the ID3v2 header is unusable', () async {
+      final tag = List<int>.filled(128, 0);
+      tag.setRange(0, 3, 'TAG'.codeUnits);
+      _setFixed(tag, 3, 'Song');
+      tag[127] = 255;
+      final bytes = Uint8List.fromList([
+        ...latin1.encode('ID3'),
+        9, 0, 0, 0, 0, 0, 0, // unsupported version
+        ...tag,
+      ]);
+
+      final fields = await extractId3(bytes);
+
+      expect(fields.single.value, 'Song');
+    });
+
     test('returns a status field for a truncated ID3v2 header', () async {
       final bytes = Uint8List.fromList([
         ...latin1.encode('ID3'),
@@ -111,14 +238,18 @@ void main() {
 Uint8List _id3v2File({
   required int version,
   required List<Uint8List> frames,
+  int flags = 0,
+  List<int> prefix = const [],
 }) {
   final builder = BytesBuilder(copy: false);
   builder.add(latin1.encode('ID3'));
   builder.addByte(version);
   builder.addByte(0); // revision
-  builder.addByte(0); // flags
-  final total = frames.fold<int>(0, (sum, frame) => sum + frame.length);
+  builder.addByte(flags);
+  final total =
+      prefix.length + frames.fold<int>(0, (sum, frame) => sum + frame.length);
   builder.add(_synchsafe(total));
+  builder.add(prefix);
   for (final frame in frames) {
     builder.add(frame);
   }
@@ -186,4 +317,14 @@ Uint8List _synchsafe(int value) {
     (value >> 7) & 0x7F,
     value & 0x7F,
   ]);
+}
+
+/// Inserts a 00 byte after every FF byte (ID3 unsynchronisation).
+Uint8List _unsynchronise(Uint8List data) {
+  final out = <int>[];
+  for (final byte in data) {
+    out.add(byte);
+    if (byte == 0xFF) out.add(0x00);
+  }
+  return Uint8List.fromList(out);
 }

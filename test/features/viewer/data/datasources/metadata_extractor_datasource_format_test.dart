@@ -60,6 +60,56 @@ void main() {
       expect(titles, contains('Tail Title'));
     });
 
+    test(
+        'tag larger than the read prefix yields parsed frames, a truncation '
+        'status, and ID3v1 fields', () async {
+      final apic = Uint8List(1500000);
+      final tag = _id3v2File(
+        version: 3,
+        frames: [
+          _frame23('TIT2', _textFrame(0, latin1.encode('Front Title'))),
+          _frame23('APIC', apic),
+        ],
+      );
+      final id3v1 = List<int>.filled(128, 0);
+      id3v1.setRange(0, 3, 'TAG'.codeUnits);
+      id3v1.setRange(3, 3 + 7, latin1.encode('V1Title'));
+      final file = await _tempFile(
+        'huge_tag.mp3',
+        Uint8List.fromList([...tag, ...id3v1]),
+      );
+
+      final metadata = await _extract(file, 'mp3');
+
+      final id3 = metadata.fields.where((f) => f.section == 'Audio ID3');
+      final titles = id3.where((f) => f.label == 'Title').map((f) => f.value);
+      expect(titles, containsAll(['Front Title', 'V1Title']));
+      expect(
+        id3.where((f) => f.label == 'Status').map((f) => f.value),
+        contains(contains('truncated')),
+      );
+    });
+
+    test('tag exactly at the 1 MiB prefix boundary parses fully', () async {
+      final title = _frame23('TIT2', _textFrame(0, latin1.encode('Edge')));
+      final tag = _id3v2File(version: 3, frames: [title]);
+      final padding = AppConstants.maxAudioScanBytes - tag.length;
+      final bytes = Uint8List.fromList([
+        ...tag,
+        ...Uint8List(padding),
+        ...Uint8List(4096), // audio after the tag
+      ]);
+      // Grow the declared size to cover the padding: 10 + size == 1 MiB.
+      bytes.setRange(6, 10, _synchsafe(AppConstants.maxAudioScanBytes - 10));
+      final file = await _tempFile('edge.mp3', bytes);
+
+      final metadata = await _extract(file, 'mp3');
+
+      final id3 = metadata.fields.where((f) => f.section == 'Audio ID3');
+      expect(id3.map((f) => f.label), ['Title']);
+      expect(id3.single.value, 'Edge');
+    });
+
     test('routes pdf files to the PDF extractor via the registry', () async {
       final file = await _tempFile(
         'sample.pdf',

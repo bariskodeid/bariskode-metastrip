@@ -191,24 +191,27 @@ const int _maxFrames = 64;
 Future<List<MetadataFieldEntity>> extractId3(Uint8List bytes) async {
   try {
     final fields = <MetadataFieldEntity>[];
-    final hasV2 = _hasId3v2Header(bytes);
-    if (hasV2 && !_parseId3v2(bytes, fields)) {
+    final v2 = _hasId3v2Header(bytes) ? _parseId3v2(bytes, fields) : null;
+    if (_hasId3v1Header(bytes)) _parseId3v1(bytes, fields);
+
+    if (fields.isEmpty && v2 != null && v2 != _V2Result.complete) {
       return [
         statusField('Audio ID3', 'Status', 'Unable to parse ID3 metadata'),
       ];
     }
-    if (_hasId3v1Header(bytes)) {
-      _parseId3v1(bytes, fields);
+    if (fields.isEmpty) {
+      return [statusField('Audio ID3', 'Status', 'No ID3 metadata found')];
     }
-    if (fields.isNotEmpty || hasV2 || _hasId3v1Header(bytes)) {
-      if (fields.isEmpty) {
-        return [
-          statusField('Audio ID3', 'Status', 'No ID3 metadata found'),
-        ];
-      }
-      return fields;
+    if (v2 == _V2Result.truncated) {
+      fields.add(
+        statusField(
+          'Audio ID3',
+          'Status',
+          'ID3v2 tag truncated: only the leading part was read',
+        ),
+      );
     }
-    return [statusField('Audio ID3', 'Status', 'No ID3 metadata found')];
+    return fields;
   } catch (_) {
     return [
       statusField('Audio ID3', 'Status', 'Unable to parse ID3 metadata'),
@@ -233,53 +236,98 @@ bool _hasId3v1Header(Uint8List bytes) {
       bytes[offset + 2] == 0x47; // 'G'
 }
 
+/// Outcome of [_parseId3v2].
+enum _V2Result { complete, truncated, invalid }
+
+/// Reverses ID3 unsynchronisation (`FF 00` becomes `FF`) in [data].
+Uint8List _deUnsynchronise(Uint8List data) {
+  final out = BytesBuilder(copy: false);
+  for (var i = 0; i < data.length; i++) {
+    out.addByte(data[i]);
+    if (data[i] == 0xFF && i + 1 < data.length && data[i + 1] == 0x00) i++;
+  }
+  return out.takeBytes();
+}
+
 /// Parses the ID3v2 tag in [bytes], appending fields to [fields].
 ///
-/// Returns false when the header declares a tag larger than the available
-/// bytes (truncated or corrupt), in which case scanning cannot be trusted.
-bool _parseId3v2(Uint8List bytes, List<MetadataFieldEntity> fields) {
+/// The frame walk is clamped to the available bytes. When the header declares
+/// a tag larger than [bytes] the frames that fit are still parsed and
+/// [_V2Result.truncated] is returned.
+_V2Result _parseId3v2(Uint8List bytes, List<MetadataFieldEntity> fields) {
   final version = bytes[3];
-  if (version != 2 && version != 3 && version != 4) return false;
+  if (version != 2 && version != 3 && version != 4) return _V2Result.invalid;
 
-  final tagSize = _synchsafe(bytes, 6);
-  final tagEnd = 10 + tagSize;
-  if (tagSize < 0 || tagEnd > bytes.length) return false;
+  final flags = bytes[5];
+  final tagEnd = 10 + _synchsafe(bytes, 6);
+  final truncated = tagEnd > bytes.length;
+  var body = Uint8List.sublistView(
+    bytes,
+    10,
+    truncated ? bytes.length : tagEnd,
+  );
+
+  // v2.2/v2.3: unsynchronisation covers the whole body and frame sizes are
+  // pre-unsync. v2.4 sizes count stored bytes, so it is undone per frame.
+  if (version != 4 && flags & 0x80 != 0) body = _deUnsynchronise(body);
+
+  var offset = 0;
+  if (version == 3 && flags & 0x40 != 0) {
+    // v2.3: plain big-endian size that excludes the size field itself.
+    if (body.length < 4) return _V2Result.invalid;
+    offset = 4 + _bigEndian4(body, 0);
+  } else if (version == 4 && flags & 0x40 != 0) {
+    // v2.4: synchsafe size that includes the size field itself.
+    if (body.length < 4) return _V2Result.invalid;
+    offset = _synchsafe(body, 0);
+  }
+  if (offset > body.length) return _V2Result.invalid;
 
   final frameIdLength = version == 2 ? 3 : 4;
   final hasFlags = version != 2;
   final labels = version == 2 ? _v22FrameLabels : _v23FrameLabels;
+  final end = body.length;
 
-  var offset = 10;
   var frameCount = 0;
-  while (offset + frameIdLength <= tagEnd && frameCount < _maxFrames) {
-    if (!_isValidFrameId(bytes, offset, frameIdLength)) break;
+  while (offset + frameIdLength <= end && frameCount < _maxFrames) {
+    if (!_isValidFrameId(body, offset, frameIdLength)) break;
 
     final sizeOffset = offset + frameIdLength;
     final sizeLength = hasFlags ? 4 : 3;
     final headerLength = sizeLength + (hasFlags ? 2 : 0);
-    if (sizeOffset + headerLength > tagEnd) break;
+    if (sizeOffset + headerLength > end) break;
 
     final size = switch (version) {
-      2 => _bigEndian3(bytes, sizeOffset),
-      3 => _bigEndian4(bytes, sizeOffset),
-      _ => _synchsafe(bytes, sizeOffset),
+      2 => _bigEndian3(body, sizeOffset),
+      3 => _bigEndian4(body, sizeOffset),
+      _ => _synchsafe(body, sizeOffset),
     };
 
     final dataOffset = sizeOffset + headerLength;
-    if (dataOffset + size > bytes.length) break;
+    if (dataOffset + size > end) break;
 
     final id =
-        String.fromCharCodes(bytes.sublist(offset, offset + frameIdLength));
+        String.fromCharCodes(body.sublist(offset, offset + frameIdLength));
     final label = labels[id];
     if (label != null) {
-      final data = bytes.sublist(dataOffset, dataOffset + size);
+      var data = body.sublist(dataOffset, dataOffset + size);
+      if (version == 4) {
+        final frameFlags = body[sizeOffset + 5];
+        if (frameFlags & 0x01 != 0) {
+          // Data length indicator precedes the (possibly unsynchronised) data.
+          data = data.length >= 4 ? data.sublist(4) : Uint8List(0);
+        }
+        if (flags & 0x80 != 0 || frameFlags & 0x02 != 0) {
+          data = _deUnsynchronise(data);
+        }
+      }
       var value = id == 'COMM' || id == 'COM'
           ? _decodeComment(data)
           : _decodeTextFrame(data);
       value = value.trim();
       if (id == 'TCON' || id == 'TCO') value = _resolveGenre(value);
-      if ((id == 'TXXX' || id == 'WXXX') && value.contains('\u0000')) {
-        value = value.replaceAll('\u0000', ' ');
+      if ((id == 'TXXX' || id == 'WXXX') && value.contains(' ')) {
+        value = value.replaceAll(' ', ' ');
       }
       if (value.isNotEmpty) {
         fields.add(
@@ -296,7 +344,7 @@ bool _parseId3v2(Uint8List bytes, List<MetadataFieldEntity> fields) {
     frameCount++;
     offset = dataOffset + size;
   }
-  return true;
+  return truncated ? _V2Result.truncated : _V2Result.complete;
 }
 
 /// Whether [bytes] at [offset] holds a printable ASCII frame ID.
@@ -360,7 +408,7 @@ bool _isTerminatorAt(Uint8List data, int offset, int width) {
 int _skipDescription(Uint8List data, int start, int width) {
   var cursor = start;
   while (cursor < data.length && !_isTerminatorAt(data, cursor, width)) {
-    cursor++;
+    cursor += width;
   }
   if (cursor + width > data.length) return data.length;
   return cursor + width;
@@ -447,16 +495,18 @@ void _parseId3v1(Uint8List bytes, List<MetadataFieldEntity> fields) {
   add('Album', latin1.decode(bytes.sublist(tag + 63, tag + 93)));
   add('Year', latin1.decode(bytes.sublist(tag + 93, tag + 97)));
 
-  final commentBytes = bytes.sublist(tag + 97, tag + 125);
-  add('Comment', latin1.decode(commentBytes));
-
-  if (bytes[tag + 125] == 0 && bytes[tag + 126] != 0) {
-    add('Track', '${bytes[tag + 126]}');
-  }
+  // ID3v1.1 keeps a track number in byte 126 after a NUL in byte 125;
+  // otherwise (v1.0) the comment spans all 30 bytes.
+  final isV11 = bytes[tag + 125] == 0 && bytes[tag + 126] != 0;
+  final commentEnd = isV11 ? tag + 125 : tag + 127;
+  add('Comment', latin1.decode(bytes.sublist(tag + 97, commentEnd)));
+  if (isV11) add('Track', '${bytes[tag + 126]}');
 
   final genre = bytes[tag + 127];
-  add(
-    'Genre',
-    genre < _id3v1Genres.length ? _id3v1Genres[genre] : '$genre',
-  );
+  if (genre != 255) {
+    add(
+      'Genre',
+      genre < _id3v1Genres.length ? _id3v1Genres[genre] : '$genre',
+    );
+  }
 }
