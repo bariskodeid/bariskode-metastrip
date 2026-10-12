@@ -94,22 +94,26 @@ int _scanExtension(
       );
     }
   } else if (label == 0xFF && _isXmpApplication(bytes, cursor)) {
-    // The first sub-block is the 11-byte application identifier; the XMP
-    // packet follows as further sub-blocks.
-    final data = BytesBuilder(copy: false);
-    cursor = _skipSubBlocks(bytes, cursor, data);
-    final all = data.takeBytes();
-    final packet = utf8
-        .decode(all.sublist(all.length < 11 ? all.length : 11),
-            allowMalformed: true)
-        .trim();
+    // XMP is not sub-block framed: the UTF-8 packet follows the 11-byte
+    // application identifier directly, ending at a 258-byte magic trailer.
+    final start = cursor + 1 + 11;
+    final trailer = _findXmpTrailer(bytes, start);
+    String value;
+    if (trailer < 0) {
+      value = 'XMP packet present (no valid trailer)';
+      cursor = _skipSubBlocks(bytes, cursor, null);
+    } else {
+      final packet = utf8
+          .decode(bytes.sublist(start, trailer), allowMalformed: true)
+          .trim();
+      value = packet.isEmpty ? 'XMP packet present' : packet;
+      cursor = trailer + _xmpTrailerLength;
+    }
     fields.add(
       MetadataFieldEntity(
         section: _gifSection,
         label: 'XMP',
-        value: truncateMetadataValue(
-          packet.isEmpty ? 'XMP packet present' : packet,
-        ),
+        value: truncateMetadataValue(value),
         isPrivacySensitive: true,
       ),
     );
@@ -159,4 +163,21 @@ bool _isXmpApplication(Uint8List bytes, int offset) {
     if (bytes[offset + 1 + i] != magic.codeUnitAt(i)) return false;
   }
   return true;
+}
+
+/// Length of the GIF XMP magic trailer: 0x01, 0xFF down to 0x00, 0x00.
+const int _xmpTrailerLength = 258;
+
+/// Returns the offset of the first valid XMP magic trailer at or after
+/// [start], or -1 when none is present within [bytes].
+int _findXmpTrailer(Uint8List bytes, int start) {
+  for (var i = start; i + _xmpTrailerLength <= bytes.length; i++) {
+    if (bytes[i] != 0x01) continue;
+    var ok = true;
+    for (var k = 0; k < 256 && ok; k++) {
+      ok = bytes[i + 1 + k] == 0xFF - k;
+    }
+    if (ok && bytes[i + 257] == 0x00) return i;
+  }
+  return -1;
 }

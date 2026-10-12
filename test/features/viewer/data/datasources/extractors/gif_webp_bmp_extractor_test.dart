@@ -7,18 +7,30 @@ import 'package:metastrip/features/viewer/data/datasources/extractors/gif_extrac
 import 'package:metastrip/features/viewer/data/datasources/extractors/webp_extractor.dart';
 
 void main() {
-  test('GIF XMP DataXMP application extension is surfaced', () async {
-    final xmp = latin1.encode('<x:xmpmeta>hello</x:xmpmeta>');
+  test('GIF XMP DataXMP packet is read raw up to the magic trailer', () async {
+    // Packet starts with '<' (0x3C): a sub-block reader would misread it.
+    const packet = '<x:xmpmeta>hello</x:xmpmeta>';
+    final fields = await extractGif(
+      _gifBytes([_gifXmp(packet), _gifComment('after')]),
+    );
+
+    final xmpField = fields.singleWhere((f) => f.label == 'XMP');
+    expect(xmpField.value, packet);
+    expect(xmpField.isPrivacySensitive, isTrue);
+    // Parsing continues after the trailer's terminator.
+    expect(fields.singleWhere((f) => f.label == 'Comment').value, 'after');
+  });
+
+  test('GIF XMP without a magic trailer is a presence field', () async {
     final ext = BytesBuilder()
       ..add([0x21, 0xFF, 11])
       ..add(latin1.encode('XMP DataXMP'))
-      ..addByte(xmp.length)
-      ..add(xmp)
+      ..add(latin1.encode('<x:xmpmeta>no trailer</x:xmpmeta>'))
       ..addByte(0);
     final fields = await extractGif(_gifBytes([ext.takeBytes()]));
 
     final xmpField = fields.singleWhere((f) => f.label == 'XMP');
-    expect(xmpField.value, contains('hello'));
+    expect(xmpField.value, 'XMP packet present (no valid trailer)');
     expect(xmpField.isPrivacySensitive, isTrue);
   });
 
@@ -206,4 +218,19 @@ Uint8List _le32(int value) {
     (value >> 16) & 0xFF,
     (value >> 24) & 0xFF,
   ]);
+}
+
+/// Builds a spec-shaped GIF XMP application extension: the packet follows the
+/// application identifier directly, then the 258-byte magic trailer.
+Uint8List _gifXmp(String packet) {
+  final b = BytesBuilder()
+    ..add([0x21, 0xFF, 11])
+    ..add(latin1.encode('XMP DataXMP'))
+    ..add(utf8.encode(packet))
+    ..addByte(0x01);
+  for (var i = 0xFF; i >= 0; i--) {
+    b.addByte(i);
+  }
+  b.addByte(0x00);
+  return b.takeBytes();
 }
