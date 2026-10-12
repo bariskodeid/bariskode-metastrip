@@ -254,6 +254,17 @@ void main() {
     });
   });
 
+  test('Ogg/Opus shows the spanning comment packet limitation first', () {
+    // The Remover screen shows only the first limitation, and spanning
+    // comment packets (embedded cover art) are the common rejection.
+    for (final extension in ['ogg', 'opus']) {
+      final limitations =
+          FormatRegistry.standard.lookup(extension)!.knownLimitations;
+      expect(limitations.first, contains('spanning multiple pages'));
+      expect(limitations.first, contains('cover art'));
+    }
+  });
+
   group('advertised-handler consistency', () {
     test('detects advertised extraction without an extraction handler', () {
       final registry = FormatRegistry(

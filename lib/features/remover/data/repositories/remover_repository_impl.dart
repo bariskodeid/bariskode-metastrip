@@ -79,6 +79,23 @@ class RemoverRepositoryImpl implements RemoverRepository {
           'Output validation failed; the invalid copy was removed',
         'Output validation failed; unverified copy may remain' =>
           'Output validation failed; unverified copy may remain',
+        // Deliberate fail-closed rejections of files that may be valid:
+        // say what is unsupported instead of calling the file corrupt.
+        'Ogg comment packet spans pages' =>
+          'Ogg/Opus files with embedded cover art or other large comments '
+              'are not supported yet',
+        'PDF Info dictionary is not stored as plain text (compressed '
+              'object streams are not supported)' =>
+          'This PDF stores its document info in a compressed object '
+              'stream, which is not supported yet',
+        'EPUB mimetype must be the first entry, stored, with no extra field' ||
+        'EPUB is missing the required mimetype entry' ||
+        'EPUB mimetype entry does not contain application/epub+zip' =>
+          'This EPUB has a missing or invalid mimetype entry, so it '
+              'cannot be cleaned safely',
+        'ZIP directory mismatch' =>
+          'The ZIP directory does not match its contents, so it cannot be '
+              'cleaned safely',
         _ => 'File format invalid or corrupt',
       };
     }

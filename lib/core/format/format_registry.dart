@@ -319,9 +319,11 @@ const List<FormatCapability> _standardCapabilities = [
     outputValidationStrategy: OutputValidationStrategy.signature,
     removalCoverage: RemovalCoverage.bestEffort,
     knownLimitations: [
+      // Shown first in the Remover queue: the most common rejection.
+      'Comment packets spanning multiple pages (such as embedded cover art) '
+          'are rejected.',
       'Ogg/Opus cleanup is best effort and scans a bounded page window; '
           'selective removal remains disabled.',
-      'Comment packets spanning multiple pages are rejected.',
     ],
   ),
   FormatCapability(
