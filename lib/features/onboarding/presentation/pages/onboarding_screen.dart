@@ -1,19 +1,21 @@
-import 'dart:io' show Platform;
-
-import 'package:file_selector/file_selector.dart' as fs;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/storage/output_folder_picker.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/features/onboarding/domain/entities/onboarding_state_entity.dart';
 import 'package:metastrip/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:metastrip/shared/widgets/primary_button.dart';
 import 'package:metastrip/shared/widgets/secondary_button.dart';
-import 'package:saf/saf.dart';
 
 /// First-run onboarding wizard.
 class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.directoryPicker = _defaultPicker});
+
+  /// Folder picker; injectable for tests.
+  final DirectoryPicker directoryPicker;
+
+  static Future<String?> _defaultPicker() => pickOutputFolder();
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,10 @@ class OnboardingScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const SizedBox(height: AppSpacing.md),
-                  Expanded(child: _OnboardingSlide(index: index)),
+                  Expanded(child: _OnboardingSlide(
+                      index: index,
+                      directoryPicker: directoryPicker,
+                    )),
                   _ProgressDots(index: index),
                   if (state.persistenceError != null) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -82,9 +87,10 @@ class OnboardingScreen extends StatelessWidget {
 }
 
 class _OnboardingSlide extends StatelessWidget {
-  const _OnboardingSlide({required this.index});
+  const _OnboardingSlide({required this.index, required this.directoryPicker});
 
   final int index;
+  final DirectoryPicker directoryPicker;
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +113,7 @@ class _OnboardingSlide extends StatelessWidget {
           body:
               'Create clean output copies. Originals stay untouched by default.',
         ),
-      3 => const _FolderSlide(),
+      3 => _FolderSlide(directoryPicker: directoryPicker),
       _ => const _PermissionSlide(),
     };
   }
@@ -146,7 +152,9 @@ class _BasicSlide extends StatelessWidget {
 }
 
 class _FolderSlide extends StatelessWidget {
-  const _FolderSlide();
+  const _FolderSlide({required this.directoryPicker});
+
+  final DirectoryPicker directoryPicker;
 
   @override
   Widget build(BuildContext context) {
@@ -167,11 +175,10 @@ class _FolderSlide extends StatelessWidget {
               label: 'CHOOSE FOLDER',
               onPressed: () async {
                 String? directory;
-                if (Platform.isAndroid) {
-                  final result = await Saf().pickDirectory();
-                  directory = result?.uri;
-                } else {
-                  directory = await fs.getDirectoryPath();
+                try {
+                  directory = await directoryPicker();
+                } catch (_) {
+                  directory = null;
                 }
                 if (directory != null &&
                     directory.trim().isNotEmpty &&

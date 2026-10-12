@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/storage/output_folder_picker.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:metastrip/features/settings/presentation/cubit/settings_cubit.dart';
@@ -24,17 +24,24 @@ import 'package:metastrip/features/settings/presentation/widgets/version_info_ti
 
 /// Settings screen entry point (Cubit provided by app.dart).
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.directoryPicker = _defaultPicker});
+
+  /// Folder picker; injectable for tests.
+  final DirectoryPicker directoryPicker;
+
+  static Future<String?> _defaultPicker() => pickOutputFolder();
 
   @override
   Widget build(BuildContext context) {
-    return const _SettingsView();
+    return _SettingsView(directoryPicker: directoryPicker);
   }
 }
 
 /// Internal view that consumes SettingsCubit.
 class _SettingsView extends StatelessWidget {
-  const _SettingsView();
+  const _SettingsView({required this.directoryPicker});
+
+  final DirectoryPicker directoryPicker;
 
   @override
   Widget build(BuildContext context) {
@@ -88,9 +95,18 @@ class _SettingsView extends StatelessWidget {
                   OutputFolderPickerWidget(
                     currentPath: s.storage.outputFolderPath ?? '',
                     onPick: () async {
-                      final folder = await getDirectoryPath();
-                      if (folder != null) {
-                        await cubit.updateOutputFolder(folder);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final folder = await directoryPicker();
+                        if (folder != null && folder.trim().isNotEmpty) {
+                          await cubit.updateOutputFolder(folder);
+                        }
+                      } catch (_) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Folder selection failed'),
+                          ),
+                        );
                       }
                     },
                   ),
@@ -157,6 +173,7 @@ class _SettingsView extends StatelessWidget {
                     onTap: () => showDialog(
                       context: context,
                       builder: (_) => ExportImportDialog(
+                        outputFolder: s.storage.outputFolderPath,
                         onExport: (path) => cubit.exportSettings(path),
                         onImport: (file) => cubit.importSettings(file),
                       ),
