@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_value_parser.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/pdf_xmp_packet_parser.dart';
 
 /// The Info keys covered by the current bounded PDF byte scrubber.
 const pdfInfoValidationKeys = <String>[
@@ -19,13 +20,16 @@ const pdfInfoValidationKeys = <String>[
 
 /// Verifies the generated mutation made by the bounded PDF Info scrubber.
 ///
-/// This intentionally does not validate PDF structure, xrefs, streams, XMP,
+/// This intentionally does not validate PDF structure, xrefs, streams,
 /// rendering, signatures, or any metadata surface outside the supported Info
-/// key byte patterns.
+/// key byte patterns. Set [xmpPacketsBlanked] when the scrubber also blanked
+/// literal XMP packet content so those bytes are expected to be spaces; the
+/// XMP mutation itself is verified by `validateGeneratedPdfXmpMutation`.
 void validateGeneratedPdfInfoMutation(
   Uint8List input,
   Uint8List output, {
   Set<String>? selectedKeys,
+  bool xmpPacketsBlanked = false,
 }) {
   if (input.length > AppConstants.maxRemoverFileSizeBytes ||
       output.length > AppConstants.maxRemoverFileSizeBytes) {
@@ -93,11 +97,28 @@ void validateGeneratedPdfInfoMutation(
     );
   }
 
+  final xmpRanges = xmpPacketsBlanked
+      ? findPdfXmpPacketRanges(inputText)
+      : const <PdfXmpPacketRange>[];
+
   var rangeIndex = 0;
+  var xmpIndex = 0;
   for (var byteIndex = 0; byteIndex < input.length; byteIndex++) {
     while (rangeIndex < mergedRanges.length &&
         byteIndex >= mergedRanges[rangeIndex].end) {
       rangeIndex++;
+    }
+    while (
+        xmpIndex < xmpRanges.length && byteIndex >= xmpRanges[xmpIndex].end) {
+      xmpIndex++;
+    }
+    final isBlankedXmp =
+        xmpIndex < xmpRanges.length && byteIndex >= xmpRanges[xmpIndex].start;
+    if (isBlankedXmp) {
+      if (output[byteIndex] != 0x20) {
+        throw const FormatException('Generated PDF mutation is invalid');
+      }
+      continue;
     }
     final isMutable = rangeIndex < mergedRanges.length &&
         byteIndex >= mergedRanges[rangeIndex].start;

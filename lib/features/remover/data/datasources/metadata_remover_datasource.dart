@@ -15,6 +15,8 @@ import 'package:metastrip/features/remover/data/datasources/strippers/odf_stripp
 import 'package:metastrip/features/remover/data/datasources/strippers/openxml_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_validator.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_value_parser.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/pdf_xmp_packet_parser.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/pdf_xmp_validator.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/riff_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/vorbis_stripper.dart';
 import 'package:metastrip/features/remover/data/datasources/strippers/wav_info_selective_stripper.dart';
@@ -790,9 +792,10 @@ class MetadataRemoverDatasource {
 
   /// Writes a clean PDF copy, blanking document Info values.
   ///
-  /// A null [selectiveLabels] blanks all nine Info keys as before. When
-  /// [selectiveLabels] is provided, only the keys present in the set are
-  /// blanked; the other Info entries keep their values. Labels use the PDF
+  /// A null [selectiveLabels] blanks all nine Info keys as before and also
+  /// blanks the content of every literal XMP packet. When [selectiveLabels]
+  /// is provided, only the keys present in the set are blanked; the other
+  /// Info entries and the XMP packets keep their values. Labels use the PDF
   /// Info key names produced by the extractor (for example `Title`).
   Future<File> stripPdfMetadata(
     String inputPath, {
@@ -818,14 +821,23 @@ class MetadataRemoverDatasource {
     if (bytes.length > AppConstants.maxRemoverFileSizeBytes) {
       throw const FileSystemException('PDF too large for remover MVP');
     }
+    final blankXmp = selectiveLabels == null;
     final outputBytes = await runOnWorker(
-      () => _stripPdfInfoBytes(bytes, selectiveLabels: selectiveLabels),
+      () => _stripPdfInfoBytes(
+        bytes,
+        selectiveLabels: selectiveLabels,
+        blankXmpPackets: blankXmp,
+      ),
     );
     validateGeneratedPdfInfoMutation(
       bytes,
       outputBytes,
       selectedKeys: selectiveLabels,
+      xmpPacketsBlanked: blankXmp,
     );
+    if (blankXmp) {
+      validateGeneratedPdfXmpMutation(bytes, outputBytes);
+    }
     return _writeCleanCopy(inputPath, outputBytes, outputDirectory);
   }
 
@@ -1239,7 +1251,7 @@ class MetadataRemoverDatasource {
               entry.localExtraLength;
           final end = start + entry.compressedSize;
           if (end > bytes.length) return null;
-          return Uint8List.fromList(bytes.sublist(start as int, end as int));
+          return Uint8List.fromList(bytes.sublist(start, end));
         }
       }
     } on FormatException {
@@ -1867,9 +1879,16 @@ int _pngCrc32(Uint8List bytes, int start, int end) {
 /// Values inside page content streams that happen to match `/Key (...)` are
 /// blanked too; this is the same best-effort MVP behavior as the previous
 /// implementation and is documented as a known limitation.
+///
+/// When [blankXmpPackets] is set, the content of every literal `<?xpacket ...?>`
+/// packet is blanked with the same same-length space fill, after the Info pass
+/// so an overlapping Info replacement cannot survive inside a packet. XMP
+/// stored inside compressed object streams is not literal text and is not
+/// touched. Malformed packet markers fail closed with a [FormatException].
 Uint8List _stripPdfInfoBytes(
   Uint8List bytes, {
   Set<String>? selectiveLabels,
+  bool blankXmpPackets = false,
 }) {
   if (bytes.length < 5 || String.fromCharCodes(bytes.take(5)) != '%PDF-') {
     throw const FormatException('Not a valid PDF file');
@@ -1879,6 +1898,11 @@ Uint8List _stripPdfInfoBytes(
   final occurrenceBudget = PdfInfoOccurrenceBudget();
   for (final key in _pdfInfoKeysToBlank(selectiveLabels)) {
     _blankPdfInfoKey(text, outBytes, key, occurrenceBudget);
+  }
+  if (blankXmpPackets) {
+    for (final range in findPdfXmpPacketRanges(text)) {
+      _blankRange(outBytes, range.start, range.end);
+    }
   }
   return outBytes;
 }
@@ -1943,9 +1967,10 @@ const List<String> _pdfInfoKeys = [
 ];
 
 const _pdfBestEffortWarning =
-    'Generated PDF byte mutation passed bounded integrity validation, but the '
-    'persisted artifact, PDF structure, and other metadata surfaces remain '
-    'unverified.';
+    'Generated PDF byte mutation passed bounded integrity validation, '
+    'including literal XMP packet content, but XMP inside compressed object '
+    'streams is not stripped and the persisted artifact, PDF structure, and '
+    'other metadata surfaces remain unverified.';
 
 const _safBmpValidationWarning =
     'Generated BMP bytes were validated, but the persisted SAF artifact was '
