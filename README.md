@@ -6,7 +6,7 @@
 
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.35%2B-02569B?logo=flutter">
-  <img alt="Dart" src="https://img.shields.io/badge/Dart-3.4%2B-0175C2?logo=dart">
+  <img alt="Dart" src="https://img.shields.io/badge/Dart-3.9%2B-0175C2?logo=dart">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-green">
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey">
 </p>
