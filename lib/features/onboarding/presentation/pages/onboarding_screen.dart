@@ -170,12 +170,14 @@ class _FolderSlideState extends State<_FolderSlide> {
   void initState() {
     super.initState();
     if (_isIos) {
-      // iOS has no folder picker: fill in the app Documents/MetaStrip folder.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            context.read<OnboardingCubit>().state.outputFolderPath == null) {
-          _chooseFolder();
-        }
+      // iOS has no folder picker: fill in the app Documents/MetaStrip folder,
+      // also when a saved path went stale (the app container moved after an
+      // update or restore).
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        final valid =
+            await context.read<OnboardingCubit>().hasValidOutputFolder();
+        if (mounted && !valid) _chooseFolder();
       });
     }
   }

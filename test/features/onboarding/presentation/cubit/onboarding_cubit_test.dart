@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:bloc_test/bloc_test.dart';
@@ -7,6 +9,7 @@ import 'package:metastrip/features/onboarding/domain/entities/onboarding_state_e
 import 'package:metastrip/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:metastrip/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:metastrip/features/onboarding/presentation/pages/onboarding_screen.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 void main() {
   blocTest<OnboardingCubit, OnboardingStateEntity>(
@@ -159,8 +162,9 @@ void main() {
 
   Future<OnboardingCubit> pumpFolderSlide(
     WidgetTester tester,
-    OnboardingScreen screen,
-  ) async {
+    OnboardingScreen screen, {
+    String? initialFolder,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(1000, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final cubit = OnboardingCubit(
@@ -168,6 +172,7 @@ void main() {
       validator: _validFolder,
     );
     addTearDown(cubit.close);
+    if (initialFolder != null) await cubit.setOutputFolder(initialFolder);
     cubit.setSlide(3);
     await tester.pumpWidget(
       MaterialApp(
@@ -189,6 +194,128 @@ void main() {
 
       expect(find.text('Folder selection failed'), findsOneWidget);
       expect(cubit.state.outputFolderPath, isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  group('iOS container path changes between launches', () {
+    late Directory temp;
+    late String stalePath;
+    late String freshPath;
+
+    setUp(() async {
+      temp = await Directory.systemTemp.createTemp('metastrip_ios_launch_');
+      addTearDown(() => temp.delete(recursive: true));
+      // First launch saved this path; the update moved the container.
+      stalePath = '${temp.path}/old-uuid/Documents/MetaStrip';
+      freshPath = '${temp.path}/new-uuid/Documents/MetaStrip';
+      final previous = PathProviderPlatform.instance;
+      PathProviderPlatform.instance =
+          _FakePathProvider('${temp.path}/new-uuid/Documents');
+      addTearDown(() => PathProviderPlatform.instance = previous);
+    });
+
+    test('iOS load re-derives the folder and stays completed', () async {
+      final repository = _FakeOnboardingRepository(
+        completed: true,
+        outputFolder: stalePath,
+      );
+      final cubit = OnboardingCubit(repository);
+      addTearDown(cubit.close);
+      try {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        await cubit.load();
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+
+      expect(cubit.state.isCompleted, isTrue);
+      expect(cubit.state.outputFolderPath, freshPath);
+      expect(cubit.state.persistenceError, isNull);
+      expect(repository.savedPath, freshPath);
+      expect(await Directory(freshPath).exists(), isTrue);
+    });
+
+    test('non-iOS load still requires choosing a folder again', () async {
+      final repository = _FakeOnboardingRepository(
+        completed: true,
+        outputFolder: stalePath,
+      );
+      final cubit = OnboardingCubit(repository);
+      addTearDown(cubit.close);
+      try {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        await cubit.load();
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+
+      expect(cubit.state.isCompleted, isFalse);
+      expect(cubit.state.outputFolderPath, stalePath);
+      expect(cubit.state.persistenceError, contains('valid'));
+      expect(repository.savedPath, isNull);
+    });
+  });
+
+  testWidgets('iOS folder slide re-fills a stale saved folder', (tester) async {
+    try {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.binding.setSurfaceSize(const Size(1000, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final repository = _FakeOnboardingRepository(
+        outputFolder: '/old-uuid/Documents/MetaStrip',
+      );
+      final cubit = OnboardingCubit(
+        repository,
+        validator: (path) async {
+          if (path.startsWith('/old-uuid')) throw StateError('stale');
+          return path;
+        },
+      );
+      addTearDown(cubit.close);
+      await cubit.load();
+      expect(cubit.state.outputFolderPath, '/old-uuid/Documents/MetaStrip');
+      cubit.setSlide(3);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider.value(
+            value: cubit,
+            child: OnboardingScreen(
+              directoryPicker: ({onError}) async =>
+                  '/new-uuid/Documents/MetaStrip',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(cubit.state.outputFolderPath, '/new-uuid/Documents/MetaStrip');
+      expect(repository.savedPath, '/new-uuid/Documents/MetaStrip');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('iOS folder slide keeps a valid saved folder', (tester) async {
+    try {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      var picks = 0;
+      final cubit = await pumpFolderSlide(
+        tester,
+        OnboardingScreen(
+          directoryPicker: ({onError}) async {
+            picks++;
+            return '/docs/MetaStrip';
+          },
+        ),
+        initialFolder: '/docs/MetaStrip',
+      );
+      await tester.pumpAndSettle();
+
+      expect(picks, 0);
+      expect(cubit.state.outputFolderPath, '/docs/MetaStrip');
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
@@ -333,4 +460,13 @@ Future<String> _validFolder(String path) async => path;
 
 Future<String> _invalidFolder(String path) async {
   throw StateError('invalid folder');
+}
+
+class _FakePathProvider extends PathProviderPlatform {
+  _FakePathProvider(this.documentsPath);
+
+  final String? documentsPath;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => documentsPath;
 }

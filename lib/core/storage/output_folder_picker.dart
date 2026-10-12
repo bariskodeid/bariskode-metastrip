@@ -48,3 +48,26 @@ Future<String?> pickOutputFolder({void Function(Object error)? onError}) async {
     return null;
   }
 }
+
+/// Re-derives the iOS output folder when [stored] is a stale container path.
+///
+/// [pickOutputFolder] returns an absolute `<container>/Documents/MetaStrip`
+/// path on iOS, and iOS moves the app container to a new UUID path on app
+/// updates, reinstalls and restores, so a path saved earlier stops existing.
+/// On iOS, when [stored] ends in `/Documents/MetaStrip` and differs from the
+/// current folder, this returns the current `<app Documents>/MetaStrip`
+/// folder (created on demand). Returns `null` on other platforms, for any
+/// other path, when [stored] is already current, or when the current folder
+/// cannot be derived. Never throws.
+///
+/// Android `content://` tree URIs and other plain paths are never touched.
+Future<String?> resolveStaleIosOutputFolder(String? stored) async {
+  if (defaultTargetPlatform != TargetPlatform.iOS) return null;
+  final normalized = stored?.trim();
+  if (normalized == null || !normalized.endsWith('/Documents/MetaStrip')) {
+    return null;
+  }
+  final current = await pickOutputFolder();
+  if (current == null || current == normalized) return null;
+  return current;
+}

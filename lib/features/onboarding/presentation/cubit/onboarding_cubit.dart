@@ -1,6 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:metastrip/core/storage/output_folder_picker.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
 import 'package:metastrip/core/storage/saf_grant_release.dart';
+import 'package:metastrip/core/storage/stored_output_folder_repository.dart';
 import 'package:metastrip/features/onboarding/domain/entities/onboarding_state_entity.dart';
 import 'package:metastrip/features/onboarding/domain/repositories/onboarding_repository.dart';
 
@@ -13,8 +15,11 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
     this._repository, {
     OutputFolderValidator? validator,
     SafGrantReleaser? safGrantReleaser,
+    StaleOutputFolderResolver? staleOutputFolderResolver,
   })  : _validator = validator ?? validateOutputFolder,
         _releaseSafGrant = safGrantReleaser ?? releaseSafGrant,
+        _resolveStaleFolder =
+            staleOutputFolderResolver ?? resolveStaleIosOutputFolder,
         super(OnboardingStateEntity.initial());
 
   static const int lastSlideIndex = 4;
@@ -22,12 +27,19 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
   final OnboardingRepository _repository;
   final OutputFolderValidator _validator;
   final SafGrantReleaser _releaseSafGrant;
+  final StaleOutputFolderResolver _resolveStaleFolder;
 
+  /// Loads the onboarding state and validates the saved output folder.
+  ///
+  /// A completed onboarding whose folder no longer validates is reopened,
+  /// unless the folder is a stale iOS app-container path that can be
+  /// re-derived (see [resolveStaleIosOutputFolder]); the fresh folder is then
+  /// saved and onboarding stays completed.
   Future<void> load() async {
     emit(state.copyWith(status: OnboardingStatus.loading));
     try {
       final isCompleted = await _repository.isOnboardingCompleted();
-      final folderPath = await _repository.getOutputFolderPath();
+      var folderPath = await _repository.getOutputFolderPath();
 
       var completed = isCompleted;
       String? persistenceError;
@@ -36,9 +48,14 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
           if (folderPath == null) throw StateError('missing folder');
           await _validator(folderPath);
         } catch (_) {
-          completed = false;
-          persistenceError =
-              'Choose a valid, writable output folder to finish setup.';
+          final repaired = await _repairStaleFolder(folderPath);
+          if (repaired != null) {
+            folderPath = repaired;
+          } else {
+            completed = false;
+            persistenceError =
+                'Choose a valid, writable output folder to finish setup.';
+          }
         }
       }
 
@@ -65,6 +82,31 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
       }
     } catch (_) {
       emit(state.copyWith(status: OnboardingStatus.failure));
+    }
+  }
+
+  /// Re-derives, validates and saves a stale [stored] folder, or returns null.
+  Future<String?> _repairStaleFolder(String? stored) async {
+    try {
+      final fresh = await _resolveStaleFolder(stored);
+      if (fresh == null) return null;
+      await _validator(fresh);
+      await _repository.saveOutputFolderPath(fresh);
+      return fresh;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Whether the current output folder is set and passes validation.
+  Future<bool> hasValidOutputFolder() async {
+    final path = state.outputFolderPath;
+    if (path == null) return false;
+    try {
+      await _validator(path);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

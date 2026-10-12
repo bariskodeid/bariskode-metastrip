@@ -52,6 +52,62 @@ void main() {
     expect(await Directory('${temp.path}/MetaStrip').exists(), isTrue);
   });
 
+  group('resolveStaleIosOutputFolder', () {
+    late Directory temp;
+
+    setUp(() async {
+      temp = await Directory.systemTemp.createTemp('metastrip_ios_stale_');
+      final previous = PathProviderPlatform.instance;
+      PathProviderPlatform.instance =
+          _FakePathProvider('${temp.path}/new-uuid/Documents');
+      addTearDown(() => PathProviderPlatform.instance = previous);
+      addTearDown(() => temp.delete(recursive: true));
+    });
+
+    test('iOS re-derives a stale container Documents/MetaStrip path', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+      final result = await resolveStaleIosOutputFolder(
+        '${temp.path}/old-uuid/Documents/MetaStrip',
+      );
+
+      expect(result, '${temp.path}/new-uuid/Documents/MetaStrip');
+      expect(await Directory(result!).exists(), isTrue);
+    });
+
+    test('iOS leaves the current folder and unrelated paths alone', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+      expect(
+        await resolveStaleIosOutputFolder(
+          '${temp.path}/new-uuid/Documents/MetaStrip',
+        ),
+        isNull,
+      );
+      expect(await resolveStaleIosOutputFolder('/somewhere/else'), isNull);
+      expect(await resolveStaleIosOutputFolder(null), isNull);
+    });
+
+    test('other platforms never re-derive', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      expect(
+        await resolveStaleIosOutputFolder('/old-uuid/Documents/MetaStrip'),
+        isNull,
+      );
+    });
+
+    test('iOS path provider failure returns null', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      PathProviderPlatform.instance = _FakePathProvider(null);
+
+      expect(
+        await resolveStaleIosOutputFolder('/old-uuid/Documents/MetaStrip'),
+        isNull,
+      );
+    });
+  });
+
   test('iOS pickOutputFolder reports path provider failures', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     final previous = PathProviderPlatform.instance;
