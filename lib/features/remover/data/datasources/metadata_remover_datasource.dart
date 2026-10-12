@@ -1693,7 +1693,7 @@ Uint8List _stripJpegBytes(Uint8List bytes) {
 /// two-byte length field) is metadata that a clean copy must not carry.
 ///
 /// APP0 (JFIF), APP14 with an `Adobe` signature (colour transform) and APP2
-/// with an `ICC_PROFILE ` signature are kept because dropping them changes
+/// with an `ICC_PROFILE\0` signature are kept because dropping them changes
 /// how the image renders. Other APP1-APP15 and COM segments are dropped.
 bool _shouldDropJpegSegment(int marker, Uint8List payload) {
   bool startsWith(List<int> prefix) {
