@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
@@ -60,6 +62,29 @@ class _FakeOutputFolderRepository implements OutputFolderRepository {
   Future<String> getValidOutputFolder() async {
     if (path == null) throw StateError('invalid output folder');
     return path!;
+  }
+}
+
+/// Records each call, then blocks until [gate] completes.
+class _GatedRemoverRepository implements RemoverRepository {
+  final List<String> calls = [];
+  final Completer<void> gate = Completer<void>();
+  final Completer<void> firstCall = Completer<void>();
+
+  @override
+  Future<ProcessingResultEntity> stripFile(
+    String path, {
+    required String outputDirectory,
+    required StripPolicy policy,
+  }) async {
+    calls.add(path);
+    if (!firstCall.isCompleted) firstCall.complete();
+    await gate.future;
+    return ProcessingResultEntity.success(
+      inputPath: path,
+      outputPath: '$path.clean',
+      bytesWritten: 42,
+    );
   }
 }
 
@@ -583,6 +608,117 @@ void main() {
       expect(state.policiesByPath, isEmpty);
       bloc.close();
     });
+  });
+
+  group('RemoverBloc batch concurrency', () {
+    late _FakeRemoverRepository repo;
+    late _GatedRemoverRepository gatedRepo;
+
+    setUp(() {
+      repo = _FakeRemoverRepository();
+      gatedRepo = _GatedRemoverRepository();
+    });
+
+    Matcher hasStatus(RemoverStatus status) =>
+        isA<RemoverState>().having((s) => s.status, 'status', status);
+
+    blocTest<RemoverBloc, RemoverState>(
+      'second RemoverProcessingStarted while processing is ignored',
+      build: () => RemoverBloc(
+        validateInputs: false,
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      ),
+      act: (bloc) async {
+        bloc
+          ..add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]))
+          ..add(const RemoverProcessingStarted())
+          ..add(const RemoverProcessingStarted());
+        await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
+      },
+      wait: const Duration(milliseconds: 50),
+      verify: (bloc) {
+        expect(repo.processedPaths, ['/tmp/a.jpg', '/tmp/b.png']);
+        expect(bloc.state.results, hasLength(2));
+      },
+    );
+
+    blocTest<RemoverBloc, RemoverState>(
+      'clear during processing stops the batch and keeps the cleared state',
+      build: () => RemoverBloc(
+        validateInputs: false,
+        repository: gatedRepo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      ),
+      act: (bloc) async {
+        bloc
+          ..add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]))
+          ..add(const RemoverProcessingStarted());
+        await gatedRepo.firstCall.future;
+        bloc.add(const RemoverClearRequested());
+        await _waitFor(bloc, (s) => s.files.isEmpty);
+        gatedRepo.gate.complete();
+      },
+      wait: const Duration(milliseconds: 50),
+      verify: (bloc) {
+        expect(bloc.state, RemoverState.initial());
+        expect(gatedRepo.calls, ['/tmp/a.jpg']);
+      },
+    );
+
+    blocTest<RemoverBloc, RemoverState>(
+      'remove during processing stops the batch and ends it as cancelled',
+      build: () => RemoverBloc(
+        validateInputs: false,
+        repository: gatedRepo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      ),
+      act: (bloc) async {
+        bloc
+          ..add(RemoverFilesAdded([_file('a.jpg'), _file('b.png')]))
+          ..add(const RemoverProcessingStarted());
+        await gatedRepo.firstCall.future;
+        bloc.add(const RemoverFileRemoved('/tmp/b.png'));
+        await _waitFor(bloc, (s) => s.files.length == 1);
+        gatedRepo.gate.complete();
+      },
+      wait: const Duration(milliseconds: 50),
+      verify: (bloc) {
+        expect(bloc.state.status, RemoverStatus.cancelled);
+        expect(bloc.state.files.map((f) => f.path), ['/tmp/a.jpg']);
+        expect(bloc.state.progress, isNull);
+        expect(gatedRepo.calls, ['/tmp/a.jpg']);
+      },
+    );
+
+    blocTest<RemoverBloc, RemoverState>(
+      'retry with still-invalid folder emits processing before failure',
+      build: () => RemoverBloc(
+        validateInputs: false,
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(path: null),
+        initialState: RemoverState(
+          files: [_file('a.jpg')],
+          status: RemoverStatus.idle,
+          policiesByPath: const {
+            '/tmp/a.jpg': StripPolicy.supportedCleanup(),
+          },
+        ),
+      ),
+      act: (bloc) async {
+        bloc.add(const RemoverProcessingStarted());
+        await _waitFor(bloc, (s) => s.status == RemoverStatus.failure);
+        bloc.add(const RemoverProcessingStarted());
+      },
+      wait: const Duration(milliseconds: 50),
+      expect: () => [
+        hasStatus(RemoverStatus.processing),
+        hasStatus(RemoverStatus.failure),
+        hasStatus(RemoverStatus.processing),
+        hasStatus(RemoverStatus.failure),
+      ],
+      verify: (_) => expect(repo.processedPaths, isEmpty),
+    );
   });
 
   group('RemoverBloc input size validation', () {

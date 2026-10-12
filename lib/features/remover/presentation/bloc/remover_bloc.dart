@@ -41,6 +41,10 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
   final bool _validateInputs;
   bool _cancelRequested = false;
 
+  /// Identifies the current batch. Clear, reset and a mid-batch remove bump it
+  /// so a running loop stops emitting onto the state they replaced.
+  int _batchGeneration = 0;
+
   /// Interrupts processing after the current file completes.
   /// Called directly from the UI to bypass the event queue.
   void requestCancel() => _cancelRequested = true;
@@ -89,20 +93,32 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
   void _onFileRemoved(RemoverFileRemoved event, Emitter<RemoverState> emit) {
     final policiesByPath = Map<String, StripPolicy>.of(state.policiesByPath)
       ..remove(event.path);
+    final interruptsBatch = state.status == RemoverStatus.processing;
+    if (interruptsBatch) _stopBatch();
     emit(
       state.copyWith(
         files: state.files.where((f) => f.path != event.path).toList(),
         policiesByPath: policiesByPath,
+        // The stopped loop no longer emits, so end the batch here rather than
+        // leaving the queue stuck in `processing`.
+        status: interruptsBatch ? RemoverStatus.cancelled : null,
+        clearProgress: interruptsBatch,
         clearError: true,
       ),
     );
+  }
+
+  /// Stops any running batch: it exits at its next check and emits nothing.
+  void _stopBatch() {
+    _batchGeneration++;
+    _cancelRequested = true;
   }
 
   void _onClearRequested(
     RemoverClearRequested event,
     Emitter<RemoverState> emit,
   ) {
-    _cancelRequested = false;
+    _stopBatch();
     emit(RemoverState.initial());
   }
 
@@ -110,7 +126,13 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
     RemoverProcessingStarted event,
     Emitter<RemoverState> emit,
   ) async {
+    // Handlers run concurrently, so a second start must not begin a batch.
+    if (state.status == RemoverStatus.processing) return;
     if (state.files.isEmpty) return;
+    final generation = ++_batchGeneration;
+    bool isCurrent() => generation == _batchGeneration && !isClosed;
+    // Emit before any failure so a repeated failure is a new transition.
+    emit(state.copyWith(status: RemoverStatus.processing, clearError: true));
     final supportedFiles = state.files
         .where(
             (file) => FormatRegistry.standard.supportsRemoval(file.extension))
@@ -131,6 +153,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
     try {
       outputDirectory = await _outputFolderRepository.getValidOutputFolder();
     } catch (_) {
+      if (!isCurrent()) return;
       emit(
         state.copyWith(
           status: RemoverStatus.failure,
@@ -140,6 +163,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       );
       return;
     }
+    if (!isCurrent()) return;
 
     emit(
       state.copyWith(
@@ -156,7 +180,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
 
     final results = <ProcessingResultEntity>[];
     for (var i = 0; i < supportedFiles.length; i++) {
-      if (_cancelRequested) break;
+      if (_cancelRequested || !isCurrent()) break;
       final file = supportedFiles[i];
       emit(
         state.copyWith(
@@ -169,6 +193,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
       );
       final validationError =
           _validateInputs ? await _validateInput(file) : null;
+      if (!isCurrent()) return;
       final policy = state.policiesByPath[file.path];
       final policyError = policy == null
           ? 'Cleanup policy is missing for this file'
@@ -188,9 +213,11 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
         outputDirectory: outputDirectory,
         policy: policy!,
       );
+      if (!isCurrent()) return;
       results.add(result);
       emit(state.copyWith(results: [...results]));
     }
+    if (!isCurrent()) return;
 
     emit(
       state.copyWith(
@@ -256,7 +283,7 @@ class RemoverBloc extends Bloc<RemoverEvent, RemoverState> {
     RemoverResetRequested event,
     Emitter<RemoverState> emit,
   ) {
-    _cancelRequested = false;
+    _stopBatch();
     emit(RemoverState.initial());
   }
 }

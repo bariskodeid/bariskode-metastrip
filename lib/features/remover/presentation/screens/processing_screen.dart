@@ -55,30 +55,38 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
         }
       },
       builder: (context, state) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('PROCESSING'),
-            automaticallyImplyLeading: false,
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _ProgressCard(state: state),
-                const SizedBox(height: AppSpacing.md),
-                Text('LOG', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Expanded(child: _ResultLog(results: state.results)),
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: state.status == RemoverStatus.processing
-                      ? () => context.read<RemoverBloc>().requestCancel()
-                      : null,
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('CANCEL'),
-                ),
-              ],
+        // System back must not leave the batch running unseen: it requests
+        // cancel, and the listener pops once the bloc reports `cancelled`.
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) context.read<RemoverBloc>().requestCancel();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('PROCESSING'),
+              automaticallyImplyLeading: false,
+            ),
+            body: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _ProgressCard(state: state),
+                  const SizedBox(height: AppSpacing.md),
+                  Text('LOG', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: AppSpacing.sm),
+                  Expanded(child: _ResultLog(results: state.results)),
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton.icon(
+                    onPressed: state.status == RemoverStatus.processing
+                        ? () => context.read<RemoverBloc>().requestCancel()
+                        : null,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('CANCEL'),
+                  ),
+                ],
+              ),
             ),
           ),
         );
