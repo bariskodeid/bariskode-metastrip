@@ -9,10 +9,6 @@
 ## MetaStrip: no code-generated reflection models in use.
 ## Widened keep removed; obfuscation now covers app classes.
 
-## Firebase
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
-
 ## Play Core (required for FlutterPlayStoreSplitApplication)
 -dontwarn com.google.android.play.core.**
 -keep class com.google.android.play.core.** { *; }
