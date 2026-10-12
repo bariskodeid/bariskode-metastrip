@@ -14,7 +14,7 @@ MetaStrip adalah aplikasi mobile Flutter untuk melihat metadata dari format yang
 │  METASTRIP  v1.0.0                      │
 │  ─────────────────────────────────────  │
 │  Platform  : Android 7.0+ · iOS 13.0+  │
-│  Framework : Flutter 3.22 · Dart 3.4   │
+│  Framework : Flutter 3.35+ · Dart 3.9+ │
 │  License   : MIT                        │
 │  Privacy   : 100% Offline · No Servers  │
 └─────────────────────────────────────────┘
@@ -122,11 +122,11 @@ Lihat [DESIGN.md](./DESIGN.md) untuk dokumentasi design system lengkap.
 |----------|---------|
 | Android  | 7.0 Nougat (API 24) |
 | iOS      | iOS 13.0 |
-| Flutter  | 3.22.x |
-| Dart     | 3.4.x |
+| Flutter  | 3.35+ (CI pins 3.41.7) |
+| Dart     | 3.9+ |
 
 ### Development Tools
-- Flutter SDK 3.22+
+- Flutter SDK 3.35+ (CI pins 3.41.7)
 - Android Studio / VS Code dengan Flutter extension
 - Xcode 15+ (untuk iOS build)
 - Git

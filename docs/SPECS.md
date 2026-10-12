@@ -398,8 +398,8 @@ Persistent app configuration saat ini disimpan di `SharedPreferences`. SQLite hi
 |----------|------------|
 | Android | API 24 (Android 7.0 Nougat) |
 | iOS | iOS 13.0 |
-| Flutter | 3.22.x atau lebih baru |
-| Dart | 3.4.x atau lebih baru |
+| Flutter | 3.35.x atau lebih baru (CI 3.41.7) |
+| Dart | 3.9.x atau lebih baru |
 | Storage | Minimal 100MB free untuk processing |
 
 ---

@@ -1,7 +1,7 @@
 # IMPLEMENTATION_PLAN.md — Technical Implementation Plan
 ## MetaStrip: Metadata Viewer & Remover
 **Version:** 1.0.0  
-**Stack:** Flutter 3.22+ / Dart 3.4+  
+**Stack:** Flutter 3.35+ (CI pins 3.41.7) / Dart 3.9+  
 **Last Updated:** 2026-08-10
 
 ---
@@ -190,8 +190,8 @@ description: Metadata Viewer & Remover — strip the invisible, own your files.
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.4.0 <4.0.0'
-  flutter: '>=3.22.0'
+  sdk: '>=3.9.0 <4.0.0'
+  flutter: '>=3.35.0'
 
 dependencies:
   flutter:
