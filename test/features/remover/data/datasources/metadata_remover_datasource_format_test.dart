@@ -247,7 +247,13 @@ void main() {
 
     await expectLater(
       datasource.stripMetadata(input.path, outputDirectory: dir.path),
-      throwsA(isA<FormatException>()),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          'Output validation failed; unverified copy may remain',
+        ),
+      ),
     );
     expect(
       await File('${dir.path}${Platform.pathSeparator}archive_clean.zip')

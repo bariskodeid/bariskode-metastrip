@@ -102,7 +102,13 @@ void main() {
           outputDirectory: directory.path,
           policy: const StripPolicy.supportedCleanup(),
         ),
-        throwsA(isA<FormatException>()),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            'Output validation failed',
+          ),
+        ),
       );
       expect(
         directory.listSync().where((entity) => entity.path.contains('_clean')),
@@ -131,7 +137,7 @@ void main() {
           isA<FormatException>().having(
             (error) => error.message,
             'message',
-            'Output validation failed',
+            'Output validation failed; unverified copy may remain',
           ),
         ),
       );

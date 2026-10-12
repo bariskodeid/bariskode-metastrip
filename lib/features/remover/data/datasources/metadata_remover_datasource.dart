@@ -1481,14 +1481,19 @@ class MetadataRemoverDatasource {
   /// replacement/path races in the trusted output directory, while the small
   /// final stat-to-delete window remains an unavoidable cross-platform TOCTOU
   /// limitation. Cleanup must never hide the original validation failure.
-  Future<void> _deleteIfSameBytes(
+  ///
+  /// Returns true when no file remains at [file]'s path (deleted here or
+  /// already gone), and false when deletion was declined or failed, so the
+  /// caller can tell the user an unverified copy may remain.
+  Future<bool> _deleteIfSameBytes(
     File file,
     Uint8List expected,
     FileStat installedStat,
   ) async {
     try {
       final beforeRead = await file.stat();
-      if (!_sameStatAttributes(installedStat, beforeRead)) return;
+      if (beforeRead.type == FileSystemEntityType.notFound) return true;
+      if (!_sameStatAttributes(installedStat, beforeRead)) return false;
       final handle = await file.open();
       late final Uint8List actual;
       try {
@@ -1498,13 +1503,16 @@ class MetadataRemoverDatasource {
       } finally {
         await handle.close();
       }
-      if (!_sameBytes(actual, expected)) return;
+      if (!_sameBytes(actual, expected)) return false;
       final immediatelyBeforeDelete = await file.stat();
-      if (_sameStatAttributes(installedStat, immediatelyBeforeDelete)) {
-        await file.delete();
+      if (!_sameStatAttributes(installedStat, immediatelyBeforeDelete)) {
+        return false;
       }
+      await file.delete();
+      return true;
     } on Object {
       // Cleanup is defensive and must not hide the validation failure.
+      return false;
     }
   }
 
@@ -1513,8 +1521,9 @@ class MetadataRemoverDatasource {
   /// [body] receives the stat captured right after installation. Any failure
   /// removes the copy only if it still holds [installedBytes] (see
   /// [_deleteIfSameBytes]) and surfaces a uniform validation error. When the
-  /// installed file cannot even be stat'ed, no safe cleanup is possible and
-  /// the message says the unverified copy may remain.
+  /// installed file cannot even be stat'ed, or the cleanup declined to delete
+  /// a file that no longer matches, the message says the unverified copy may
+  /// remain.
   Future<void> _verifyInstalledOutput(
     File output,
     Uint8List installedBytes,
@@ -1530,7 +1539,16 @@ class MetadataRemoverDatasource {
           'Output validation failed; unverified copy may remain',
         );
       }
-      await _deleteIfSameBytes(output, installedBytes, installedStat);
+      final removed = await _deleteIfSameBytes(
+        output,
+        installedBytes,
+        installedStat,
+      );
+      if (!removed) {
+        throw const FormatException(
+          'Output validation failed; unverified copy may remain',
+        );
+      }
       throw const FormatException('Output validation failed');
     }
   }
