@@ -49,6 +49,45 @@ void main() {
       expect(byLabel['Created']?.id, MetadataFieldId.odfCreationDate);
     });
 
+    test('viewer prefers root meta.xml over Object 1/meta.xml listed first',
+        () async {
+      String meta(String title) => '<office:document-meta '
+          'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+          'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+          '<office:meta><dc:title>$title</dc:title></office:meta>'
+          '</office:document-meta>';
+      final bytes = _zipBytes([
+        ArchiveFile.string('Object 1/meta.xml', meta('Chart title')),
+        ArchiveFile.string('meta.xml', meta('Document title')),
+      ]);
+
+      final fields = await extractOdf(bytes);
+      final title = fields.singleWhere((field) => field.label == 'Title');
+
+      expect(title.value, 'Document title');
+      expect(title.id, MetadataFieldId.odfTitle);
+    });
+
+    test('nested dc:title below a non-root element gets no removable id',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'meta.xml',
+          '<office:document-meta '
+              'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<office:meta><x:wrap xmlns:x="urn:x">'
+              '<dc:title>Nested</dc:title></x:wrap></office:meta>'
+              '</office:document-meta>',
+        ),
+      ]);
+
+      final fields = await extractOdf(bytes);
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(byLabel['Title']?.id, isNull);
+    });
+
     test('keeps visible value but withholds ID for a wrong namespace',
         () async {
       final bytes = _zipBytes([

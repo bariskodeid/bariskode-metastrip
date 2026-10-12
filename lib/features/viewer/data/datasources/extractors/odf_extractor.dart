@@ -33,7 +33,8 @@ const Set<String> _privacyLabels = {'Author', 'Initial Creator'};
 
 /// Extracts OpenDocument (ODF) metadata from raw [bytes].
 ///
-/// Reads the first `meta.xml` suffix entry of the zip container using XML parsing and
+/// Reads the root `meta.xml` entry of the zip container (or the first
+/// `meta.xml` suffix entry when no root entry exists) using XML parsing and
 /// namespace-aware field matching. Returns a single
 /// status field when the bytes are not a valid zip, when `meta.xml` is
 /// missing, or when no recognizable metadata is found; this function never
@@ -177,16 +178,23 @@ bool _isCanonicalMetaChild(XmlElement element) {
       root.parent is XmlDocument;
 }
 
-/// Returns the first entry whose name matches [name] in [archive].
+/// Returns the entry named [name] in [archive].
 ///
-/// Names use the viewer's established exact-or-suffix lookup contract. The
-/// selective remover intentionally uses a narrower canonical-root contract.
+/// The exact root path wins regardless of archive order, so an embedded
+/// `Object 1/meta.xml` listed first never shadows the document's own
+/// `meta.xml`. Only when no root entry exists does the viewer fall back to the
+/// first `/`-suffixed match. The selective remover uses the narrower
+/// canonical-root contract.
 ArchiveFile? _findEntry(Archive archive, String name) {
+  ArchiveFile? suffixMatch;
   for (final file in archive.files) {
     final entryName = normalizeEntryPath(file.name);
-    if (entryName == name || entryName.endsWith('/$name')) return file;
+    if (entryName == name) return file;
+    if (suffixMatch == null && entryName.endsWith('/$name')) {
+      suffixMatch = file;
+    }
   }
-  return null;
+  return suffixMatch;
 }
 
 /// Decodes [content] as UTF-8 text, tolerating malformed sequences.

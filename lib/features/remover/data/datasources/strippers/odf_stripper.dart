@@ -13,30 +13,26 @@ const Set<String> _odfMetadataPaths = {'meta.xml'};
 
 /// Strips OpenDocument (ODF) metadata from [bytes] (odt, ods, odp).
 ///
-/// Removes the `meta.xml` entry by re-encoding the zip container without it;
-/// every other entry (content.xml, styles.xml, media, ...) keeps its content
-/// verbatim. When the document has no `meta.xml` entry the original [bytes]
+/// Removes the `meta.xml` entry by re-encoding the zip container without it,
+/// and drops the matching `manifest:file-entry` records from
+/// `META-INF/manifest.xml`; every other entry (content.xml, styles.xml,
+/// media, ...) keeps its content verbatim. When the document has no `meta.xml`
+/// entry the original [bytes]
 /// are returned unchanged (the same instance, not re-encoded).
 ///
 /// Throws [FormatException] when [bytes] is not a valid zip archive, when the
 /// archive is too large to repack, or when stripping would leave no entries.
 Uint8List stripOdf(Uint8List bytes, {String extension = 'odt'}) {
-  final bool hasMeta;
+  final Set<String> removedPaths;
+  Uint8List? manifestBytes;
   try {
     final preflight = preflightZip(bytes);
-    final mimeDescriptor = preflight.where((entry) => entry.name == 'mimetype');
     final contentDescriptors =
         preflight.where((entry) => entry.name == 'content.xml');
-    if (preflight.isEmpty ||
-        mimeDescriptor.length != 1 ||
-        contentDescriptors.length != 1 ||
-        mimeDescriptor.single.localHeaderOffset != 0 ||
-        mimeDescriptor.single.localExtraLength != 0 ||
-        mimeDescriptor.single.compressionMethod != 0 ||
-        mimeDescriptor.single.uncompressedSize > 256 ||
-        mimeDescriptor.single.compressedSize > 256) {
+    if (preflight.isEmpty || contentDescriptors.length != 1) {
       throw const FormatException('Invalid OpenDocument package');
     }
+    requireStoredLeadingMimetype(preflight);
     final archive = decodeGuardedZip(bytes);
     final mimeEntry = archive.findFile('mimetype');
     final expectedMime = switch (extension) {
@@ -55,22 +51,84 @@ Uint8List stripOdf(Uint8List bytes, {String extension = 'odt'}) {
     if (mime != expectedMime || archive.findFile('content.xml') == null) {
       throw const FormatException('Invalid OpenDocument package');
     }
-    final metaEntries = archive.files.where((entry) {
-      final name = normalizeEntryPath(entry.name);
-      return name == 'meta.xml' || name.endsWith('/meta.xml');
-    });
-    hasMeta = metaEntries.isNotEmpty;
+    removedPaths = {
+      for (final entry in archive.files)
+        if (_isMetaPath(normalizeEntryPath(entry.name)))
+          normalizeEntryPath(entry.name),
+    };
+    final manifestEntry = archive.findFile(_manifestPath);
+    if (removedPaths.isNotEmpty && manifestEntry != null) {
+      final manifest = decodeZipEntrySafely(
+        manifestEntry,
+        maxBytes: maxPackageDescriptorSize,
+      );
+      if (manifest == null) {
+        throw const FormatException('Invalid OpenDocument package');
+      }
+      manifestBytes = _removeManifestEntries(manifest, removedPaths);
+    }
   } on FormatException {
     throw const FormatException('Invalid office document');
   }
-  if (!hasMeta) {
+  if (removedPaths.isEmpty) {
     return bytes;
   }
   return repackZipWithoutEntries(
     bytes,
     skipPaths: _odfMetadataPaths,
+    replacements: {
+      if (manifestBytes != null) _manifestPath: manifestBytes,
+    },
     storedFirstPath: 'mimetype',
   );
+}
+
+const String _manifestPath = 'META-INF/manifest.xml';
+const String _manifestNamespace =
+    'urn:oasis:names:tc:opendocument:xmlns:manifest:1.0';
+
+bool _isMetaPath(String name) =>
+    name == 'meta.xml' || name.endsWith('/meta.xml');
+
+/// Drops `manifest:file-entry` children of the manifest root whose
+/// `manifest:full-path` names one of [removedPaths]. Returns `null` when the
+/// manifest lists none of them, so the original bytes are kept.
+Uint8List? _removeManifestEntries(
+  Uint8List content,
+  Set<String> removedPaths,
+) {
+  final XmlDocument document;
+  try {
+    final xml = utf8.decode(content, allowMalformed: false);
+    if (xml.toUpperCase().contains('<!DOCTYPE')) {
+      throw const FormatException('Invalid ODF manifest');
+    }
+    document = XmlDocument.parse(xml);
+  } on FormatException {
+    rethrow;
+  } on Object {
+    throw const FormatException('Invalid ODF manifest');
+  }
+  final root = document.rootElement;
+  if (root.name.local != 'manifest' ||
+      root.name.namespaceUri != _manifestNamespace) {
+    throw const FormatException('Invalid ODF manifest');
+  }
+  final matches = root.children.whereType<XmlElement>().where((element) {
+    if (element.name.local != 'file-entry' ||
+        element.name.namespaceUri != _manifestNamespace) {
+      return false;
+    }
+    final fullPath =
+        element.getAttribute('full-path', namespace: _manifestNamespace);
+    return fullPath != null &&
+        removedPaths.contains(normalizeEntryPath(fullPath));
+  }).toList();
+  if (matches.isEmpty) return null;
+  for (final element in matches) {
+    element.remove();
+  }
+  return Uint8List.fromList(utf8.encode(document.toXmlString()));
 }
 
 /// Facts returned by bounded ODF property mutation.
@@ -145,19 +203,12 @@ _ValidatedOdfPackage _validateOdfPackage(Uint8List bytes, String extension) {
   try {
     final preflight = preflightZip(bytes);
     _validateInventoryBounds(preflight);
-    final mime = preflight.where((entry) => entry.name == 'mimetype').toList();
     final content =
         preflight.where((entry) => entry.name == 'content.xml').toList();
-    if (preflight.isEmpty ||
-        mime.length != 1 ||
-        content.length != 1 ||
-        mime.single.localHeaderOffset != 0 ||
-        mime.single.localExtraLength != 0 ||
-        mime.single.compressionMethod != 0 ||
-        mime.single.uncompressedSize > 256 ||
-        mime.single.compressedSize > 256) {
+    if (preflight.isEmpty || content.length != 1) {
       throw const FormatException('Invalid OpenDocument package');
     }
+    requireStoredLeadingMimetype(preflight);
     // ZipDecoder creates lazy entries. Only the required members below are
     // decoded; unrelated entries remain represented by preflight metadata.
     final archive = decodeGuardedZip(bytes);

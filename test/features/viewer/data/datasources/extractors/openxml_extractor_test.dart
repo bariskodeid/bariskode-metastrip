@@ -211,6 +211,72 @@ void main() {
       final byLabel = {for (final field in fields) field.label: field};
       expect(byLabel['Author']?.value, 'Jane Doe');
     });
+    test('viewer reads core properties from a .psmdcp part referenced by '
+        '_rels/.rels', () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          '_rels/.rels',
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/'
+              '2006/relationships">'
+              '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
+              'package/2006/relationships/metadata/core-properties" '
+              'Target="package/services/metadata/core-properties/a.psmdcp"/>'
+              '</Relationships>',
+        ),
+        ArchiveFile.string(
+          'package/services/metadata/core-properties/a.psmdcp',
+          '<cp:coreProperties '
+              'xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+              'metadata/core-properties" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<dc:creator>Psmdcp Author</dc:creator>'
+              '</cp:coreProperties>',
+        ),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(byLabel['Author']?.value, 'Psmdcp Author');
+      expect(byLabel['Author']?.id, MetadataFieldId.openXmlAuthor);
+    });
+
+    test('prefers root docProps/core.xml over a nested copy listed first',
+        () async {
+      String core(String author) => '<cp:coreProperties '
+          'xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+          'metadata/core-properties" '
+          'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+          '<dc:creator>$author</dc:creator></cp:coreProperties>';
+      final bytes = _zipBytes([
+        ArchiveFile.string('embedded/docProps/core.xml', core('Embedded')),
+        ArchiveFile.string('docProps/core.xml', core('Root')),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+
+      expect(fields.single.value, 'Root');
+    });
+
+    test('nested dc:creator below a non-root element gets no removable id',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'docProps/core.xml',
+          '<cp:coreProperties '
+              'xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+              'metadata/core-properties" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<cp:wrap><dc:creator>Nested</dc:creator></cp:wrap>'
+              '</cp:coreProperties>',
+        ),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(byLabel['Author'], isNull);
+    });
   });
 }
 

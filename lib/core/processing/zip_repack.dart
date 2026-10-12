@@ -684,6 +684,31 @@ bool zipArchiveContainsEntry(Uint8List bytes, String entryPath) {
   }
 }
 
+/// Requires exactly one `mimetype` entry that is the first record in the file
+/// (local header offset 0), STORED, without a local extra field, and at most
+/// 256 bytes. This is the shared ODF and EPUB container rule.
+///
+/// Throws [FormatException] when any condition fails; returns the entry.
+ZipPreflightEntry requireStoredLeadingMimetype(
+  List<ZipPreflightEntry> entries,
+) {
+  final matches = entries.where((entry) => entry.name == 'mimetype').toList();
+  if (matches.length != 1) {
+    throw const FormatException('Package mimetype entry is missing');
+  }
+  final mime = matches.single;
+  if (mime.localHeaderOffset != 0 ||
+      mime.localExtraLength != 0 ||
+      mime.compressionMethod != 0 ||
+      mime.uncompressedSize > 256 ||
+      mime.compressedSize > 256) {
+    throw const FormatException(
+      'Package mimetype must be the first entry, stored, with no extra field',
+    );
+  }
+  return mime;
+}
+
 /// Applies the in-memory repacker's payload budget before decompression.
 void _validateRepackPolicy(List<ZipPreflightEntry> entries) {
   var totalDeclaredSize = 0;

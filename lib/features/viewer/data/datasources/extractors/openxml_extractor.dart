@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
+import 'package:metastrip/core/processing/openxml_package_paths.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/remover/domain/entities/openxml_property_descriptor.dart';
@@ -48,9 +49,10 @@ const Set<String> _privacyLabels = {'Author', 'Last Modified By', 'Company'};
 /// Extracts Office Open XML metadata from raw [bytes] for [extension].
 ///
 /// [extension] must be `docx`, `xlsx` or `pptx`; presentation-only properties
-/// are additionally surfaced for `pptx`. Reads the `docProps/core.xml` and
-/// `docProps/app.xml` entries of the zip container using exact namespace and
-/// local-name matching. Returns a single
+/// are additionally surfaced for `pptx`. Reads the core and extended property
+/// parts named by `_rels/.rels` (falling back to the conventional
+/// `docProps/core.xml` and `docProps/app.xml`) using exact namespace and
+/// local-name matching of direct children of the root element. Returns a single
 /// status field when the bytes are not a valid zip, when neither property
 /// entry exists, or when no recognizable properties are found; this function
 /// never throws.
@@ -60,8 +62,9 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
 }) async {
   try {
     final archive = decodeGuardedZip(bytes);
-    final core = _findEntry(archive, 'docProps/core.xml');
-    final app = _findEntry(archive, 'docProps/app.xml');
+    final related = _relatedPropertyPaths(archive);
+    final core = _resolvePart(archive, related['core'], 'docProps/core.xml');
+    final app = _resolvePart(archive, related['app'], 'docProps/app.xml');
     if (core == null && app == null) {
       return [
         statusField(
@@ -196,7 +199,8 @@ _TagValue? _readTagValue(
   try {
     final document = XmlDocument.parse(xml);
     String? nonRemovableValue;
-    for (final element in document.descendants.whereType<XmlElement>()) {
+    final children = document.rootElement.children.whereType<XmlElement>();
+    for (final element in children) {
       if (element.name.local != tag) continue;
       final value = element.innerText.trim();
       if (value.isEmpty) continue;
@@ -253,17 +257,86 @@ String _decodeDecimalRef(Match match) {
   return code == null ? match.group(0)! : String.fromCharCode(code);
 }
 
-/// Returns the first entry whose name matches [name] in [archive].
+/// Maps `core` and `app` to the package path their `_rels/.rels` relationship
+/// targets, using the same target rules as the remover.
 ///
-/// Names are compared through [normalizeEntryPath] and by `/`-suffixed suffix,
-/// the same rule the remover strippers apply, so metadata stored at a non-root
-/// location such as `a/docProps/core.xml` is found here and stripped there.
+/// Unreadable, ambiguous or unresolvable relationships are skipped, so the
+/// caller falls back to the conventional location; this never throws.
+Map<String, String> _relatedPropertyPaths(Archive archive) {
+  final result = <String, String>{};
+  try {
+    final rels = _exactEntries(archive, '_rels/.rels');
+    if (rels.length != 1) return result;
+    final content = decodeArchiveFileSafely(
+      rels.single,
+      maxBytes: maxPackageDescriptorSize,
+    );
+    if (content == null) return result;
+    final xml = utf8.decode(content, allowMalformed: true);
+    if (xml.toUpperCase().contains('<!DOCTYPE')) return result;
+    final root = XmlDocument.parse(xml).rootElement;
+    if (root.name.namespaceUri != openXmlRelationshipsNamespace) return result;
+    final seen = <String>{};
+    for (final relationship in root.children.whereType<XmlElement>()) {
+      if (relationship.name.local != 'Relationship') continue;
+      final kind =
+          openXmlPropertyRelationshipKinds[relationship.getAttribute('Type')];
+      if (kind != 'core' && kind != 'extended') continue;
+      final part = kind == 'extended' ? 'app' : 'core';
+      if (!seen.add(part)) {
+        result.remove(part);
+        continue;
+      }
+      if (relationship.getAttribute('TargetMode')?.toLowerCase() ==
+          'external') {
+        continue;
+      }
+      final target = relationship.getAttribute('Target');
+      final path = target == null ? null : resolveOpenXmlPackageTarget(target);
+      if (path != null) result[part] = path;
+    }
+  } on Object {
+    return {};
+  }
+  return result;
+}
+
+/// Returns the part at [relatedPath] when exactly one entry has it, otherwise
+/// the conventional [fallbackName] entry.
+ArchiveFile? _resolvePart(
+  Archive archive,
+  String? relatedPath,
+  String fallbackName,
+) {
+  if (relatedPath != null) {
+    final related = _exactEntries(archive, relatedPath);
+    if (related.length == 1) return related.single;
+  }
+  return _findEntry(archive, fallbackName);
+}
+
+/// Entries whose normalized name equals [path].
+List<ArchiveFile> _exactEntries(Archive archive, String path) => [
+      for (final file in archive.files)
+        if (normalizeEntryPath(file.name) == path) file,
+    ];
+
+/// Returns the entry named [name] in [archive].
+///
+/// The exact root path wins regardless of archive order; only when no root
+/// entry exists does the viewer fall back to the first `/`-suffixed match, the
+/// same suffix rule the remover applies when stripping, so metadata stored at
+/// a non-root location such as `a/docProps/core.xml` is still shown.
 ArchiveFile? _findEntry(Archive archive, String name) {
+  ArchiveFile? suffixMatch;
   for (final file in archive.files) {
     final entryName = normalizeEntryPath(file.name);
-    if (entryName == name || entryName.endsWith('/$name')) return file;
+    if (entryName == name) return file;
+    if (suffixMatch == null && entryName.endsWith('/$name')) {
+      suffixMatch = file;
+    }
   }
-  return null;
+  return suffixMatch;
 }
 
 /// Decodes [content] as UTF-8 text, tolerating malformed sequences.

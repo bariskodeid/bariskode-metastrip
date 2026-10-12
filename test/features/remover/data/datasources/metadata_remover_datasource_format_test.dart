@@ -355,6 +355,50 @@ void main() {
         StripVerificationOutcome.verified);
   });
 
+  test('EPUB with mimetype not first fails validation', () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_epub_order_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}book.epub');
+    final archive = Archive();
+    archive.addFile(ArchiveFile.string('OEBPS/content.opf', '<package/>'));
+    final mimetype = ArchiveFile.string('mimetype', 'application/epub+zip')
+      ..compress = false;
+    archive.addFile(mimetype);
+    await input.writeAsBytes(ZipEncoder().encode(archive)!);
+
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: const StripPolicy.supportedCleanup(),
+      ),
+      throwsA(isA<FormatException>()),
+    );
+    expect(
+      dir.listSync().whereType<File>().map((f) => f.path),
+      [input.path],
+    );
+  });
+
+  test('EPUB with deflated mimetype fails validation', () async {
+    final dir = await Directory.systemTemp.createTemp('metastrip_epub_defl_');
+    addTearDown(() => dir.delete(recursive: true));
+    final input = File('${dir.path}${Platform.pathSeparator}book.epub');
+    final archive = Archive();
+    archive.addFile(ArchiveFile.string('mimetype', 'application/epub+zip'));
+    archive.addFile(ArchiveFile.string('OEBPS/content.opf', '<package/>'));
+    await input.writeAsBytes(ZipEncoder().encode(archive)!);
+
+    await expectLater(
+      MetadataRemoverDatasource().stripMetadataWithPolicy(
+        input.path,
+        outputDirectory: dir.path,
+        policy: const StripPolicy.supportedCleanup(),
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('EPUB cleanup rejects archives missing the required mimetype entry',
       () async {
     final dir = await Directory.systemTemp.createTemp('metastrip_epub_no_mt_');

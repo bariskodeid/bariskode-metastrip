@@ -1103,6 +1103,13 @@ class MetadataRemoverDatasource {
     if (inputBytes.length > AppConstants.maxRemoverFileSizeBytes) {
       throw const FileSystemException('EPUB too large for remover MVP');
     }
+    try {
+      requireStoredLeadingMimetype(preflightZip(inputBytes));
+    } on FormatException {
+      throw const FormatException(
+        'EPUB mimetype must be the first entry, stored, with no extra field',
+      );
+    }
     final mimetypeBytes = _extractEpubMimetypeBytes(inputBytes);
     if (mimetypeBytes == null) {
       throw const FormatException(
@@ -1118,7 +1125,7 @@ class MetadataRemoverDatasource {
     final outputBytes = await runOnWorker(
       () => rewriteZipMetadata(inputBytes),
     );
-    _validateGeneratedZip(outputBytes);
+    _validateGeneratedEpub(outputBytes);
     final output = await _writeCleanCopy(
       inputPath,
       outputBytes,
@@ -1136,7 +1143,7 @@ class MetadataRemoverDatasource {
         if (!_sameStatAttributes(installedStat, validatedStat)) {
           throw const FormatException('EPUB persisted output changed');
         }
-        _validateGeneratedZip(persisted);
+        _validateGeneratedEpub(persisted);
         if (!_sameBytes(persisted, outputBytes)) {
           throw const FormatException('EPUB persisted output differs');
         }
@@ -1155,6 +1162,11 @@ class MetadataRemoverDatasource {
         outputValidated: !isSafOutput,
       ),
     );
+  }
+
+  void _validateGeneratedEpub(Uint8List bytes) {
+    _validateGeneratedZip(bytes);
+    requireStoredLeadingMimetype(preflightZip(bytes));
   }
 
   Future<MetadataRemovalOutput> _stripArchiveWithReport(

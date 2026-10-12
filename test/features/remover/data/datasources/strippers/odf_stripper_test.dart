@@ -33,6 +33,38 @@ void main() {
       );
     });
 
+    test('full ODF strip removes manifest entries for deleted meta.xml', () {
+      const manifestNs = 'urn:oasis:names:tc:opendocument:xmlns:manifest:1.0';
+      final bytes = _odfZip({
+        'mimetype': 'application/vnd.oasis.opendocument.text',
+        'content.xml': '<office:document-content/>',
+        'meta.xml': '<office:document-meta/>',
+        'Object 1/meta.xml': '<office:document-meta/>',
+        'META-INF/manifest.xml': '<manifest:manifest '
+            'xmlns:manifest="$manifestNs">'
+            '<manifest:file-entry manifest:full-path="/" '
+            'manifest:media-type="application/vnd.oasis.opendocument.text"/>'
+            '<manifest:file-entry manifest:full-path="content.xml" '
+            'manifest:media-type="text/xml"/>'
+            '<manifest:file-entry manifest:full-path="meta.xml" '
+            'manifest:media-type="text/xml"/>'
+            '<manifest:file-entry manifest:full-path="Object 1/meta.xml" '
+            'manifest:media-type="text/xml"/>'
+            '</manifest:manifest>',
+      });
+
+      final archive = ZipDecoder().decodeBytes(stripOdf(bytes), verify: false);
+
+      expect(archive.findFile('meta.xml'), isNull);
+      expect(archive.findFile('Object 1/meta.xml'), isNull);
+      final manifest = String.fromCharCodes(
+        archive.findFile('META-INF/manifest.xml')!.content as List<int>,
+      );
+      expect(manifest, isNot(contains('meta.xml')));
+      expect(manifest, contains('full-path="content.xml"'));
+      expect(manifest, contains('full-path="/"'));
+    });
+
     test('full cleanup removes nested meta.xml suffix entries', () {
       final bytes = _odfZip({
         'mimetype': 'application/vnd.oasis.opendocument.text',

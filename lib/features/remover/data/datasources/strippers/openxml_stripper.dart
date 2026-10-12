@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:metastrip/core/processing/openxml_package_paths.dart';
 import 'package:metastrip/core/processing/zip_repack.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/remover/domain/entities/openxml_property_descriptor.dart';
@@ -19,23 +20,6 @@ const Set<String> _openXmlMetadataPaths = {
 
 const _contentTypesNamespace =
     'http://schemas.openxmlformats.org/package/2006/content-types';
-const _relationshipsNamespace =
-    'http://schemas.openxmlformats.org/package/2006/relationships';
-const _propertyRelationshipKinds = {
-  'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties':
-      'core',
-  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties':
-      'extended',
-  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties':
-      'custom',
-  'http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties':
-      'core',
-  'http://purl.oclc.org/ooxml/officeDocument/relationships/extended-properties':
-      'extended',
-  'http://purl.oclc.org/ooxml/officeDocument/relationships/custom-properties':
-      'custom',
-};
-
 const _mainContentTypes = {
   'docx': {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
@@ -263,7 +247,7 @@ Map<String, String> _selectivePropertyPaths(Archive archive) {
   );
   if (content == null) throw const FormatException('Invalid relationships');
   final document = _parseDescriptor(content, 'Relationships');
-  if (document.rootElement.name.namespaceUri != _relationshipsNamespace) {
+  if (document.rootElement.name.namespaceUri != openXmlRelationshipsNamespace) {
     throw const FormatException('Invalid relationships');
   }
   final relationships = document.rootElement.children.whereType<XmlElement>();
@@ -274,7 +258,8 @@ Map<String, String> _selectivePropertyPaths(Archive archive) {
   final result = <String, String>{};
   for (final relationship in relationships) {
     if (relationship.name.local != 'Relationship') continue;
-    final kind = _propertyRelationshipKinds[relationship.getAttribute('Type')];
+    final kind =
+        openXmlPropertyRelationshipKinds[relationship.getAttribute('Type')];
     if (kind != 'core' && kind != 'extended') continue;
     final part = kind == 'extended' ? 'app' : kind!;
     if (!seenKinds.add(part) ||
@@ -282,7 +267,7 @@ Map<String, String> _selectivePropertyPaths(Archive archive) {
       throw const FormatException('Invalid property relationship');
     }
     final target = relationship.getAttribute('Target');
-    final path = target == null ? null : _resolvePackageTarget(target);
+    final path = target == null ? null : resolveOpenXmlPackageTarget(target);
     if (path == null ||
         archive.files
                 .where((entry) => normalizeEntryPath(entry.name) == path)
@@ -497,7 +482,7 @@ bool _hasValidContentTypeManifest(
     throw const FormatException('Invalid package relationships');
   }
   final document = _parseDescriptor(content, 'Relationships');
-  if (document.rootElement.name.namespaceUri != _relationshipsNamespace) {
+  if (document.rootElement.name.namespaceUri != openXmlRelationshipsNamespace) {
     throw const FormatException('Invalid package relationships');
   }
   final relationships = document.rootElement.children
@@ -516,14 +501,14 @@ bool _hasValidContentTypeManifest(
       throw const FormatException('Invalid package relationships');
     }
     final type = relationship.getAttribute('Type');
-    final kind = _propertyRelationshipKinds[type];
+    final kind = openXmlPropertyRelationshipKinds[type];
     if (kind == null) continue;
     if (!kinds.add(kind) ||
         relationship.getAttribute('TargetMode')?.toLowerCase() == 'external') {
       throw const FormatException('Invalid property relationship');
     }
     final target = relationship.getAttribute('Target');
-    final path = target == null ? null : _resolvePackageTarget(target);
+    final path = target == null ? null : resolveOpenXmlPackageTarget(target);
     if (path == null || !paths.add(path)) {
       throw const FormatException('Invalid property relationship');
     }
@@ -541,30 +526,6 @@ bool _hasValidContentTypeManifest(
   );
 }
 
-String? _resolvePackageTarget(String target) {
-  if (target.isEmpty ||
-      target.contains('\\') ||
-      target.contains('?') ||
-      target.contains('#') ||
-      RegExp('%(?:2f|5c)', caseSensitive: false).hasMatch(target)) {
-    return null;
-  }
-  final uri = Uri.tryParse(target);
-  if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
-  final segments = <String>[];
-  for (final segment in target.replaceFirst(RegExp('^/+'), '').split('/')) {
-    if (segment.isEmpty || segment == '.') continue;
-    if (segment == '..') {
-      if (segments.isEmpty) return null;
-      segments.removeLast();
-    } else {
-      segments.add(segment);
-    }
-  }
-  final path = normalizeEntryPath(segments.join('/'));
-  return path.isEmpty ? null : path;
-}
-
 Uint8List _removeContentTypeOverrides(
   Uint8List content,
   Set<String> removedPaths,
@@ -578,7 +539,7 @@ Uint8List _removeContentTypeOverrides(
     if (element.name.local != 'Override') continue;
     final partName = element.getAttribute('PartName');
     if (partName != null &&
-        removedPaths.contains(_resolvePackageTarget(partName))) {
+        removedPaths.contains(resolveOpenXmlPackageTarget(partName))) {
       element.remove();
     }
   }
