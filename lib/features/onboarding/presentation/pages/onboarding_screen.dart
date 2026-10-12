@@ -10,12 +10,10 @@ import 'package:metastrip/shared/widgets/secondary_button.dart';
 
 /// First-run onboarding wizard.
 class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key, this.directoryPicker = _defaultPicker});
+  const OnboardingScreen({super.key, this.directoryPicker = pickOutputFolder});
 
   /// Folder picker; injectable for tests.
   final DirectoryPicker directoryPicker;
-
-  static Future<String?> _defaultPicker() => pickOutputFolder();
 
   @override
   Widget build(BuildContext context) {
@@ -174,11 +172,21 @@ class _FolderSlide extends StatelessWidget {
             SecondaryButton(
               label: 'CHOOSE FOLDER',
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                var failed = false;
                 String? directory;
                 try {
-                  directory = await directoryPicker();
+                  directory = await directoryPicker(
+                    onError: (_) => failed = true,
+                  );
                 } catch (_) {
-                  directory = null;
+                  failed = true;
+                }
+                if (failed) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Folder selection failed')),
+                  );
+                  return;
                 }
                 if (directory != null &&
                     directory.trim().isNotEmpty &&

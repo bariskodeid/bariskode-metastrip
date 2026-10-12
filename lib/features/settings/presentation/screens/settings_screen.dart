@@ -24,12 +24,10 @@ import 'package:metastrip/features/settings/presentation/widgets/version_info_ti
 
 /// Settings screen entry point (Cubit provided by app.dart).
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, this.directoryPicker = _defaultPicker});
+  const SettingsScreen({super.key, this.directoryPicker = pickOutputFolder});
 
   /// Folder picker; injectable for tests.
   final DirectoryPicker directoryPicker;
-
-  static Future<String?> _defaultPicker() => pickOutputFolder();
 
   @override
   Widget build(BuildContext context) {
@@ -96,17 +94,23 @@ class _SettingsView extends StatelessWidget {
                     currentPath: s.storage.outputFolderPath ?? '',
                     onPick: () async {
                       final messenger = ScaffoldMessenger.of(context);
+                      var failed = false;
+                      String? folder;
                       try {
-                        final folder = await directoryPicker();
-                        if (folder != null && folder.trim().isNotEmpty) {
-                          await cubit.updateOutputFolder(folder);
-                        }
+                        folder = await directoryPicker(
+                          onError: (_) => failed = true,
+                        );
                       } catch (_) {
+                        failed = true;
+                      }
+                      if (failed) {
                         messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Folder selection failed'),
                           ),
                         );
+                      } else if (folder != null && folder.trim().isNotEmpty) {
+                        await cubit.updateOutputFolder(folder);
                       }
                     },
                   ),

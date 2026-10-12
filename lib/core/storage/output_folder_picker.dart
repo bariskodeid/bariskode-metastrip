@@ -3,7 +3,11 @@ import 'dart:io' show Platform;
 import 'package:saf/saf.dart';
 
 /// Opens a folder picker and returns the chosen output folder, or `null`.
-typedef DirectoryPicker = Future<String?> Function();
+///
+/// Failures are reported through `onError`; callers show them to the user.
+typedef DirectoryPicker = Future<String?> Function({
+  void Function(Object error)? onError,
+});
 
 /// Picks an output folder with a mobile-safe system picker.
 ///

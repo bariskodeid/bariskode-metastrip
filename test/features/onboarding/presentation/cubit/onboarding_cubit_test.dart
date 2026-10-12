@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -131,6 +133,53 @@ void main() {
     expect(find.text('Could not finish setup. Try again.'), findsOneWidget);
     expect(cubit.state.isCompleted, isFalse);
     await cubit.close();
+  });
+
+  Future<OnboardingCubit> pumpFolderSlide(
+    WidgetTester tester,
+    OnboardingScreen screen,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final cubit = OnboardingCubit(
+      _FakeOnboardingRepository(),
+      validator: _validFolder,
+    );
+    addTearDown(cubit.close);
+    cubit.setSlide(3);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(value: cubit, child: screen),
+      ),
+    );
+    return cubit;
+  }
+
+  testWidgets('default picker failure shows a snackbar on the folder slide',
+      (tester) async {
+    final cubit = await pumpFolderSlide(tester, const OnboardingScreen());
+
+    await tester.tap(find.text('CHOOSE FOLDER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Folder selection failed'), findsOneWidget);
+    expect(cubit.state.outputFolderPath, isNull);
+  }, skip: Platform.isAndroid // Android opens the real SAF picker.
+  );
+
+  testWidgets('thrown picker exception shows a snackbar', (tester) async {
+    final cubit = await pumpFolderSlide(
+      tester,
+      OnboardingScreen(
+        directoryPicker: ({onError}) async => throw StateError('boom'),
+      ),
+    );
+
+    await tester.tap(find.text('CHOOSE FOLDER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Folder selection failed'), findsOneWidget);
+    expect(cubit.state.outputFolderPath, isNull);
   });
 }
 

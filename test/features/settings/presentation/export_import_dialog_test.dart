@@ -45,13 +45,15 @@ Future<SettingsCubit> _cubit(String? folder) async {
 Future<void> _pumpSettings(
   WidgetTester tester,
   SettingsCubit cubit,
-  DirectoryPicker picker,
+  DirectoryPicker? picker,
 ) async {
   await tester.pumpWidget(
     MaterialApp(
       home: BlocProvider.value(
         value: cubit,
-        child: SettingsScreen(directoryPicker: picker),
+        child: picker == null
+            ? const SettingsScreen()
+            : SettingsScreen(directoryPicker: picker),
       ),
     ),
   );
@@ -84,7 +86,7 @@ void main() {
     final cubit = await _cubit(null);
     addTearDown(cubit.close);
     await cubit.load();
-    await _pumpSettings(tester, cubit, () async => '/picked/folder');
+    await _pumpSettings(tester, cubit, ({onError}) async => '/picked/folder');
 
     await tester.tap(find.text('CHOOSE FOLDER'));
     await tester.pumpAndSettle();
@@ -98,7 +100,41 @@ void main() {
     final cubit = await _cubit('/old/folder');
     addTearDown(cubit.close);
     await cubit.load();
-    await _pumpSettings(tester, cubit, () async => throw StateError('boom'));
+    await _pumpSettings(tester, cubit, ({onError}) async => throw StateError('boom'));
+
+    await tester.tap(find.text('CHOOSE FOLDER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Folder selection failed'), findsOneWidget);
+    expect(cubit.state.settings!.storage.outputFolderPath, '/old/folder');
+  });
+
+  testWidgets(
+      'default picker failure surfaces the error snackbar and keeps the '
+      'old folder', (tester) async {
+    final cubit = await _cubit('/old/folder');
+    addTearDown(cubit.close);
+    await cubit.load();
+    await _pumpSettings(tester, cubit, null);
+
+    await tester.tap(find.text('CHOOSE FOLDER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Folder selection failed'), findsOneWidget);
+    expect(cubit.state.settings!.storage.outputFolderPath, '/old/folder');
+  }, skip: Platform.isAndroid // Android opens the real SAF picker.
+  );
+
+  testWidgets(
+      'picker reporting through onError shows the error snackbar',
+      (tester) async {
+    final cubit = await _cubit('/old/folder');
+    addTearDown(cubit.close);
+    await cubit.load();
+    await _pumpSettings(tester, cubit, ({onError}) async {
+      onError?.call(StateError('saf'));
+      return null;
+    });
 
     await tester.tap(find.text('CHOOSE FOLDER'));
     await tester.pumpAndSettle();
