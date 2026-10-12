@@ -266,6 +266,38 @@ int? findPdfValueEnd(String latin1Text, int start) {
   return end < 0 ? null : end;
 }
 
+/// The range of the single literal or hex string that forms the whole object
+/// [body] of [latin1Text], excluding surrounding whitespace.
+///
+/// This is the one rule for what an indirect Info value (`/Title 12 0 R`)
+/// may resolve to. Throws a [FormatException] for any other body, including
+/// a name, number, array, dictionary, several values, or a malformed string.
+PdfTextRange findPdfIndirectStringRange(
+  String latin1Text,
+  PdfTextRange body,
+) {
+  var start = body.start;
+  while (start < body.end && _isWhitespace(latin1Text.codeUnitAt(start))) {
+    start++;
+  }
+  final isString = start < body.end &&
+      (latin1Text.codeUnitAt(start) == 0x28 ||
+          (latin1Text.codeUnitAt(start) == 0x3C &&
+              !latin1Text.startsWith('<<', start)));
+  final end = isString ? findPdfValueEnd(latin1Text, start) : null;
+  if (end == null || end > body.end) {
+    throw const FormatException('Indirect PDF Info value is not a string');
+  }
+  var after = end;
+  while (after < body.end && _isWhitespace(latin1Text.codeUnitAt(after))) {
+    after++;
+  }
+  if (after != body.end) {
+    throw const FormatException('Indirect PDF Info value is not a string');
+  }
+  return PdfTextRange(start, end);
+}
+
 const _maxObjectNumberDigits = 10;
 const _maxGenerationDigits = 5;
 

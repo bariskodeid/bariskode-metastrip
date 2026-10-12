@@ -221,6 +221,50 @@ void main() {
       expect(findPdfValueEnd('', 0), isNull);
     });
   });
+
+  group('findPdfIndirectStringRange', () {
+    PdfTextRange body(String text) => PdfTextRange(0, text.length);
+
+    test('returns the range of a single literal or hex string', () {
+      const literal = '  (a (b) \\)) \n';
+      final range = findPdfIndirectStringRange(literal, body(literal));
+      expect(_slice(literal, range), '(a (b) \\))');
+
+      const hex = '<4142>';
+      expect(
+        _slice(hex, findPdfIndirectStringRange(hex, body(hex))),
+        '<4142>',
+      );
+    });
+
+    test('fails closed unless the body is exactly one string', () {
+      for (final text in [
+        '',
+        '<< /A 1 >>',
+        '/Name',
+        '12',
+        '(a) (b)',
+        '(a) 1',
+        '(unterminated',
+        '<4142',
+        '[ (a) ]',
+      ]) {
+        expect(
+          () => findPdfIndirectStringRange(text, body(text)),
+          throwsFormatException,
+          reason: text,
+        );
+      }
+    });
+
+    test('rejects a string that runs past the body end', () {
+      const text = '(abc) trailing';
+      expect(
+        () => findPdfIndirectStringRange(text, const PdfTextRange(0, 3)),
+        throwsFormatException,
+      );
+    });
+  });
 }
 
 String _slice(String text, PdfTextRange range) =>

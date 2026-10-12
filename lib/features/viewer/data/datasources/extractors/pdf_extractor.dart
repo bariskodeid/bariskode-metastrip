@@ -151,35 +151,8 @@ String _decodeValue(String text, int start, int end) {
 /// Decodes the object [body] referenced by an indirect Info value, which
 /// must hold exactly one literal or hex string.
 String _decodeIndirectString(String text, PdfTextRange body) {
-  final start = _skipPdfWhitespace(text, body.start, body.end);
-  final isString = text.startsWith('(', start) ||
-      (text.startsWith('<', start) && !text.startsWith('<<', start));
-  final end = isString ? findPdfValueEnd(text, start) : null;
-  if (end == null ||
-      end > body.end ||
-      _skipPdfWhitespace(text, end, body.end) != body.end) {
-    throw const FormatException('Indirect PDF Info value is not a string');
-  }
-  return _decodeValue(text, start, end);
-}
-
-/// First offset in `[start, limit)` of [text] that is not PDF whitespace,
-/// or [limit] when there is none.
-int _skipPdfWhitespace(String text, int start, int limit) {
-  var index = start;
-  while (index < limit) {
-    final unit = text.codeUnitAt(index);
-    if (unit != 0x00 &&
-        unit != 0x09 &&
-        unit != 0x0A &&
-        unit != 0x0C &&
-        unit != 0x0D &&
-        unit != 0x20) {
-      break;
-    }
-    index++;
-  }
-  return index;
+  final string = findPdfIndirectStringRange(text, body);
+  return _decodeValue(text, string.start, string.end);
 }
 
 /// Extracts an XMP packet field when an `<?xpacket` marker is present.

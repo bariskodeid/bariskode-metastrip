@@ -192,22 +192,9 @@ void applyPdfInfoValueMutations(
 /// The mutable range of the single literal or hex string that forms the
 /// object [body]. Throws a [FormatException] for any other body.
 PdfInfoValueRange _indirectStringRange(String text, PdfTextRange body) {
-  var start = body.start;
-  while (start < body.end && isPdfWhitespace(text.codeUnitAt(start))) {
-    start++;
-  }
-  final isString = start < body.end &&
-      (text.codeUnitAt(start) == 0x28 ||
-          (text.codeUnitAt(start) == 0x3C && !text.startsWith('<<', start)));
-  final range = isString ? parsePdfInfoValueRange(text, start) : null;
-  if (range == null || range.nextSearchOffset > body.end) {
-    throw const FormatException('Indirect PDF Info value is not a string');
-  }
-  var after = range.nextSearchOffset;
-  while (after < body.end && isPdfWhitespace(text.codeUnitAt(after))) {
-    after++;
-  }
-  if (after != body.end) {
+  final string = findPdfIndirectStringRange(text, body);
+  final range = parsePdfInfoValueRange(text, string.start);
+  if (range == null || range.nextSearchOffset != string.end) {
     throw const FormatException('Indirect PDF Info value is not a string');
   }
   return range;
