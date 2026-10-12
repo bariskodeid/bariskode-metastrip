@@ -107,6 +107,74 @@ void main() {
       expect(fields, hasLength(2));
     });
 
+    test('comment packet cut off between pages reports truncation', () async {
+      final payload = _commentPayload(['TITLE=Cut', 'COVER=${'C' * 600}']);
+      final full = _oggSpanning(
+        Uint8List.fromList([0x01, ...latin1.encode('vorbis')]),
+        _concat(
+            Uint8List.fromList([0x03, ...latin1.encode('vorbis')]), payload),
+      );
+      // Drop the final continuation page, as a bounded prefix read would.
+      final lastPage = _lastIndexOfOggS(full);
+      final bytes = Uint8List.sublistView(full, 0, lastPage);
+
+      final fields = await extractVorbis(bytes, extension: 'ogg');
+
+      expect(fields, hasLength(1));
+      expect(fields.single.label, 'Status');
+      expect(fields.single.value, _truncatedStatus);
+    });
+
+    test('Opus tags packet cut off mid-segment reports truncation', () async {
+      final payload = _commentPayload(['TITLE=Cut', 'X=${'y' * 600}']);
+      final full = _oggSpanning(
+        Uint8List.fromList(latin1.encode('OpusHead') + List.filled(11, 0)),
+        _concat(Uint8List.fromList(latin1.encode('OpusTags')), payload),
+      );
+      // Cut inside the first lacing segment of the second comment page.
+      final secondCommentPage = _nthIndexOfOggS(full, 2);
+      final bytes = Uint8List.sublistView(full, 0, secondCommentPage + 40);
+
+      final fields = await extractVorbis(bytes, extension: 'opus');
+
+      expect(fields.single.value, _truncatedStatus);
+    });
+
+    test('comment packet cut inside its first segment reports truncation',
+        () async {
+      final payload = _commentPayload(['TITLE=Cut', 'X=${'y' * 600}']);
+      final full = _oggSpanning(
+        Uint8List.fromList(latin1.encode('OpusHead') + List.filled(11, 0)),
+        _concat(Uint8List.fromList(latin1.encode('OpusTags')), payload),
+      );
+      final firstCommentPage = _nthIndexOfOggS(full, 1);
+      // Page header (27) + lacing table + 20 bytes of the comment packet.
+      final lacingCount = full[firstCommentPage + 26];
+      final bytes = Uint8List.sublistView(
+        full,
+        0,
+        firstCommentPage + 27 + lacingCount + 20,
+      );
+
+      final fields = await extractVorbis(bytes, extension: 'opus');
+
+      expect(fields.single.value, _truncatedStatus);
+    });
+
+    test('truncated non-comment packet still reports no comments', () async {
+      final ident = Uint8List.fromList([0x01, ...latin1.encode('vorbis')]);
+      final audio = Uint8List.fromList(List.filled(600, 0x55));
+      final full = _concat(
+        _oggPage([ident.length], ident, 0x02),
+        _oggPage([255, 255, 90], audio, 0),
+      );
+      final bytes = Uint8List.sublistView(full, 0, full.length - 100);
+
+      final fields = await extractVorbis(bytes, extension: 'ogg');
+
+      expect(fields.single.value, 'No Vorbis comments found');
+    });
+
     test('extracts comments from a minimal Ogg Vorbis page', () async {
       final payload = _commentPayload([
         'TITLE=Open Road',
@@ -147,6 +215,37 @@ void main() {
       expect(fields.single.value, 'Unable to parse Vorbis comments');
     });
   });
+}
+
+const String _truncatedStatus =
+    'Vorbis comments present but truncated: only the leading part was read';
+
+/// Returns the offset of the [n]th (zero-based) `OggS` capture pattern.
+int _nthIndexOfOggS(Uint8List bytes, int n) {
+  var seen = 0;
+  for (var i = 0; i + 4 <= bytes.length; i++) {
+    if (bytes[i] == 0x4F &&
+        bytes[i + 1] == 0x67 &&
+        bytes[i + 2] == 0x67 &&
+        bytes[i + 3] == 0x53) {
+      if (seen == n) return i;
+      seen++;
+    }
+  }
+  throw StateError('OggS #$n not found');
+}
+
+/// Returns the offset of the last `OggS` capture pattern in [bytes].
+int _lastIndexOfOggS(Uint8List bytes) {
+  for (var i = bytes.length - 4; i >= 0; i--) {
+    if (bytes[i] == 0x4F &&
+        bytes[i + 1] == 0x67 &&
+        bytes[i + 2] == 0x67 &&
+        bytes[i + 3] == 0x53) {
+      return i;
+    }
+  }
+  throw StateError('OggS not found');
 }
 
 /// Builds a FLAC stream with a STREAMINFO block and a VORBIS_COMMENT block.

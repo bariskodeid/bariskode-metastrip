@@ -88,19 +88,27 @@ List<MetadataFieldEntity> _extractFlac(Uint8List bytes) {
   ];
 }
 
+/// Status shown when a comment packet runs past the end of the bytes read.
+const String _truncatedCommentsStatus =
+    'Vorbis comments present but truncated: only the leading part was read';
+
 /// Scans Ogg pages and returns parsed comments from the comment packet.
 ///
 /// Walks `OggS` pages and concatenates segment data until a lacing value below
 /// 255 ends a packet, so a comment packet spanning several pages is
-/// reassembled. Only packets starting with the `vorbis` / `OpusTags`
+/// reassembled. Only packets starting with the `vorbis` / `OpusTags`
 /// markers are buffered, and a reassembled packet larger than
-/// [AppConstants.maxAudioScanBytes] is rejected.
+/// [AppConstants.maxAudioScanBytes] is rejected. When the bytes end while a
+/// comment packet is still being buffered (for example cover art past the
+/// bounded prefix read), a truncation status is returned rather than
+/// claiming the stream holds no comments.
 List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
   const signature = [0x4F, 0x67, 0x67, 0x53]; // 'OggS'
   var offset = 0;
   var foundPage = false;
   final packet = BytesBuilder(copy: false);
   var skipping = false; // current packet is not a comment packet
+  var markerChecked = false; // current packet's marker already verified
 
   while (offset + 27 <= bytes.length) {
     if (!_startsWith(bytes, signature, offset)) break;
@@ -114,12 +122,10 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
     var cursor = tableEnd;
     for (var i = 0; i < segmentCount; i++) {
       final lace = bytes[tableStart + i];
-      if (cursor + lace > bytes.length) {
-        cursor = bytes.length + 1;
-        break;
-      }
+      final truncated = cursor + lace > bytes.length;
+      final segmentEnd = truncated ? bytes.length : cursor + lace;
       if (!skipping) {
-        packet.add(Uint8List.sublistView(bytes, cursor, cursor + lace));
+        packet.add(Uint8List.sublistView(bytes, cursor, segmentEnd));
         if (packet.length > AppConstants.maxAudioScanBytes) {
           return [
             statusField(
@@ -129,10 +135,17 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
             ),
           ];
         }
-        if (packet.length >= 8 && !_isCommentPacketStart(packet)) {
-          skipping = true;
-          packet.clear();
+        if (!markerChecked && packet.length >= 8) {
+          markerChecked = true;
+          if (!_isCommentPacketStart(packet.toBytes())) {
+            skipping = true;
+            packet.clear();
+          }
         }
+      }
+      if (truncated) {
+        cursor = bytes.length + 1;
+        break;
       }
       cursor += lace;
       if (lace < 255) {
@@ -141,6 +154,7 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
           if (parsed != null) return parsed;
         }
         skipping = false;
+        markerChecked = false;
         packet.clear();
       }
     }
@@ -149,6 +163,11 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
     offset = cursor;
   }
 
+  if (!skipping && _mayBeCommentPacketPrefix(packet.toBytes())) {
+    return [
+      statusField('Audio Vorbis', 'Status', _truncatedCommentsStatus),
+    ];
+  }
   if (foundPage) {
     return [
       statusField('Audio Vorbis', 'Status', 'No Vorbis comments found'),
@@ -159,11 +178,27 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
   ];
 }
 
-/// Whether the buffered packet prefix is a Vorbis or Opus comment marker.
-bool _isCommentPacketStart(BytesBuilder packet) {
-  final head = packet.toBytes();
+/// Whether the buffered packet prefix [head] (at least 8 bytes) is a Vorbis or
+/// Opus comment marker.
+bool _isCommentPacketStart(Uint8List head) {
   return (head[0] == 0x03 && _asciiEquals(head, 1, 'vorbis')) ||
       _asciiEquals(head, 0, 'OpusTags');
+}
+
+/// Whether the non-empty unfinished packet [head] starts like a Vorbis or Opus
+/// comment packet, comparing only the bytes that are available.
+bool _mayBeCommentPacketPrefix(Uint8List head) {
+  if (head.isEmpty) return false;
+  bool prefixOf(List<int> marker) {
+    final n = head.length < marker.length ? head.length : marker.length;
+    for (var i = 0; i < n; i++) {
+      if (head[i] != marker[i]) return false;
+    }
+    return true;
+  }
+
+  return prefixOf([0x03, ...ascii.encode('vorbis')]) ||
+      prefixOf(ascii.encode('OpusTags'));
 }
 
 /// Parses [packet] when it starts with a Vorbis/Opus comment marker.
