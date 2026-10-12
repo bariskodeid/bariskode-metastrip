@@ -137,6 +137,24 @@ void main() {
       expect(fields.single.id, isNull);
     });
 
+    test('Object 1/meta.xml alone shows the title without a removable id',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'Object 1/meta.xml',
+          '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<office:meta><dc:title>Chart title</dc:title></office:meta>'
+              '</office:document-meta>',
+        ),
+      ]);
+
+      final fields = await extractOdf(bytes);
+
+      expect(fields.single.value, 'Chart title');
+      expect(fields.single.id, isNull);
+    });
+
     test('withholds IDs for metadata decoys outside office:meta', () async {
       final bytes = _zipBytes([
         ArchiveFile.string(

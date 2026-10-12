@@ -211,7 +211,8 @@ void main() {
       final byLabel = {for (final field in fields) field.label: field};
       expect(byLabel['Author']?.value, 'Jane Doe');
     });
-    test('viewer reads core properties from a .psmdcp part referenced by '
+    test(
+        'viewer reads core properties from a .psmdcp part referenced by '
         '_rels/.rels', () async {
       final bytes = _zipBytes([
         ArchiveFile.string(
@@ -258,7 +259,7 @@ void main() {
       expect(fields.single.value, 'Root');
     });
 
-    test('nested dc:creator below a non-root element gets no removable id',
+    test('nested dc:creator below a non-root element is visible without id',
         () async {
       final bytes = _zipBytes([
         ArchiveFile.string(
@@ -275,7 +276,44 @@ void main() {
       final fields = await extractOpenXml(bytes, extension: 'docx');
       final byLabel = {for (final field in fields) field.label: field};
 
-      expect(byLabel['Author'], isNull);
+      expect(byLabel['Author']?.value, 'Nested');
+      expect(byLabel['Author']?.id, isNull);
+    });
+
+    test('core part found only by suffix fallback shows values without ids',
+        () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'embedded/docProps/core.xml',
+          '<cp:coreProperties '
+              'xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+              'metadata/core-properties" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<dc:creator>Suffix</dc:creator></cp:coreProperties>',
+        ),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+
+      expect(fields.single.value, 'Suffix');
+      expect(fields.single.id, isNull);
+    });
+
+    test('conventional root core part keeps its removable id', () async {
+      final bytes = _zipBytes([
+        ArchiveFile.string(
+          'docProps/core.xml',
+          '<cp:coreProperties '
+              'xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+              'metadata/core-properties" '
+              'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+              '<dc:creator>Root</dc:creator></cp:coreProperties>',
+        ),
+      ]);
+
+      final fields = await extractOpenXml(bytes, extension: 'docx');
+
+      expect(fields.single.id, MetadataFieldId.openXmlAuthor);
     });
   });
 }

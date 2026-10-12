@@ -63,8 +63,11 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
   try {
     final archive = decodeGuardedZip(bytes);
     final related = _relatedPropertyPaths(archive);
-    final core = _resolvePart(archive, related['core'], 'docProps/core.xml');
-    final app = _resolvePart(archive, related['app'], 'docProps/app.xml');
+    final coreMatch =
+        _resolvePart(archive, related['core'], 'docProps/core.xml');
+    final appMatch = _resolvePart(archive, related['app'], 'docProps/app.xml');
+    final core = coreMatch?.file;
+    final app = appMatch?.file;
     if (core == null && app == null) {
       return [
         statusField(
@@ -87,7 +90,8 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
       if (totalDecompressed > AppConstants.maxZipCumulativeDecompressBytes) {
         return _invalidStatus();
       }
-      fields.addAll(_extractCoreProperties(content));
+      fields.addAll(
+          _extractCoreProperties(content, canonical: coreMatch!.canonical));
     }
     if (app != null) {
       final content = decodeArchiveFileSafely(
@@ -99,7 +103,13 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
       if (totalDecompressed > AppConstants.maxZipCumulativeDecompressBytes) {
         return _invalidStatus();
       }
-      fields.addAll(_extractAppProperties(content, extension.toLowerCase()));
+      fields.addAll(
+        _extractAppProperties(
+          content,
+          extension.toLowerCase(),
+          canonical: appMatch!.canonical,
+        ),
+      );
     }
     if (fields.isEmpty) {
       return [
@@ -119,7 +129,12 @@ Future<List<MetadataFieldEntity>> extractOpenXml(
 }
 
 /// Extracts core property fields from the XML of [content].
-List<MetadataFieldEntity> _extractCoreProperties(Uint8List content) {
+///
+/// Ids are emitted only when [canonical] (the part the remover targets).
+List<MetadataFieldEntity> _extractCoreProperties(
+  Uint8List content, {
+  required bool canonical,
+}) {
   final fields = <MetadataFieldEntity>[];
   final xml = _decodeUtf8(content);
   for (final MapEntry(key: tag, value: label) in _corePropertyLabels.entries) {
@@ -133,7 +148,7 @@ List<MetadataFieldEntity> _extractCoreProperties(Uint8List content) {
       _field(
         label,
         property.value,
-        id: property.hasRemovableIdentity ? _coreId(tag) : null,
+        id: canonical && property.hasRemovableIdentity ? _coreId(tag) : null,
         isPrivacySensitive: _privacyLabels.contains(label),
       ),
     );
@@ -147,8 +162,9 @@ List<MetadataFieldEntity> _extractCoreProperties(Uint8List content) {
 /// extracted when [extension] is `pptx`.
 List<MetadataFieldEntity> _extractAppProperties(
   Uint8List content,
-  String extension,
-) {
+  String extension, {
+  required bool canonical,
+}) {
   final fields = <MetadataFieldEntity>[];
   final xml = _decodeUtf8(content);
   for (final MapEntry(key: tag, value: label) in _appPropertyLabels.entries) {
@@ -162,7 +178,7 @@ List<MetadataFieldEntity> _extractAppProperties(
       _field(
         label,
         property.value,
-        id: property.hasRemovableIdentity ? _appId(tag) : null,
+        id: canonical && property.hasRemovableIdentity ? _appId(tag) : null,
         isPrivacySensitive: _privacyLabels.contains(label),
       ),
     );
@@ -180,7 +196,7 @@ List<MetadataFieldEntity> _extractAppProperties(
       _field(
         label,
         property.value,
-        id: property.hasRemovableIdentity ? _appId(tag) : null,
+        id: canonical && property.hasRemovableIdentity ? _appId(tag) : null,
       ),
     );
   }
@@ -199,12 +215,12 @@ _TagValue? _readTagValue(
   try {
     final document = XmlDocument.parse(xml);
     String? nonRemovableValue;
-    final children = document.rootElement.children.whereType<XmlElement>();
-    for (final element in children) {
+    final root = document.rootElement;
+    for (final element in root.descendants.whereType<XmlElement>()) {
       if (element.name.local != tag) continue;
       final value = element.innerText.trim();
       if (value.isEmpty) continue;
-      if (element.name.namespaceUri == namespace) {
+      if (element.parent == root && element.name.namespaceUri == namespace) {
         return (
           value: value,
           hasRemovableIdentity: true,
@@ -301,18 +317,26 @@ Map<String, String> _relatedPropertyPaths(Archive archive) {
   return result;
 }
 
+/// A resolved property part and whether the remover targets the same part.
+typedef _ResolvedPart = ({ArchiveFile file, bool canonical});
+
 /// Returns the part at [relatedPath] when exactly one entry has it, otherwise
 /// the conventional [fallbackName] entry.
-ArchiveFile? _resolvePart(
+///
+/// A relationship target or an exact root [fallbackName] is canonical; a part
+/// found only by the `/`-suffix fallback is shown but not canonical.
+_ResolvedPart? _resolvePart(
   Archive archive,
   String? relatedPath,
   String fallbackName,
 ) {
   if (relatedPath != null) {
     final related = _exactEntries(archive, relatedPath);
-    if (related.length == 1) return related.single;
+    if (related.length == 1) return (file: related.single, canonical: true);
   }
-  return _findEntry(archive, fallbackName);
+  final file = _findEntry(archive, fallbackName);
+  if (file == null) return null;
+  return (file: file, canonical: normalizeEntryPath(file.name) == fallbackName);
 }
 
 /// Entries whose normalized name equals [path].

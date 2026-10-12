@@ -65,6 +65,50 @@ void main() {
       expect(manifest, contains('full-path="/"'));
     });
 
+    test('full strip accepts an OOo external-id DOCTYPE manifest', () {
+      const manifestNs = 'urn:oasis:names:tc:opendocument:xmlns:manifest:1.0';
+      final bytes = _odfZip({
+        'mimetype': 'application/vnd.oasis.opendocument.text',
+        'content.xml': '<office:document-content/>',
+        'meta.xml': '<office:document-meta/>',
+        'META-INF/manifest.xml': '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<!DOCTYPE manifest:manifest PUBLIC '
+            '"-//OpenOffice.org//DTD Manifest 1.0//EN" "Manifest.dtd">\n'
+            '<manifest:manifest xmlns:manifest="$manifestNs">'
+            '<manifest:file-entry manifest:full-path="content.xml" '
+            'manifest:media-type="text/xml"/>'
+            '<manifest:file-entry manifest:full-path="meta.xml" '
+            'manifest:media-type="text/xml"/>'
+            '</manifest:manifest>',
+      });
+
+      final archive = ZipDecoder().decodeBytes(stripOdf(bytes), verify: false);
+
+      expect(archive.findFile('meta.xml'), isNull);
+      final manifest = String.fromCharCodes(
+        archive.findFile('META-INF/manifest.xml')!.content as List<int>,
+      );
+      expect(manifest, isNot(contains('meta.xml')));
+      expect(manifest, contains('full-path="content.xml"'));
+    });
+
+    test('manifest DOCTYPE with an internal subset fails closed', () {
+      const manifestNs = 'urn:oasis:names:tc:opendocument:xmlns:manifest:1.0';
+      final bytes = _odfZip({
+        'mimetype': 'application/vnd.oasis.opendocument.text',
+        'content.xml': '<office:document-content/>',
+        'meta.xml': '<office:document-meta/>',
+        'META-INF/manifest.xml': '<!DOCTYPE manifest:manifest '
+            '[<!ENTITY x "y">]>'
+            '<manifest:manifest xmlns:manifest="$manifestNs">'
+            '<manifest:file-entry manifest:full-path="meta.xml" '
+            'manifest:media-type="text/xml"/>'
+            '</manifest:manifest>',
+      });
+
+      expect(() => stripOdf(bytes), throwsFormatException);
+    });
+
     test('full cleanup removes nested meta.xml suffix entries', () {
       final bytes = _odfZip({
         'mimetype': 'application/vnd.oasis.opendocument.text',

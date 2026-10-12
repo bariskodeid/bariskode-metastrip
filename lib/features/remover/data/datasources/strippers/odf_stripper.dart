@@ -99,10 +99,8 @@ Uint8List? _removeManifestEntries(
 ) {
   final XmlDocument document;
   try {
-    final xml = utf8.decode(content, allowMalformed: false);
-    if (xml.toUpperCase().contains('<!DOCTYPE')) {
-      throw const FormatException('Invalid ODF manifest');
-    }
+    final xml =
+        _dropExternalDoctype(utf8.decode(content, allowMalformed: false));
     document = XmlDocument.parse(xml);
   } on FormatException {
     rethrow;
@@ -129,6 +127,30 @@ Uint8List? _removeManifestEntries(
     element.remove();
   }
   return Uint8List.fromList(utf8.encode(document.toXmlString()));
+}
+
+final RegExp _manifestDoctype = RegExp(
+  r'''<!DOCTYPE\s+[^\s>\[]+(?:\s+(?:PUBLIC\s+(?:"[^"]*"|'[^']*')\s+'''
+  r'''(?:"[^"]*"|'[^']*')|SYSTEM\s+(?:"[^"]*"|'[^']*')))?\s*>''',
+  caseSensitive: false,
+);
+
+/// Removes an external-identifier-only `<!DOCTYPE ...>` (as written by
+/// OpenOffice.org 2.x/3.x manifests) from [xml].
+///
+/// The identifier is never resolved and the rewritten manifest omits the
+/// declaration. Any other DOCTYPE form, such as one with an internal subset,
+/// and any `<!ENTITY` declaration fail closed.
+String _dropExternalDoctype(String xml) {
+  final upper = xml.toUpperCase();
+  if (!upper.contains('<!DOCTYPE')) return xml;
+  if (upper.contains('<!ENTITY') ||
+      upper.indexOf('<!DOCTYPE') != upper.lastIndexOf('<!DOCTYPE')) {
+    throw const FormatException('Invalid ODF manifest');
+  }
+  final match = _manifestDoctype.firstMatch(xml);
+  if (match == null) throw const FormatException('Invalid ODF manifest');
+  return xml.replaceRange(match.start, match.end, '');
 }
 
 /// Facts returned by bounded ODF property mutation.
