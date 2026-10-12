@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/output_folder_repository.dart';
@@ -10,11 +12,7 @@ import 'package:metastrip/features/remover/presentation/bloc/remover_event.dart'
 import 'package:metastrip/features/remover/presentation/bloc/remover_state.dart';
 import 'package:metastrip/features/viewer/domain/entities/file_item_entity.dart';
 
-FileItemEntity _file(
-  String name, {
-  String ext = 'jpg',
-  int sizeBytes = 100,
-}) {
+FileItemEntity _file(String name, {String ext = 'jpg', int sizeBytes = 100}) {
   return FileItemEntity(
     path: '/tmp/$name',
     name: name,
@@ -43,10 +41,7 @@ class _FakeRemoverRepository implements RemoverRepository {
     lastOutputDirectory = outputDirectory;
     lastPolicy = policy;
     if (shouldFail) {
-      return ProcessingResultEntity.failure(
-        inputPath: path,
-        error: 'boom',
-      );
+      return ProcessingResultEntity.failure(inputPath: path, error: 'boom');
     }
     return ProcessingResultEntity.success(
       inputPath: path,
@@ -188,18 +183,12 @@ void main() {
         fieldIds: {MetadataFieldId.pngText('Title')},
       );
       bloc.add(
-        RemoverFilesAdded(
-          [file],
-          policiesByPath: {file.path: firstPolicy},
-        ),
+        RemoverFilesAdded([file], policiesByPath: {file.path: firstPolicy}),
       );
       await _waitFor(bloc, (s) => s.files.length == 1);
 
       bloc.add(
-        RemoverFilesAdded(
-          [file],
-          policiesByPath: {file.path: duplicatePolicy},
-        ),
+        RemoverFilesAdded([file], policiesByPath: {file.path: duplicatePolicy}),
       );
       final state = await _waitFor(bloc, (s) => s.errorMessage != null);
 
@@ -218,10 +207,7 @@ void main() {
         (i) => _file('file$i.jpg'),
       );
       bloc.add(RemoverFilesAdded(files));
-      final state = await _waitFor(
-        bloc,
-        (s) => s.errorMessage != null,
-      );
+      final state = await _waitFor(bloc, (s) => s.errorMessage != null);
 
       expect(state.files, hasLength(AppConstants.maxFilesPerSession));
       expect(state.errorMessage, contains('skipped'));
@@ -286,30 +272,33 @@ void main() {
       bloc.close();
     });
 
-    test('missing policy is a per-file failure and is never defaulted',
-        () async {
-      final repository = _FakeRemoverRepository();
-      final file = _file('a.jpg');
-      final bloc = RemoverBloc(
-        validateInputs: false,
-        repository: repository,
-        outputFolderRepository: _FakeOutputFolderRepository(),
-        initialState: RemoverState(
-          files: [file],
-          status: RemoverStatus.idle,
-        ),
-      );
+    test(
+      'missing policy is a per-file failure and is never defaulted',
+      () async {
+        final repository = _FakeRemoverRepository();
+        final file = _file('a.jpg');
+        final bloc = RemoverBloc(
+          validateInputs: false,
+          repository: repository,
+          outputFolderRepository: _FakeOutputFolderRepository(),
+          initialState: RemoverState(files: [file], status: RemoverStatus.idle),
+        );
 
-      bloc.add(const RemoverProcessingStarted());
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
+        bloc.add(const RemoverProcessingStarted());
+        final state = await _waitFor(
+          bloc,
+          (s) => s.status == RemoverStatus.completed,
+        );
 
-      expect(state.results.single.success, isFalse);
-      expect(state.results.single.error,
-          'Cleanup policy is missing for this file');
-      expect(repository.processedPaths, isEmpty);
-      await bloc.close();
-    });
+        expect(state.results.single.success, isFalse);
+        expect(
+          state.results.single.error,
+          'Cleanup policy is missing for this file',
+        );
+        expect(repository.processedPaths, isEmpty);
+        await bloc.close();
+      },
+    );
 
     test('processes files sequentially and reaches completed', () async {
       final repo = _FakeRemoverRepository();
@@ -322,8 +311,10 @@ void main() {
       await _waitFor(bloc, (s) => s.files.length == 2);
 
       bloc.add(const RemoverProcessingStarted());
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
+      final state = await _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.completed,
+      );
 
       expect(repo.processedPaths, ['/tmp/a.jpg', '/tmp/b.png']);
       expect(repo.lastOutputDirectory, '/out');
@@ -334,54 +325,58 @@ void main() {
       bloc.close();
     });
 
-    test('accepts exact selective Office IDs and rejects presentation-only IDs',
-        () async {
-      final repo = _FakeRemoverRepository();
-      final bloc = RemoverBloc(
-        validateInputs: false,
-        repository: repo,
-        outputFolderRepository: _FakeOutputFolderRepository(),
-        initialState: RemoverState(
-          status: RemoverStatus.idle,
-          files: [_file('document.docx', ext: 'docx')],
-          policiesByPath: {
-            '/tmp/document.docx': StripPolicy.selective(
-              fieldIds: const {MetadataFieldId.openXmlTitle},
-            ),
-          },
-        ),
-      );
-      bloc.add(const RemoverProcessingStarted());
-      final accepted = await _waitFor(
-        bloc,
-        (state) => state.status == RemoverStatus.completed,
-      );
-      expect(accepted.results.single.success, isTrue);
+    test(
+      'accepts exact selective Office IDs and rejects presentation-only IDs',
+      () async {
+        final repo = _FakeRemoverRepository();
+        final bloc = RemoverBloc(
+          validateInputs: false,
+          repository: repo,
+          outputFolderRepository: _FakeOutputFolderRepository(),
+          initialState: RemoverState(
+            status: RemoverStatus.idle,
+            files: [_file('document.docx', ext: 'docx')],
+            policiesByPath: {
+              '/tmp/document.docx': StripPolicy.selective(
+                fieldIds: const {MetadataFieldId.openXmlTitle},
+              ),
+            },
+          ),
+        );
+        bloc.add(const RemoverProcessingStarted());
+        final accepted = await _waitFor(
+          bloc,
+          (state) => state.status == RemoverStatus.completed,
+        );
+        expect(accepted.results.single.success, isTrue);
 
-      final rejected = RemoverBloc(
-        validateInputs: false,
-        repository: repo,
-        outputFolderRepository: _FakeOutputFolderRepository(),
-        initialState: RemoverState(
-          status: RemoverStatus.idle,
-          files: [_file('document.docx', ext: 'docx')],
-          policiesByPath: {
-            '/tmp/document.docx': StripPolicy.selective(
-              fieldIds: const {MetadataFieldId.openXmlSlides},
-            ),
-          },
-        ),
-      );
-      rejected.add(const RemoverProcessingStarted());
-      final failed = await _waitFor(
-        rejected,
-        (state) => state.status == RemoverStatus.completed,
-      );
-      expect(failed.results.single.error,
-          'Selected metadata fields do not match this file type');
-      await bloc.close();
-      await rejected.close();
-    });
+        final rejected = RemoverBloc(
+          validateInputs: false,
+          repository: repo,
+          outputFolderRepository: _FakeOutputFolderRepository(),
+          initialState: RemoverState(
+            status: RemoverStatus.idle,
+            files: [_file('document.docx', ext: 'docx')],
+            policiesByPath: {
+              '/tmp/document.docx': StripPolicy.selective(
+                fieldIds: const {MetadataFieldId.openXmlSlides},
+              ),
+            },
+          ),
+        );
+        rejected.add(const RemoverProcessingStarted());
+        final failed = await _waitFor(
+          rejected,
+          (state) => state.status == RemoverStatus.completed,
+        );
+        expect(
+          failed.results.single.error,
+          'Selected metadata fields do not match this file type',
+        );
+        await bloc.close();
+        await rejected.close();
+      },
+    );
 
     test('accepts exact ODF IDs and rejects cross-format IDs', () async {
       final repo = _FakeRemoverRepository();
@@ -428,8 +423,7 @@ void main() {
       await rejected.close();
     });
 
-    test(
-        'processes registered formats including supported BMP and reports '
+    test('processes registered formats including supported BMP and reports '
         'supported progress total', () async {
       final repo = _FakeRemoverRepository();
       final bloc = RemoverBloc(
@@ -437,12 +431,14 @@ void main() {
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
-      bloc.add(RemoverFilesAdded([
-        _file('canonical.bmp', ext: 'bmp'),
-        _file('photo.jpg'),
-        _file('unsupported.mp4', ext: 'mp4'),
-        _file('document.pdf', ext: 'pdf'),
-      ]));
+      bloc.add(
+        RemoverFilesAdded([
+          _file('canonical.bmp', ext: 'bmp'),
+          _file('photo.jpg'),
+          _file('unsupported.mp4', ext: 'mp4'),
+          _file('document.pdf', ext: 'pdf'),
+        ]),
+      );
       await _waitFor(bloc, (s) => s.files.length == 4);
 
       bloc.add(const RemoverProcessingStarted());
@@ -452,10 +448,15 @@ void main() {
       );
       expect(processing.progress?.currentFile, 'canonical.bmp');
 
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
-      expect(repo.processedPaths,
-          ['/tmp/canonical.bmp', '/tmp/photo.jpg', '/tmp/document.pdf']);
+      final state = await _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.completed,
+      );
+      expect(repo.processedPaths, [
+        '/tmp/canonical.bmp',
+        '/tmp/photo.jpg',
+        '/tmp/document.pdf',
+      ]);
       expect(state.results, hasLength(3));
       expect(state.successCount, 3);
       bloc.close();
@@ -468,15 +469,19 @@ void main() {
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(path: null),
       );
-      bloc.add(RemoverFilesAdded([
-        _file('audio.aac', ext: 'aac'),
-        _file('movie.mp4', ext: 'mp4'),
-      ]));
+      bloc.add(
+        RemoverFilesAdded([
+          _file('audio.aac', ext: 'aac'),
+          _file('movie.mp4', ext: 'mp4'),
+        ]),
+      );
       await _waitFor(bloc, (s) => s.files.length == 2);
 
       bloc.add(const RemoverProcessingStarted());
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.failure);
+      final state = await _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.failure,
+      );
 
       expect(state.errorMessage, 'No supported files in the queue to process.');
       expect(state.progress, isNull);
@@ -496,8 +501,10 @@ void main() {
       await _waitFor(bloc, (s) => s.files.length == 2);
 
       bloc.add(const RemoverProcessingStarted());
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.completed);
+      final state = await _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.completed,
+      );
 
       expect(state.successCount, 0);
       expect(state.failureCount, 2);
@@ -515,8 +522,10 @@ void main() {
       await _waitFor(bloc, (state) => state.files.isNotEmpty);
 
       bloc.add(const RemoverProcessingStarted());
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.failure);
+      final state = await _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.failure,
+      );
 
       expect(repo.processedPaths, isEmpty);
       expect(state.errorMessage, contains('valid output folder'));
@@ -530,19 +539,23 @@ void main() {
         repository: repo,
         outputFolderRepository: _FakeOutputFolderRepository(),
       );
-      bloc.add(RemoverFilesAdded([
-        _file('a.jpg'),
-        _file('b.png'),
-        _file('c.pdf', ext: 'pdf'),
-      ]));
+      bloc.add(
+        RemoverFilesAdded([
+          _file('a.jpg'),
+          _file('b.png'),
+          _file('c.pdf', ext: 'pdf'),
+        ]),
+      );
       await _waitFor(bloc, (s) => s.files.length == 3);
 
       bloc.add(const RemoverProcessingStarted());
       // Cancel after the first file is processed.
       await _waitFor(bloc, (s) => s.results.isNotEmpty);
       bloc.requestCancel();
-      final state =
-          await _waitFor(bloc, (s) => s.status == RemoverStatus.cancelled);
+      final state = await _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.cancelled,
+      );
 
       expect(repo.processedPaths.length, lessThan(3));
       expect(state.status, RemoverStatus.cancelled);
@@ -569,6 +582,64 @@ void main() {
       expect(state.files, isEmpty);
       expect(state.policiesByPath, isEmpty);
       bloc.close();
+    });
+  });
+
+  group('RemoverBloc input size validation', () {
+    late Directory tempDir;
+
+    setUp(() => tempDir = Directory.systemTemp.createTempSync('remover_bloc_'));
+    tearDown(() => tempDir.deleteSync(recursive: true));
+
+    Future<(_FakeRemoverRepository, RemoverState)> run(int size) async {
+      final path = '${tempDir.path}${Platform.pathSeparator}a.zip';
+      final raf = File(path).openSync(mode: FileMode.write);
+      raf.truncateSync(size);
+      raf.closeSync();
+      final repo = _FakeRemoverRepository();
+      final bloc = RemoverBloc(
+        repository: repo,
+        outputFolderRepository: _FakeOutputFolderRepository(),
+      );
+      final file = FileItemEntity(
+        path: path,
+        name: 'a.zip',
+        extension: 'zip',
+        // Entity size is deliberately small so the add step accepts it; the
+        // processing-time check must use the on-disk size.
+        sizeBytes: 1,
+        addedAt: DateTime(2026, 1, 1),
+      );
+      bloc.add(RemoverFilesAdded([file]));
+      await _waitFor(bloc, (s) => s.files.length == 1);
+      final completed = _waitFor(
+        bloc,
+        (s) => s.status == RemoverStatus.completed,
+      );
+      bloc.add(const RemoverProcessingStarted());
+      final state = await completed;
+      await bloc.close();
+      return (repo, state);
+    }
+
+    test('accepts a small ZIP and reaches the repository', () async {
+      final (repo, state) = await run(1024);
+      expect(repo.processedPaths, hasLength(1));
+      expect(
+        state.results.map((r) => r.error),
+        isNot(contains('Input file is too large for cleanup')),
+      );
+    });
+
+    test('accepts a ZIP of exactly the removal size cap', () async {
+      final (repo, _) = await run(AppConstants.maxRemoverFileSizeBytes);
+      expect(repo.processedPaths, hasLength(1));
+    });
+
+    test('rejects a ZIP one byte over the removal size cap', () async {
+      final (repo, state) = await run(AppConstants.maxRemoverFileSizeBytes + 1);
+      expect(repo.processedPaths, isEmpty);
+      expect(state.results.single.error, 'Input file is too large for cleanup');
     });
   });
 }

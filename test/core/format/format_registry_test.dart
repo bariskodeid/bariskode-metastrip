@@ -132,10 +132,7 @@ void main() {
       expect(flac.supportsSelectiveRemoval, isTrue);
 
       for (final extension in ['mp3', 'ogg', 'opus']) {
-        expect(
-          registry.lookup(extension)!.supportsSelectiveRemoval,
-          isFalse,
-        );
+        expect(registry.lookup(extension)!.supportsSelectiveRemoval, isFalse);
       }
 
       final bmp = registry.lookup('bmp')!;
@@ -213,10 +210,24 @@ void main() {
       );
     });
 
-    test('the standard registry advertises only capabilities with handlers',
-        () {
-      expect(FormatRegistry.standard.handlerConsistencyIssues, isEmpty);
+    test('every full-removal capability declares a removal size limit', () {
+      for (final c in FormatRegistry.standard.capabilities.where(
+        (c) => c.supportsFullRemoval,
+      )) {
+        expect(
+          c.removalSizeLimitBytes,
+          isNotNull,
+          reason: c.extensions.join('/'),
+        );
+      }
     });
+
+    test(
+      'the standard registry advertises only capabilities with handlers',
+      () {
+        expect(FormatRegistry.standard.handlerConsistencyIssues, isEmpty);
+      },
+    );
 
     test('reports handler map declarations missing in either direction', () {
       final registry = FormatRegistry(
@@ -247,10 +258,7 @@ void main() {
     test('detects advertised extraction without an extraction handler', () {
       final registry = FormatRegistry(
         capabilities: [
-          _capability(
-            supportsExtraction: true,
-            extractionHandlerFactory: null,
-          ),
+          _capability(supportsExtraction: true, extractionHandlerFactory: null),
         ],
       );
 
@@ -279,17 +287,11 @@ void main() {
     test('detects advertised removal without a removal handler', () {
       final registry = FormatRegistry(
         capabilities: [
-          _capability(
-            supportsFullRemoval: true,
-            removalHandlerFactory: null,
-          ),
+          _capability(supportsFullRemoval: true, removalHandlerFactory: null),
         ],
       );
 
-      expect(
-        registry.handlerConsistencyIssues,
-        contains(contains('removal')),
-      );
+      expect(registry.handlerConsistencyIssues, contains(contains('removal')));
     });
 
     test('detects a removal handler that is not advertised', () {
@@ -302,10 +304,7 @@ void main() {
         ],
       );
 
-      expect(
-        registry.handlerConsistencyIssues,
-        contains(contains('removal')),
-      );
+      expect(registry.handlerConsistencyIssues, contains(contains('removal')));
     });
 
     test('detects selective support without full removal support', () {

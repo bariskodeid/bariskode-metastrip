@@ -458,6 +458,7 @@ const List<FormatCapability> _standardCapabilities = [
     extractionHandlerFactory: _handlerDeclaration,
     removalHandlerFactory: _handlerDeclaration,
     extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
+    removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.containerStructure,
     removalCoverage: RemovalCoverage.verifiedSupportedScope,
     knownLimitations: [
