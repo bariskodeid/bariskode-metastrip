@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
+import 'package:metastrip/core/storage/saf_grant_release.dart';
 import 'package:metastrip/features/onboarding/domain/entities/onboarding_state_entity.dart';
 import 'package:metastrip/features/onboarding/domain/repositories/onboarding_repository.dart';
 
@@ -8,14 +9,19 @@ typedef OutputFolderValidator = Future<String> Function(String path);
 
 /// Controls onboarding slide navigation, permissions, persistence.
 class OnboardingCubit extends Cubit<OnboardingStateEntity> {
-  OnboardingCubit(this._repository, {OutputFolderValidator? validator})
-      : _validator = validator ?? validateOutputFolder,
+  OnboardingCubit(
+    this._repository, {
+    OutputFolderValidator? validator,
+    SafGrantReleaser? safGrantReleaser,
+  })  : _validator = validator ?? validateOutputFolder,
+        _releaseSafGrant = safGrantReleaser ?? releaseSafGrant,
         super(OnboardingStateEntity.initial());
 
   static const int lastSlideIndex = 4;
 
   final OnboardingRepository _repository;
   final OutputFolderValidator _validator;
+  final SafGrantReleaser _releaseSafGrant;
 
   Future<void> load() async {
     emit(state.copyWith(status: OnboardingStatus.loading));
@@ -24,7 +30,7 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
       final folderPath = await _repository.getOutputFolderPath();
 
       var completed = isCompleted;
-      var persistenceError = state.persistenceError;
+      String? persistenceError;
       if (completed) {
         try {
           if (folderPath == null) throw StateError('missing folder');
@@ -36,15 +42,27 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
         }
       }
 
-      emit(
-        state.copyWith(
-          isCompleted: completed,
-          outputFolderPath: folderPath,
-          clearOutputFolderPath: folderPath == null,
-          persistenceError: persistenceError,
-          status: OnboardingStatus.ready,
-        ),
-      );
+      if (completed) {
+        emit(
+          state.copyWith(
+            isCompleted: true,
+            outputFolderPath: folderPath,
+            clearOutputFolderPath: folderPath == null,
+            persistenceError: persistenceError,
+            status: OnboardingStatus.ready,
+          ),
+        );
+      } else {
+        // Not completed (first run or after a reset): start from a clean
+        // slate so no stale slide, permissions or error survive.
+        emit(
+          OnboardingStateEntity.initial().copyWith(
+            outputFolderPath: folderPath,
+            persistenceError: persistenceError,
+            status: OnboardingStatus.ready,
+          ),
+        );
+      }
     } catch (_) {
       emit(state.copyWith(status: OnboardingStatus.failure));
     }
@@ -78,7 +96,13 @@ class OnboardingCubit extends Cubit<OnboardingStateEntity> {
 
     try {
       await _validator(normalizedPath);
+      final previousPath = state.outputFolderPath;
       await _repository.saveOutputFolderPath(normalizedPath);
+      await releaseReplacedSafGrant(
+        previousPath,
+        normalizedPath,
+        _releaseSafGrant,
+      );
       emit(
         state.copyWith(
           outputFolderPath: normalizedPath,

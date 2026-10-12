@@ -29,6 +29,23 @@ void main() {
     expect(settings.storage.outputFolderPath, '/legacy-output');
   });
 
+  test('clearing settings releases a content:// output grant', () async {
+    SharedPreferences.setMockInitialValues({
+      AppConstants.keyOutputFolderPath: 'content://tree/old',
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final released = <String>[];
+    final dataSource = SettingsLocalDataSourceImpl(
+      SharedPreferencesStorage(preferences),
+      safGrantReleaser: (uri) async => released.add(uri),
+    );
+
+    await dataSource.clearAllSettings();
+
+    expect(released, ['content://tree/old']);
+    expect(preferences.getString(AppConstants.keyOutputFolderPath), isNull);
+  });
+
   test('saved settings persist as JSON', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();

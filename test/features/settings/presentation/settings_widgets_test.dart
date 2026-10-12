@@ -20,6 +20,49 @@ import 'package:metastrip/features/settings/presentation/widgets/naming_template
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('naming template control is disabled with Not yet applied',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final storage = SharedPreferencesStorage(preferences);
+    final repository =
+        SettingsRepositoryImpl(SettingsLocalDataSourceImpl(storage));
+    final cubit = SettingsCubit(
+      getSettings: GetSettings(repository),
+      saveSettings: SaveSettings(repository),
+      resetSettings: ResetSettings(repository),
+      exportSettings: ExportSettings(repository),
+      importSettings: ImportSettings(repository, storage: storage),
+      clearCache: ClearCache(storage),
+      storage: storage,
+      validator: (path) async => path,
+    );
+    addTearDown(cubit.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(
+          value: cubit,
+          child: const SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // One subtitle each for the naming template and folder structure.
+    expect(find.text('Not yet applied'), findsNWidgets(2));
+    final field = find.descendant(
+      of: find.byType(NamingTemplateField),
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(field).enabled, isFalse);
+    final radios = tester.widgetList<RadioListTile<String>>(
+      find.byType(RadioListTile<String>),
+    );
+    expect(radios, isNotEmpty);
+    expect(radios.every((radio) => radio.enabled == true), isFalse);
+  });
+
   testWidgets('SettingsScreen renders persisted output and processing controls',
       (tester) async {
     SharedPreferences.setMockInitialValues({

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/key_value_storage.dart';
 import 'package:metastrip/core/storage/output_folder_validator.dart';
+import 'package:metastrip/core/storage/saf_grant_release.dart';
 import 'package:metastrip/features/settings/domain/entities/settings_entity.dart';
 import 'package:metastrip/features/settings/domain/usecases/clear_cache.dart';
 import 'package:metastrip/features/settings/domain/usecases/export_settings.dart';
@@ -25,6 +26,7 @@ class SettingsCubit extends Cubit<SettingsState> {
     required ClearCache clearCache,
     required KeyValueStorage storage,
     OutputFolderValidator? validator,
+    SafGrantReleaser? safGrantReleaser,
   })  : _getSettings = getSettings,
         _saveSettings = saveSettings,
         _resetSettings = resetSettings,
@@ -33,6 +35,7 @@ class SettingsCubit extends Cubit<SettingsState> {
         _clearCache = clearCache,
         _storage = storage,
         _validator = validator ?? validateOutputFolder,
+        _releaseSafGrant = safGrantReleaser ?? releaseSafGrant,
         super(SettingsState.initial()) {
     load();
   }
@@ -45,6 +48,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   final ClearCache _clearCache;
   final KeyValueStorage _storage;
   final OutputFolderValidator _validator;
+  final SafGrantReleaser _releaseSafGrant;
   Future<void> _operationQueue = Future<void>.value();
   bool _resetBarrier = false;
 
@@ -130,6 +134,11 @@ class SettingsCubit extends Cubit<SettingsState> {
       await _saveSettings(updated);
       await _storage.setString(AppConstants.keyOutputFolderPath, value: path);
       emit(state.copyWith(settings: updated, status: SettingsStatus.loaded));
+      await releaseReplacedSafGrant(
+        previousOutputFolder,
+        path,
+        _releaseSafGrant,
+      );
     } catch (_) {
       try {
         await _saveSettings(previous);

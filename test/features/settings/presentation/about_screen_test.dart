@@ -50,4 +50,50 @@ void main() {
     expect(find.text('REPORT ISSUE'), findsOneWidget);
     expect(find.text('PRIVACY POLICY'), findsOneWidget);
   });
+
+  testWidgets('about link failure shows snackbar', (tester) async {
+    final opened = <Uri>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AboutScreen(
+          urlLauncher: (uri) async {
+            opened.add(uri);
+            return false;
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('GITHUB REPOSITORY'));
+    await tester.pump();
+
+    expect(opened, [Uri.parse(AboutScreen.repositoryUrl)]);
+    expect(find.text('Could not open the link'), findsOneWidget);
+  });
+
+  testWidgets('about link exception shows snackbar', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AboutScreen(
+          urlLauncher: (uri) async => throw StateError('no handler'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('PRIVACY POLICY'));
+    await tester.pump();
+
+    expect(find.text('Could not open the link'), findsOneWidget);
+  });
+
+  testWidgets('about link success shows no snackbar', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: AboutScreen(urlLauncher: (uri) async => true)),
+    );
+
+    await tester.tap(find.text('REPORT ISSUE'));
+    await tester.pump();
+
+    expect(find.byType(SnackBar), findsNothing);
+  });
 }

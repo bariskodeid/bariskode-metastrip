@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/key_value_storage.dart';
+import 'package:metastrip/core/storage/saf_grant_release.dart';
 import 'package:metastrip/features/settings/domain/entities/settings_entity.dart';
 
 /// Local data source for settings persistence using SharedPreferences.
@@ -15,9 +16,13 @@ abstract class SettingsLocalDataSource {
 
 /// SharedPreferences-backed implementation.
 class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
-  SettingsLocalDataSourceImpl(this._storage);
+  SettingsLocalDataSourceImpl(
+    this._storage, {
+    SafGrantReleaser? safGrantReleaser,
+  }) : _releaseSafGrant = safGrantReleaser ?? releaseSafGrant;
 
   final KeyValueStorage _storage;
+  final SafGrantReleaser _releaseSafGrant;
 
   static const _settingsKey = 'app_settings_v1';
 
@@ -72,6 +77,7 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
       await _storage.remove(AppConstants.keyColorTheme);
       await _storage.remove(AppConstants.keyOutputFolderPath);
       await _storage.remove(AppConstants.keyOnboardingCompleted);
+      await releaseReplacedSafGrant(outputFolder, null, _releaseSafGrant);
     } catch (_) {
       try {
         await _restoreString(_settingsKey, settings);

@@ -117,10 +117,12 @@ class _SettingsView extends StatelessWidget {
                   NamingTemplateField(
                     initialValue: s.storage.namingTemplate,
                     onChanged: cubit.updateNamingTemplate,
+                    enabled: false,
                   ),
                   FolderStructureSelector(
                     currentValue: s.storage.folderStructure,
                     onChanged: cubit.updateFolderStructure,
+                    enabled: false,
                   ),
                   const ToggleSettingTile(
                     title: 'Keep originals',

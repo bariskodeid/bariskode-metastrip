@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/storage/key_value_storage.dart';
+import 'package:metastrip/core/storage/saf_grant_release.dart';
 import 'package:metastrip/features/settings/domain/entities/settings_entity.dart';
 import 'package:metastrip/features/settings/domain/repositories/settings_repository.dart';
 import 'package:metastrip/features/settings/domain/usecases/clear_cache.dart';
@@ -17,6 +18,63 @@ import 'package:metastrip/features/settings/presentation/cubit/settings_cubit.da
 import 'package:metastrip/features/settings/presentation/cubit/settings_state.dart';
 
 void main() {
+  test('changing output folder releases the previous SAF grant', () async {
+    final repository = _MemorySettingsRepository(SettingsEntity.defaults());
+    final storage = _FailingStorage('content://tree/old');
+    final released = <String>[];
+    final cubit = _createCubit(
+      repository,
+      storage,
+      safGrantReleaser: (uri) async => released.add(uri),
+    );
+    addTearDown(cubit.close);
+    await cubit.load();
+
+    await cubit.updateOutputFolder('content://tree/old');
+    expect(released, isEmpty);
+    await cubit.updateOutputFolder('content://tree/new');
+
+    expect(released, ['content://tree/old']);
+    expect(
+      storage.getString(AppConstants.keyOutputFolderPath),
+      'content://tree/new',
+    );
+  });
+
+  test('SAF release failure never blocks a folder change', () async {
+    final repository = _MemorySettingsRepository(SettingsEntity.defaults());
+    final storage = _FailingStorage('content://tree/old');
+    final cubit = _createCubit(
+      repository,
+      storage,
+      safGrantReleaser: (uri) async => throw StateError('revoked'),
+    );
+    addTearDown(cubit.close);
+    await cubit.load();
+
+    await cubit.updateOutputFolder('/local');
+
+    expect(cubit.state.status, SettingsStatus.loaded);
+    expect(storage.getString(AppConstants.keyOutputFolderPath), '/local');
+  });
+
+  test('a local old folder never triggers a SAF release', () async {
+    final repository = _MemorySettingsRepository(SettingsEntity.defaults());
+    final storage = _FailingStorage('/old');
+    final released = <String>[];
+    final cubit = _createCubit(
+      repository,
+      storage,
+      safGrantReleaser: (uri) async => released.add(uri),
+    );
+    addTearDown(cubit.close);
+    await cubit.load();
+
+    await cubit.updateOutputFolder('content://tree/new');
+
+    expect(released, isEmpty);
+  });
+
   test('output folder update rolls back when processing-key write fails',
       () async {
     final defaults = SettingsEntity.defaults();
@@ -280,8 +338,9 @@ void main() {
 
 SettingsCubit _createCubit(
   SettingsRepository repository,
-  KeyValueStorage storage,
-) =>
+  KeyValueStorage storage, {
+  SafGrantReleaser? safGrantReleaser,
+}) =>
     SettingsCubit(
       getSettings: GetSettings(repository),
       saveSettings: SaveSettings(repository),
@@ -295,6 +354,7 @@ SettingsCubit _createCubit(
       clearCache: ClearCache(storage),
       storage: storage,
       validator: (path) async => path,
+      safGrantReleaser: safGrantReleaser,
     );
 
 class _MemorySettingsRepository implements SettingsRepository {

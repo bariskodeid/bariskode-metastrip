@@ -4,9 +4,23 @@ import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/core/theme/app_spacing.dart';
 import 'package:metastrip/shared/widgets/primary_button.dart';
 
+/// Opens [uri] externally; returns whether it was launched.
+typedef ExternalUrlLauncher = Future<bool> Function(Uri uri);
+
+Future<bool> _launchExternally(Uri uri) =>
+    launchUrl(uri, mode: LaunchMode.externalApplication);
+
 /// About screen with app info and links.
 class AboutScreen extends StatelessWidget {
-  const AboutScreen({super.key});
+  const AboutScreen({super.key, this.urlLauncher = _launchExternally});
+
+  static const repositoryUrl =
+      'https://github.com/bariskodeid/bariskode-metastrip';
+  static const issuesUrl = '$repositoryUrl/issues';
+  static const privacyPolicyUrl = '$repositoryUrl/blob/main/PRIVACY-POLICY.md';
+
+  /// Link opener; injectable for tests.
+  final ExternalUrlLauncher urlLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -38,19 +52,19 @@ class AboutScreen extends StatelessWidget {
             PrimaryButton(
               label: 'GITHUB REPOSITORY',
               icon: Icons.code_outlined,
-              onPressed: () => _launchUrl('https://github.com/'),
+              onPressed: () => _launchUrl(context, repositoryUrl),
             ),
             const SizedBox(height: AppSpacing.sm),
             PrimaryButton(
               label: 'REPORT ISSUE',
               icon: Icons.bug_report_outlined,
-              onPressed: () => _launchUrl('https://github.com/issues'),
+              onPressed: () => _launchUrl(context, issuesUrl),
             ),
             const SizedBox(height: AppSpacing.sm),
             PrimaryButton(
               label: 'PRIVACY POLICY',
               icon: Icons.privacy_tip_outlined,
-              onPressed: () => _launchUrl('https://github.com/privacy'),
+              onPressed: () => _launchUrl(context, privacyPolicyUrl),
             ),
           ],
         ),
@@ -58,10 +72,18 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+  Future<void> _launchUrl(BuildContext context, String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    var opened = false;
+    try {
+      opened = await urlLauncher(Uri.parse(url));
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not open the link')),
+      );
     }
   }
 }

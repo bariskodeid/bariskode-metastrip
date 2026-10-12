@@ -6,10 +6,14 @@ class NamingTemplateField extends StatefulWidget {
     super.key,
     required this.initialValue,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final String initialValue;
   final ValueChanged<String> onChanged;
+
+  /// When false the field is read-only and shows "Not yet applied".
+  final bool enabled;
 
   @override
   State<NamingTemplateField> createState() => _NamingTemplateFieldState();
@@ -63,8 +67,11 @@ class _NamingTemplateFieldState extends State<NamingTemplateField> {
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.drive_file_rename_outline),
       title: const Text('Filename Template'),
+      enabled: widget.enabled,
       subtitle: Text(
-        'Placeholders: {name}, {ext}, {date}, {time}',
+        widget.enabled
+            ? 'Placeholders: {name}, {ext}, {date}, {time}'
+            : 'Not yet applied',
         style: Theme.of(context).textTheme.bodySmall,
       ),
       trailing: SizedBox(
@@ -72,6 +79,7 @@ class _NamingTemplateFieldState extends State<NamingTemplateField> {
         child: TextField(
           controller: _controller,
           focusNode: _focusNode,
+          enabled: widget.enabled,
           decoration: const InputDecoration(
             isDense: true,
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),

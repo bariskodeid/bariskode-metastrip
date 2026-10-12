@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metastrip/features/onboarding/domain/entities/onboarding_state_entity.dart';
@@ -8,6 +9,28 @@ import 'package:metastrip/features/onboarding/presentation/cubit/onboarding_cubi
 import 'package:metastrip/features/onboarding/presentation/pages/onboarding_screen.dart';
 
 void main() {
+  blocTest<OnboardingCubit, OnboardingStateEntity>(
+    'load after reset starts at slide 0 with no permissions and no error',
+    build: () => OnboardingCubit(
+      _FakeOnboardingRepository(),
+      validator: _validFolder,
+    ),
+    seed: () => OnboardingStateEntity.initial().copyWith(
+      currentSlideIndex: 3,
+      permissionsStatus: const {'System picker scoped access': true},
+      persistenceError: 'stale error',
+      isCompleted: true,
+      status: OnboardingStatus.ready,
+    ),
+    act: (cubit) => cubit.load(),
+    skip: 1,
+    expect: () => [
+      OnboardingStateEntity.initial().copyWith(
+        status: OnboardingStatus.ready,
+      ),
+    ],
+  );
+
   test('load resolves completed startup', () async {
     final cubit = OnboardingCubit(
       _FakeOnboardingRepository(completed: true, outputFolder: '/output'),
@@ -225,6 +248,25 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  test('changing output folder releases the previous SAF grant', () async {
+    final released = <String>[];
+    final cubit = OnboardingCubit(
+      _FakeOnboardingRepository(),
+      validator: _validFolder,
+      safGrantReleaser: (uri) async => released.add(uri),
+    );
+    addTearDown(cubit.close);
+
+    await cubit.setOutputFolder('content://tree/old');
+    expect(released, isEmpty);
+    await cubit.setOutputFolder('content://tree/old');
+    expect(released, isEmpty);
+    await cubit.setOutputFolder('content://tree/new');
+
+    expect(released, ['content://tree/old']);
+    expect(cubit.state.outputFolderPath, 'content://tree/new');
   });
 
   testWidgets('thrown picker exception shows a snackbar', (tester) async {
