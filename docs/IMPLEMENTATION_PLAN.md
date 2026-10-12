@@ -319,6 +319,7 @@ Still pending:
 - [ ] Phase 5 follow-up: expose and wire naming template, folder structure, keep-original, JPEG quality, concurrency, and auto-confirm controls. These fields are persisted/imported but intentionally absent from the current UI and processing pipeline.
 - [ ] Phase 5 follow-up: implement real cache deletion when thumbnail/temp caches are introduced; current action reports 0 bytes.
 - [ ] Phase 6: E2E tests, accessibility audit, performance profiling, dark theme consistency, crash reporting, signed release-build validation with production credentials, and obfuscation.
+- [ ] Bug-audit L12 backlog (unscheduled): ID3 stripper removes only the first leading tag (appended v2.4 and Lyrics3 survive); WebP/RIFF reject trailing junk after the declared size; the GIF 10,000-block limit rejects GIFs with more than about 5,000 frames; GIF `MGK8BIM0000`/`MGKIPTC0000` extensions are kept; ZIP extras `0x5855`/`0x000d`/`0x7875` are kept (documented); SAF result filenames show the URL-encoded URI segment.
 - [ ] Move `FileItemEntity` to `shared/domain/` to remove remover→viewer cross-feature coupling.
 
 ### Phase 0: Project Setup (1 minggu)
