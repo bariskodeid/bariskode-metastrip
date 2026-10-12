@@ -127,11 +127,14 @@ int _scanExtension(
 
 /// Skips an image descriptor, its local color table and the LZW data.
 ///
-/// Returns the offset of the next block after the image's sub-block stream.
+/// The descriptor is 10 bytes counting the `0x2C` introducer (left, top,
+/// width, height at two bytes each, then the packed byte at offset 9),
+/// matching the remover's GIF walker. Returns the offset of the next block
+/// after the image's sub-block stream.
 int _skipImage(Uint8List bytes, int offset) {
-  var cursor = offset + 9; // 9-byte image descriptor
+  var cursor = offset + 10;
   if (cursor > bytes.length) return bytes.length;
-  final packed = bytes[offset + 8];
+  final packed = bytes[offset + 9];
   if ((packed & 0x80) != 0) {
     cursor += 3 * (1 << ((packed & 0x07) + 1));
   }

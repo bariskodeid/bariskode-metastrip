@@ -34,6 +34,40 @@ void main() {
     expect(xmpField.isPrivacySensitive, isTrue);
   });
 
+  test('GIF comment and XMP after an image frame are surfaced', () async {
+    const packet = '<x:xmpmeta>after frame</x:xmpmeta>';
+    final fields = await extractGif(
+      _gifBytes([
+        _gifImage(),
+        _gifComment('inter-frame'),
+        _gifXmp(packet),
+      ]),
+    );
+
+    expect(
+        fields.singleWhere((f) => f.label == 'Comment').value, 'inter-frame');
+    expect(fields.singleWhere((f) => f.label == 'XMP').value, packet);
+  });
+
+  test('GIF metadata after an image with a local color table is surfaced',
+      () async {
+    const packet = '<x:xmpmeta>lct</x:xmpmeta>';
+    final fields = await extractGif(
+      _gifBytes([
+        _gifImage(localColorTable: true),
+        _gifComment('after lct'),
+        _gifXmp(packet),
+        _gifImage(localColorTable: true),
+        _gifComment('second frame'),
+      ]),
+    );
+
+    final comments =
+        fields.where((f) => f.label == 'Comment').map((f) => f.value);
+    expect(comments, ['after lct', 'second frame']);
+    expect(fields.singleWhere((f) => f.label == 'XMP').value, packet);
+  });
+
   group('extractGif', () {
     test('extracts a comment extension from a GIF89a file', () async {
       final bytes = _gifBytes([_gifComment('Sample GIF comment')]);
@@ -183,6 +217,24 @@ Uint8List _gifComment(String comment) {
   builder.add(data);
   builder.addByte(0x00); // sub-block terminator
   return builder.takeBytes();
+}
+
+/// Builds a 1x1 GIF image block: the 10-byte descriptor (introducer through
+/// packed byte), an optional 2-entry local color table, the LZW minimum code
+/// size byte and one data sub-block.
+Uint8List _gifImage({bool localColorTable = false}) {
+  final b = BytesBuilder()
+    ..add([0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00])
+    ..addByte(localColorTable ? 0x80 : 0x00);
+  if (localColorTable) {
+    // Two RGB entries whose bytes are not valid block introducers.
+    b.add([0x21, 0xFE, 0x05, 0x2C, 0x3B, 0x10]);
+  }
+  b
+    ..addByte(0x02) // LZW minimum code size
+    ..add([0x02, 0x4C, 0x01]) // one 2-byte data sub-block
+    ..addByte(0x00); // sub-block terminator
+  return b.takeBytes();
 }
 
 /// Builds a WebP container: `RIFF` + size + `WEBP` + [chunks].
