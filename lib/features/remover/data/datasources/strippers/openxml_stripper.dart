@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -423,15 +424,15 @@ Map<String, Uint8List> _entryContents(Archive archive) {
     if (result.containsKey(path)) {
       throw const FormatException('Duplicate entry');
     }
-    final raw = entry.content;
-    if (raw is! List<int> || raw.length > maxRepackEntrySize) {
-      throw const FormatException('Invalid ZIP entry');
-    }
-    totalSize += raw.length;
-    if (totalSize > maxRepackTotalSize) {
+    final raw = decodeZipEntrySafely(
+      entry,
+      maxBytes: min(maxRepackEntrySize, maxRepackTotalSize - totalSize),
+    );
+    if (raw == null) {
       throw const FormatException('Archive too large to validate');
     }
-    result[path] = Uint8List.fromList(raw);
+    totalSize += raw.length;
+    result[path] = raw;
   }
   return result;
 }

@@ -12,6 +12,11 @@ import 'package:archive/archive.dart';
 /// archives that understate their sizes.
 const int maxRepackTotalSize = 32 * 1024 * 1024; // 32 MB
 
+/// Modification time (Unix seconds) written for every repacked entry:
+/// 1980-01-02T00:00:00Z. One day past the DOS epoch so that timezones west of
+/// UTC, which the encoder converts through local time, still land in 1980.
+const int zipNormalizedModTime = 315619200;
+
 /// Upper bound for the number of entries in a zip archive that
 /// [repackZipWithoutEntries] is willing to re-encode.
 const int maxRepackEntryCount = 2000;
@@ -113,7 +118,8 @@ Uint8List repackZipWithoutEntries(
     final replacement = replacements[name];
     final rebuilt = replacement == null
         ? _rebuildEntry(entry)
-        : ArchiveFile(name, replacement.length, replacement);
+        : (ArchiveFile(name, replacement.length, replacement)
+          ..lastModTime = zipNormalizedModTime);
     if (normalizeEntryPath(rebuilt.name) == storedFirstPath) {
       rebuilt.compress = false;
     }
@@ -406,13 +412,26 @@ void _set32List(List<int> bytes, int offset, int value) {
 }
 
 /// Decodes [bytes] after structural ZIP validation.
+///
+/// The decoded entry names must match the preflight directory exactly, so a
+/// decoder that selects a different end-of-central-directory record than the
+/// preflight (for example one embedded in the archive comment) is rejected.
 Archive decodeGuardedZip(Uint8List bytes) {
-  preflightZip(bytes);
+  final descriptors = preflightZip(bytes);
   final Archive archive;
   try {
     archive = ZipDecoder().decodeBytes(bytes, verify: false);
   } catch (_) {
     throw const FormatException('Invalid zip archive');
+  }
+  final files = archive.files;
+  if (files.length != descriptors.length) {
+    throw const FormatException('ZIP directory mismatch');
+  }
+  for (var i = 0; i < files.length; i++) {
+    if (files[i].name != descriptors[i].name) {
+      throw const FormatException('ZIP directory mismatch');
+    }
   }
   return archive;
 }
@@ -719,12 +738,15 @@ bool _matchesEntryPath(String normalizedName, String entryPath) {
 /// Rebuilds [entry] as a fresh, in-memory [ArchiveFile].
 ///
 /// Decompresses lazy entries via [ArchiveFile.content] so the rebuilt file
-/// carries the real bytes; directory flags, modification time and Unix mode
-/// are preserved. Declared sizes are discarded in favor of the actual content
-/// length so the re-encoded headers stay consistent.
+/// carries the real bytes; directory flags and Unix mode are preserved and the
+/// modification time is normalized to [zipNormalizedModTime]. Declared sizes
+/// are discarded in favor of the actual content length so the re-encoded
+/// headers stay consistent.
 ArchiveFile _rebuildEntry(ArchiveFile entry) {
   if (!entry.isFile) {
-    return ArchiveFile(entry.name, 0, null)..isFile = false;
+    return ArchiveFile(entry.name, 0, null)
+      ..isFile = false
+      ..lastModTime = zipNormalizedModTime;
   }
   if (entry.size > maxRepackEntrySize) {
     throw const FormatException('Archive too large to repack');
@@ -734,18 +756,28 @@ ArchiveFile _rebuildEntry(ArchiveFile entry) {
     throw const FormatException('Archive too large to repack');
   }
   final rebuilt = ArchiveFile(entry.name, 0, content)..isFile = true;
-  rebuilt.lastModTime = entry.lastModTime;
+  rebuilt.lastModTime = zipNormalizedModTime;
   rebuilt.mode = entry.mode;
   rebuilt.compress = entry.compress;
   return rebuilt;
 }
 
+/// Decoded payloads keyed by entry. [ArchiveFile] hands out its raw stream
+/// once; a second decode (or a later `content` read) would see an exhausted
+/// stream and return empty bytes, so the verified bytes are kept here.
+final Expando<Uint8List> _decodedEntries = Expando<Uint8List>('zipEntry');
+
 /// Decompresses an entry with a hard output cap before materializing its bytes.
+///
+/// The result is cached per [entry], so repeated calls return the same verified
+/// bytes. Callers must not read `entry.content` after this call.
 Uint8List? decodeZipEntrySafely(
   ArchiveFile entry, {
   required int maxBytes,
 }) {
   if (entry.size > maxBytes) return null;
+  final cached = _decodedEntries[entry];
+  if (cached != null) return cached.length > maxBytes ? null : cached;
   final output = _BoundedOutputStream(maxBytes);
   try {
     entry.clear();
@@ -755,6 +787,7 @@ Uint8List? decodeZipEntrySafely(
         entry.crc32 != null && getCrc32(content) != entry.crc32) {
       throw const FormatException('Invalid zip entry');
     }
+    _decodedEntries[entry] = content;
     return content;
   } on FormatException {
     rethrow;
