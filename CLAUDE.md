@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `flutter pub get` · `flutter analyze` · `flutter test`
 - Single test file: `flutter test test/features/remover/data/datasources/remover_registry_contract_test.dart`
 - Single test by name: `flutter test --plain-name "<test name substring>" <file>`
-- CI (`.github/workflows/`) runs `flutter analyze`, `flutter test`, and `flutter build apk --debug` on Flutter **3.22.0**. Don't use Dart/Flutter APIs newer than that, even though the local box runs a newer SDK.
+- CI (`.github/workflows/`) runs `flutter analyze`, `flutter test`, and `flutter build apk --debug` on Flutter 3.41.7.
 - `scripts/generate_device_fixtures.py` writes the ZIP-family stress fixtures (Z01–Z10, about 400 MB) to disk for the manual device runs in `docs/DEVICE_AND_STRESS_TEST_PLAN.md`. Host tests build the same fixtures in memory, so don't commit large fixtures.
 
 ## Format capability pipeline (the core abstraction)

@@ -14,7 +14,7 @@ Flutter app (Dart 3, package name `metastrip`). Reads metadata from an allowlist
 
 ## Toolchain
 
-- Flutter SDK ≥ 3.22, Dart ≥ 3.4. CI pins Flutter 3.22.0 (`.github/workflows/`); the local dev box was recorded at 3.41.7 / Dart 3.11.5. Do not use APIs newer than 3.22.
+- Flutter ≥ 3.35, Dart ≥ 3.9. CI pins Flutter 3.41.7.
 - Android + iOS only (no web/desktop). Manifests in `android/`, `ios/`.
 - Lints: `analysis_options.yaml` includes only `flutter_lints`. `very_good_analysis` is a dev dependency but is not enabled.
 
