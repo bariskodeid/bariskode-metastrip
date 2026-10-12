@@ -155,7 +155,7 @@ void main() {
     expect(await input.readAsBytes(), containsAllInOrder('Author'.codeUnits));
   });
 
-  test('PNG persisted readback corruption fails and leaves unverified output',
+  test('PNG persisted readback corruption fails and deletes the unverified output',
       () async {
     final directory = await Directory.systemTemp.createTemp('phase1_png_bad_');
     addTearDown(() => directory.delete(recursive: true));
@@ -189,7 +189,7 @@ void main() {
 
     expect(
       directory.listSync().where((entity) => entity.path.contains('_clean')),
-      hasLength(1),
+      isEmpty,
     );
   });
 

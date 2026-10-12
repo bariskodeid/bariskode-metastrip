@@ -89,7 +89,7 @@ void main() {
       expect(result.report.warnings, isEmpty);
     });
 
-    test('persisted corruption fails closed and leaves unverified output',
+    test('persisted corruption fails closed and deletes the unverified output',
         () async {
       await input.writeAsBytes(_bmpWithTrailingData());
       final datasource = MetadataRemoverDatasource(
@@ -106,7 +106,7 @@ void main() {
       );
       expect(
         directory.listSync().where((entity) => entity.path.contains('_clean')),
-        hasLength(1),
+        isEmpty,
       );
     });
 
@@ -131,7 +131,7 @@ void main() {
           isA<FormatException>().having(
             (error) => error.message,
             'message',
-            'BMP persisted output changed',
+            'Output validation failed',
           ),
         ),
       );

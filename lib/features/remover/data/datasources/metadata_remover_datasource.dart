@@ -273,15 +273,10 @@ class MetadataRemoverDatasource {
     );
     final isSafOutput = file.path.startsWith('content://');
     if (!isSafOutput) {
-      try {
+      await _verifyInstalledOutput(file, stripped.bytes, (_) async {
         final persistedBytes = await _persistedOutputReader(file);
         _validateSelectivePngOutput(persistedBytes, labels);
-      } on Object {
-        // File paths are not stable identities. Leave the unverified output
-        // in place rather than deleting a path that another writer may have
-        // substituted during validation.
-        rethrow;
-      }
+      });
     }
     final removedIds =
         stripped.removedLabels.map(MetadataFieldId.pngText).toSet();
@@ -356,13 +351,15 @@ class MetadataRemoverDatasource {
         await _writeCleanCopy(inputPath, stripped.bytes, outputDirectory);
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      final persisted = await _persistedOutputReader(output);
-      validateFlacSelectivePreservation(
-        inputBytes,
-        stripped.bytes,
-        persisted: persisted,
-        selectedKeys: requestedKeys,
-      );
+      await _verifyInstalledOutput(output, stripped.bytes, (_) async {
+        final persisted = await _persistedOutputReader(output);
+        validateFlacSelectivePreservation(
+          inputBytes,
+          stripped.bytes,
+          persisted: persisted,
+          selectedKeys: requestedKeys,
+        );
+      });
     }
     final removedIds =
         stripped.matchedKeys.map(MetadataFieldId.vorbisComment).toSet();
@@ -418,14 +415,16 @@ class MetadataRemoverDatasource {
         await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      final persisted = await _persistedOutputReader(output);
-      validateOpenXmlSelective(
-        inputBytes,
-        persisted,
-        extension: extension,
-        selectedIds: requestedIds,
-        expectedRemovedIds: result.removedIds,
-      );
+      await _verifyInstalledOutput(output, result.bytes, (_) async {
+        final persisted = await _persistedOutputReader(output);
+        validateOpenXmlSelective(
+          inputBytes,
+          persisted,
+          extension: extension,
+          selectedIds: requestedIds,
+          expectedRemovedIds: result.removedIds,
+        );
+      });
     }
     return MetadataRemovalOutput(
       file: output,
@@ -477,11 +476,7 @@ class MetadataRemoverDatasource {
         await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      // Capture the installed path's stat before handing it to the readback
-      // hook. Cleanup uses this snapshot to avoid treating a replacement at
-      // the same path as the file this operation created.
-      final installedStat = await output.stat();
-      try {
+      await _verifyInstalledOutput(output, result.bytes, (_) async {
         final persisted = await _persistedOutputReader(output);
         validateOdfSelective(
           inputBytes,
@@ -490,13 +485,7 @@ class MetadataRemoverDatasource {
           selectedIds: requestedIds,
           expectedRemovedIds: result.removedIds,
         );
-      } catch (_) {
-        // The filename was allocated by this operation. Remove it only when
-        // it still contains the bytes we installed; this avoids deleting a
-        // replacement written by another process after validation failed.
-        await _deleteIfSameBytes(output, result.bytes, installedStat);
-        rethrow;
-      }
+      });
     }
     return MetadataRemovalOutput(
       file: output,
@@ -546,13 +535,15 @@ class MetadataRemoverDatasource {
         await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      final persisted = await _persistedOutputReader(output);
-      validateWavInfoSelective(
-        inputBytes,
-        persisted,
-        selectedIds: requestedIds,
-        expectedRemovedIds: result.removedIds,
-      );
+      await _verifyInstalledOutput(output, result.bytes, (_) async {
+        final persisted = await _persistedOutputReader(output);
+        validateWavInfoSelective(
+          inputBytes,
+          persisted,
+          selectedIds: requestedIds,
+          expectedRemovedIds: result.removedIds,
+        );
+      });
     }
     return MetadataRemovalOutput(
       file: output,
@@ -636,6 +627,11 @@ class MetadataRemoverDatasource {
         selectiveLabels.isNotEmpty &&
         !selectiveLabels.every(_pdfInfoKeys.contains)) {
       throw const FormatException('Unsupported selective metadata field');
+    }
+    if (route == _RemovalRoute.odf && selectiveLabels != null) {
+      throw const FormatException(
+        'Selective cleanup is unavailable for this format',
+      );
     }
     if (route == _RemovalRoute.flac && selectiveLabels != null) {
       try {
@@ -896,13 +892,15 @@ class MetadataRemoverDatasource {
     final output =
         await _writeCleanCopy(inputPath, result.bytes, outputDirectory);
     if (!output.path.startsWith('content://')) {
-      final persisted = await _persistedOutputReader(output);
-      validateFlacSelectivePreservation(
-        bytes,
-        result.bytes,
-        persisted: persisted,
-        selectedKeys: selectedKeys,
-      );
+      await _verifyInstalledOutput(output, result.bytes, (_) async {
+        final persisted = await _persistedOutputReader(output);
+        validateFlacSelectivePreservation(
+          bytes,
+          result.bytes,
+          persisted: persisted,
+          selectedKeys: selectedKeys,
+        );
+      });
     }
     return output;
   }
@@ -1128,9 +1126,7 @@ class MetadataRemoverDatasource {
     );
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      FileStat? installedStat;
-      try {
-        installedStat = await output.stat();
+      await _verifyInstalledOutput(output, outputBytes, (installedStat) async {
         if (installedStat.type != FileSystemEntityType.file ||
             installedStat.size != outputBytes.length) {
           throw const FormatException('EPUB persisted output size changed');
@@ -1144,14 +1140,7 @@ class MetadataRemoverDatasource {
         if (!_sameBytes(persisted, outputBytes)) {
           throw const FormatException('EPUB persisted output differs');
         }
-      } on Object {
-        if (installedStat == null) {
-          throw const FormatException(
-            'Output validation failed; unverified copy may remain',
-          );
-        }
-        rethrow;
-      }
+      });
     }
     return MetadataRemovalOutput(
       file: output,
@@ -1200,9 +1189,7 @@ class MetadataRemoverDatasource {
     );
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      FileStat? installedStat;
-      try {
-        installedStat = await output.stat();
+      await _verifyInstalledOutput(output, outputBytes, (installedStat) async {
         if (installedStat.type != FileSystemEntityType.file ||
             installedStat.size != outputBytes.length) {
           throw const FormatException('Archive persisted output size changed');
@@ -1216,14 +1203,7 @@ class MetadataRemoverDatasource {
         if (!_sameBytes(persisted, outputBytes)) {
           throw const FormatException('Archive persisted output differs');
         }
-      } on Object {
-        if (installedStat == null) {
-          throw const FormatException(
-            'Output validation failed; unverified copy may remain',
-          );
-        }
-        rethrow;
-      }
+      });
     }
     return MetadataRemovalOutput(
       file: output,
@@ -1290,9 +1270,7 @@ class MetadataRemoverDatasource {
     );
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      FileStat? installedStat;
-      try {
-        installedStat = await output.stat();
+      await _verifyInstalledOutput(output, outputBytes, (installedStat) async {
         if (installedStat.type != FileSystemEntityType.file ||
             installedStat.size != outputBytes.length) {
           throw const FormatException('ZIP persisted output size changed');
@@ -1306,12 +1284,7 @@ class MetadataRemoverDatasource {
         if (!_sameBytes(persisted, outputBytes)) {
           throw const FormatException('ZIP persisted output differs');
         }
-      } on Object {
-        // FileStat exposes mutable attributes, not a reliable file identity.
-        // Never delete a persisted output from a failed validation based only
-        // on matching size/timestamps: another writer may have substituted it.
-        rethrow;
-      }
+      });
     }
     return MetadataRemovalOutput(
       file: output,
@@ -1360,9 +1333,7 @@ class MetadataRemoverDatasource {
     );
     final isSafOutput = output.path.startsWith('content://');
     if (!isSafOutput) {
-      FileStat? installedStat;
-      try {
-        installedStat = await output.stat();
+      await _verifyInstalledOutput(output, outputBytes, (installedStat) async {
         if (installedStat.type != FileSystemEntityType.file ||
             installedStat.size != outputBytes.length) {
           throw const FormatException('BMP persisted output size changed');
@@ -1373,17 +1344,7 @@ class MetadataRemoverDatasource {
           throw const FormatException('BMP persisted output changed');
         }
         validateBmpOutput(inputBytes, persistedBytes);
-      } on Object {
-        // FileStat size/timestamps are not identity. Leave the failed output
-        // in place rather than risk deleting a replacement installed by an
-        // unrelated writer.
-        if (installedStat == null) {
-          throw const FormatException(
-            'Output validation failed; unverified copy may remain',
-          );
-        }
-        rethrow;
-      }
+      });
     }
 
     return MetadataRemovalOutput(
@@ -1532,6 +1493,33 @@ class MetadataRemoverDatasource {
       }
     } on Object {
       // Cleanup is defensive and must not hide the validation failure.
+    }
+  }
+
+  /// Runs local persisted-readback validation for an installed clean copy.
+  ///
+  /// [body] receives the stat captured right after installation. Any failure
+  /// removes the copy only if it still holds [installedBytes] (see
+  /// [_deleteIfSameBytes]) and surfaces a uniform validation error. When the
+  /// installed file cannot even be stat'ed, no safe cleanup is possible and
+  /// the message says the unverified copy may remain.
+  Future<void> _verifyInstalledOutput(
+    File output,
+    Uint8List installedBytes,
+    Future<void> Function(FileStat installedStat) body,
+  ) async {
+    FileStat? installedStat;
+    try {
+      installedStat = await output.stat();
+      await body(installedStat);
+    } on Object {
+      if (installedStat == null) {
+        throw const FormatException(
+          'Output validation failed; unverified copy may remain',
+        );
+      }
+      await _deleteIfSameBytes(output, installedBytes, installedStat);
+      throw const FormatException('Output validation failed');
     }
   }
 

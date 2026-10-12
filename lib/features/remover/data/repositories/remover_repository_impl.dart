@@ -75,6 +75,8 @@ class RemoverRepositoryImpl implements RemoverRepository {
         'Metadata field does not match file format' =>
           'Selected metadata fields do not match this file type',
         'No metadata fields selected' => 'Select at least one metadata field',
+        'Output validation failed' =>
+          'Output validation failed; the invalid copy was removed',
         'Output validation failed; unverified copy may remain' =>
           'Output validation failed; unverified copy may remain',
         _ => 'File format invalid or corrupt',
