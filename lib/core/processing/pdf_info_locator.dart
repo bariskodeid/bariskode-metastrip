@@ -256,6 +256,16 @@ List<PdfDictionaryEntry> readPdfDictionaryEntries(
   );
 }
 
+/// Offset just past the single value (string, name, token, reference, array,
+/// or dictionary) starting exactly at [start], or null when the value is
+/// malformed or no value starts there.
+///
+/// Uses the same value syntax as [readPdfDictionaryEntries].
+int? findPdfValueEnd(String latin1Text, int start) {
+  final end = _skipValue(latin1Text, start);
+  return end < 0 ? null : end;
+}
+
 const _maxObjectNumberDigits = 10;
 const _maxGenerationDigits = 5;
 

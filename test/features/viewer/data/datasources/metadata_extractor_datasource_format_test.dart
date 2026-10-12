@@ -65,12 +65,12 @@ void main() {
         'sample.pdf',
         _pdfBytes([
           '1 0 obj',
-          '<< /Info 7 0 R >>',
+          '<< /Type /Catalog >>',
           'endobj',
           '7 0 obj',
           '<< /Title (Hello World) /Author (Jane Doe) >>',
           'endobj',
-        ]),
+        ], info: '7 0 R'),
       );
 
       final metadata = await _extract(file, 'pdf');
@@ -290,13 +290,16 @@ Uint8List _synchsafe(int value) {
 }
 
 /// Builds a minimal, valid-looking PDF byte buffer from [objects].
-Uint8List _pdfBytes(List<String> objects) {
+///
+/// When [info] is given it is written as the trailer's `/Info` value.
+Uint8List _pdfBytes(List<String> objects, {String? info}) {
   final content = StringBuffer()..writeln('%PDF-1.4');
   for (final object in objects) {
     content.writeln(object);
   }
+  final infoEntry = info == null ? '' : ' /Info $info';
   content.writeln('trailer');
-  content.writeln('<< /Root 1 0 R /Size ${objects.length + 1} >>');
+  content.writeln('<< /Root 1 0 R /Size ${objects.length + 1}$infoEntry >>');
   content.writeln('%%EOF');
   return Uint8List.fromList(latin1.encode(content.toString()));
 }

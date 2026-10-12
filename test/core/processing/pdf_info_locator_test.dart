@@ -202,6 +202,25 @@ void main() {
       expect(text.substring(d.valueStart, d.valueEnd), '12 0 R');
     });
   });
+
+  group('findPdfValueEnd', () {
+    test('returns the end of a single value', () {
+      const text = ' (a (b) \\)) <4142> 12 0 R /Name true ';
+
+      expect(findPdfValueEnd(text, 1), 11);
+      expect(findPdfValueEnd(text, 12), 18);
+      expect(findPdfValueEnd(text, 19), 25);
+      expect(findPdfValueEnd(text, 26), 31);
+      expect(findPdfValueEnd(text, 32), 36);
+    });
+
+    test('returns null for malformed or missing values', () {
+      expect(findPdfValueEnd('(unterminated', 0), isNull);
+      expect(findPdfValueEnd('<4142', 0), isNull);
+      expect(findPdfValueEnd(') x', 0), isNull);
+      expect(findPdfValueEnd('', 0), isNull);
+    });
+  });
 }
 
 String _slice(String text, PdfTextRange range) =>

@@ -31,9 +31,10 @@ void main() {
     final fields = await extractPdf(
       Uint8List.fromList(
         '%PDF-1.4\n'
-                '1 0 obj << /Info 2 0 R >> endobj\n'
+                '1 0 obj << /Type /Catalog >> endobj\n'
                 '2 0 obj << /Author (Ada) /Title (Notes) >> endobj\n'
-                '<?xpacket begin="x"?>data<?xpacket end="w"?>'
+                '<?xpacket begin="x"?>data<?xpacket end="w"?>\n'
+                'trailer << /Root 1 0 R /Info 2 0 R >>\n'
             .codeUnits,
       ),
     );

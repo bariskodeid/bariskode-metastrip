@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:metastrip/core/processing/pdf_info_locator.dart';
+import 'package:metastrip/core/processing/pdf_string_decoder.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
@@ -20,10 +22,11 @@ const List<String> _infoKeys = [
 
 /// Extracts PDF metadata from raw [bytes] using a lightweight pure-Dart scan.
 ///
-/// Reads the document Info dictionary (via direct or indirect references) and
-/// any XMP packet embedded in the file. Returns a single status field when the
-/// bytes are not a valid PDF, when no metadata is found, or when parsing
-/// fails; this function never throws.
+/// Reads the document Info dictionary referenced from the trailer (inline or
+/// indirect) and any XMP packet embedded in the file. An Info dictionary that
+/// cannot be read is reported as a status field next to the XMP packet.
+/// Returns a single status field when the bytes are not a valid PDF, when no
+/// metadata is found, or when parsing fails; this function never throws.
 Future<List<MetadataFieldEntity>> extractPdf(Uint8List bytes) async {
   try {
     if (!_hasPdfSignature(bytes)) {
@@ -60,148 +63,123 @@ bool _hasPdfSignature(Uint8List bytes) {
   return true;
 }
 
-/// Maximum number of `N 0 obj ... endobj` regions scanned for the Info
-/// dictionary. A hostile PDF can carry thousands of object headers; capping
-/// the scan keeps extraction linear even when few regions are useful.
-const int _maxPdfObjectRegions = 64;
+/// Status value reported when the Info dictionary cannot be read safely.
+const String _infoStatus = 'Unable to parse PDF Info dictionary';
 
-/// Upper bound on the distance between an `obj` object header and its
-/// `endobj` terminator. A header without a terminator inside this window is
-/// treated as malformed and the scan stops instead of searching the whole
-/// document.
-const int _maxPdfRegionBytes = 1024 * 1024;
-
-/// Extracts Info dictionary entries by scanning `N 0 obj ... endobj` regions.
+/// Extracts the fields of the document Info dictionary that the trailer (or
+/// a cross-reference stream) points at, across all revisions.
 ///
-/// Resolves `/Info M 0 R` indirect references and also accepts an Info
-/// dictionary declared directly inside an object body. Returns an empty list
-/// when no `/Info` reference is found.
+/// Each known key shows its effective value: the entry at the highest file
+/// offset wins, which is the one written by the latest incremental update.
+/// Returns an empty list when no trailer references an Info dictionary, and
+/// a single status field when the Info dictionary or a selected value cannot
+/// be read, for example when it lives in a compressed object stream.
 List<MetadataFieldEntity> _extractInfoFields(String content) {
-  final headerPattern = RegExp(r'(\d+)\s+0\s+obj');
-  final regions = <int, String>{};
-  var cursor = 0;
-  while (regions.length < _maxPdfObjectRegions) {
-    final matches = headerPattern.allMatches(content, cursor);
-    final iterator = matches.iterator;
-    if (!iterator.moveNext()) break;
-    final header = iterator.current;
-    final regionStart = header.end;
-    final windowEnd = regionStart + _maxPdfRegionBytes < content.length
-        ? regionStart + _maxPdfRegionBytes
-        : content.length;
-    final endObj = content.indexOf('endobj', regionStart);
-    if (endObj < 0 || endObj > windowEnd) break;
-    regions[int.parse(header.group(1)!)] =
-        content.substring(regionStart, endObj);
-    cursor = endObj + 6; // advance past 'endobj'
+  try {
+    final values = _readEffectiveInfoValues(content);
+    return [
+      for (final key in _infoKeys)
+        if (values[key] case final value?)
+          MetadataFieldEntity(
+            section: 'PDF Document',
+            label: key,
+            value: truncateMetadataValue(value),
+            id: MetadataFieldId.pdfInfoIdsByKey[key],
+            isPrivacySensitive: isTextPrivacySensitive(key),
+          ),
+    ];
+  } on FormatException {
+    return [statusField('PDF Document', 'Status', _infoStatus)];
   }
-  if (regions.isEmpty) return const <MetadataFieldEntity>[];
+}
 
-  const directPattern = r'/Info\s*<<([\s\S]*?)>>';
-  const indirectPattern = r'/Info\s+(\d+)\s+0\s+R';
-
-  for (final body in regions.values) {
-    final direct = RegExp(directPattern).firstMatch(body);
-    if (direct != null) {
-      return _parseInfoDictionary(direct.group(1)!);
-    }
-
-    final indirect = RegExp(indirectPattern).firstMatch(body);
-    if (indirect != null) {
-      final target = regions[int.parse(indirect.group(1)!)];
-      if (target != null) {
-        final dictionary = RegExp(r'<<([\s\S]*?)>>').firstMatch(target);
-        if (dictionary != null) {
-          return _parseInfoDictionary(dictionary.group(1)!);
-        }
-      }
+/// Decoded effective value of every known Info key in latin-1 [text].
+///
+/// Every Info dictionary is parsed so a malformed revision fails closed. An
+/// indirect `N G R` value must resolve to objects that are each a single
+/// string, the same rule the remover enforces; its latest definition is
+/// shown. Throws a [FormatException] for anything else.
+Map<String, String> _readEffectiveInfoValues(String text) {
+  final effective = <String, PdfDictionaryEntry>{};
+  for (final dictionary in locatePdfInfoDictionaries(text)) {
+    for (final entry in readPdfDictionaryEntries(text, dictionary)) {
+      if (_infoKeys.contains(entry.key)) effective[entry.key] = entry;
     }
   }
 
-  return const <MetadataFieldEntity>[];
-}
-
-/// Extracts fields for every known Info key present in [dictionaryBody].
-///
-/// Values may be literal strings, hex strings, or plain tokens; only the
-/// recognized keys are surfaced, each flagged by [isTextPrivacySensitive].
-List<MetadataFieldEntity> _parseInfoDictionary(String dictionaryBody) {
-  final fields = <MetadataFieldEntity>[];
-  for (final key in _infoKeys) {
-    final value = _readDictionaryValue(dictionaryBody, key);
-    if (value == null) continue;
-    fields.add(
-      MetadataFieldEntity(
-        section: 'PDF Document',
-        label: key,
-        value: truncateMetadataValue(value),
-        id: MetadataFieldId.pdfInfoIdsByKey[key],
-        isPrivacySensitive: isTextPrivacySensitive(key),
-      ),
-    );
-  }
-  return fields;
-}
-
-/// Reads a single value for [key] from an Info dictionary body.
-///
-/// Supports literal strings `(text)`, hex strings `<...>`, and bare data
-/// tokens (such as `true`). Returns null when the key is absent.
-String? _readDictionaryValue(String body, String key) {
-  const valuePattern = r'((?:\((?:\\.|[^\\()])*\))|<[0-9A-Fa-f\s]*>'
-      r'|[^\s/<]+)';
-  final match = RegExp('/$key\\s*$valuePattern').firstMatch(body);
-  if (match == null) return null;
-
-  final raw = match.group(1)!;
-  if (raw.startsWith('(')) return _decodeLiteralString(raw);
-  if (raw.startsWith('<')) return _decodeHexString(raw);
-  return raw;
-}
-
-/// Decodes a PDF literal string, resolving escape sequences.
-String _decodeLiteralString(String raw) {
-  final buffer = StringBuffer();
-  var index = 1; // skip opening paren
-  final end = raw.length - 1; // skip closing paren
-  while (index < end) {
-    final char = raw[index];
-    if (char == r'\' && index + 1 < end) {
-      final next = raw[index + 1];
-      final replacement = switch (next) {
-        'n' => '\n',
-        'r' => '\r',
-        't' => '\t',
-        'b' => '\b',
-        'f' => '\f',
-        '(' => '(',
-        ')' => ')',
-        r'\' => r'\',
-        _ => next,
-      };
-      buffer.write(replacement);
-      index += 2;
+  final references = <String, PdfObjectRef>{};
+  final values = <String, String>{};
+  for (final MapEntry(:key, value: entry) in effective.entries) {
+    final reference = parsePdfReferenceAt(text, entry.valueStart);
+    if (reference != null && reference.end == entry.valueEnd) {
+      references[key] = reference.ref;
     } else {
-      buffer.write(char);
-      index++;
+      values[key] = _decodeValue(text, entry.valueStart, entry.valueEnd);
     }
   }
-  return buffer.toString();
+  if (references.isEmpty) return values;
+
+  final bodies = findPdfObjectBodiesFor(text, references.values.toSet());
+  for (final MapEntry(:key, value: reference) in references.entries) {
+    final definitions = bodies[reference]!;
+    if (definitions.isEmpty) {
+      throw const FormatException('Unresolvable indirect PDF Info value');
+    }
+    final decoded = [
+      for (final body in definitions) _decodeIndirectString(text, body),
+    ];
+    values[key] = decoded.last;
+  }
+  return values;
 }
 
-/// Decodes a PDF hex string such as `<48656C6C6F>` to latin-1 text.
+/// Decodes the direct value occupying `[start, end)` of [text].
 ///
-/// Whitespace inside the string is ignored and a trailing odd nibble is
-/// padded with a zero as permitted by the PDF specification.
-String _decodeHexString(String raw) {
-  final digits = raw.substring(1, raw.length - 1).replaceAll(RegExp(r'\s'), '');
-  if (digits.isEmpty) return '';
-  final padded = digits.length.isOdd ? '${digits}0' : digits;
-  final bytes = <int>[];
-  for (var i = 0; i < padded.length; i += 2) {
-    bytes.add(int.parse(padded.substring(i, i + 2), radix: 16));
+/// Strings are decoded with BOM-aware PDF text rules, a name loses its
+/// leading slash, and any other token (such as `true`) is shown verbatim.
+String _decodeValue(String text, int start, int end) {
+  if (text.startsWith('(', start)) {
+    return decodePdfLiteral(text.substring(start + 1, end - 1));
   }
-  return latin1.decode(bytes);
+  if (text.startsWith('<', start) && !text.startsWith('<<', start)) {
+    return decodePdfHex(text.substring(start + 1, end - 1));
+  }
+  if (text.startsWith('/', start)) return text.substring(start + 1, end);
+  return text.substring(start, end);
+}
+
+/// Decodes the object [body] referenced by an indirect Info value, which
+/// must hold exactly one literal or hex string.
+String _decodeIndirectString(String text, PdfTextRange body) {
+  final start = _skipPdfWhitespace(text, body.start, body.end);
+  final isString = text.startsWith('(', start) ||
+      (text.startsWith('<', start) && !text.startsWith('<<', start));
+  final end = isString ? findPdfValueEnd(text, start) : null;
+  if (end == null ||
+      end > body.end ||
+      _skipPdfWhitespace(text, end, body.end) != body.end) {
+    throw const FormatException('Indirect PDF Info value is not a string');
+  }
+  return _decodeValue(text, start, end);
+}
+
+/// First offset in `[start, limit)` of [text] that is not PDF whitespace,
+/// or [limit] when there is none.
+int _skipPdfWhitespace(String text, int start, int limit) {
+  var index = start;
+  while (index < limit) {
+    final unit = text.codeUnitAt(index);
+    if (unit != 0x00 &&
+        unit != 0x09 &&
+        unit != 0x0A &&
+        unit != 0x0C &&
+        unit != 0x0D &&
+        unit != 0x20) {
+      break;
+    }
+    index++;
+  }
+  return index;
 }
 
 /// Extracts an XMP packet field when an `<?xpacket` marker is present.
