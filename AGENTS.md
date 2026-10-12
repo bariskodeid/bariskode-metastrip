@@ -1,6 +1,6 @@
 # AGENTS.md — MetaStrip
 
-Flutter app (Dart 3, package name `metastrip`). Reads metadata from an allowlisted set and strips metadata from the registered 20-extension Remover set, including the narrow canonical BMP subset and ZIP-only container cleanup. Offline-only.
+Flutter app (Dart 3, package name `metastrip`). Reads metadata from an allowlisted set and strips metadata from the registered 22-extension Remover set, including the narrow canonical BMP subset and container-only cleanup for ZIP, APK, and EPUB. Offline-only.
 
 ## Commands
 
@@ -14,9 +14,9 @@ Flutter app (Dart 3, package name `metastrip`). Reads metadata from an allowlist
 
 ## Toolchain
 
-- Flutter SDK ≥ 3.22, Dart ≥ 3.4. CI/dev box recorded at 3.41.7 / 3.11.5.
+- Flutter SDK ≥ 3.22, Dart ≥ 3.4. CI pins Flutter 3.22.0 (`.github/workflows/`); the local dev box was recorded at 3.41.7 / Dart 3.11.5. Do not use APIs newer than 3.22.
 - Android + iOS only (no web/desktop). Manifests in `android/`, `ios/`.
-- Lints: `flutter_lints` + `very_good_analysis` (see `analysis_options.yaml`).
+- Lints: `analysis_options.yaml` includes only `flutter_lints`. `very_good_analysis` is a dev dependency but is not enabled.
 
 ## Architecture
 
@@ -51,14 +51,14 @@ Each feature follows `data/` (repo impls + datasources/models) → `domain/` (en
 
 ## Key conventions / gotchas
 
-- **Remover MVP scope**: the registry currently includes JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, and ZIP. WAV selective removal is enabled only for eleven stable-ID `LIST INFO` subchunks; ODF selective removal is enabled only for ten exact namespace-aware standard `meta.xml` IDs, preserving custom properties and non-meta members; AIFF selective removal remains disabled. BMP removal is limited to the narrow canonical subset, PDF removal remains best-effort DocInfo only, and ZIP cleanup is container-only/nonrecursive. APK and EPUB are excluded from removal. Video, archives other than ZIP, HEIC/HEIF, RAW, broader granular audio removal, broader ODF sanitization, and the Full Strip/Anonymize/Preserve Technical modes are deferred or unwired. Per-field Selective handoff is wired from Metadata Detail for registry-supported stable-ID formats, but there is no general batch mode selector. Office selective removal is available for exact allowlisted standard core/app IDs only; custom and legacy Office properties remain unsupported.
+- **Remover MVP scope**: the registry currently includes JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP, APK, and EPUB. WAV selective removal is enabled only for eleven stable-ID `LIST INFO` subchunks; ODF selective removal is enabled only for ten exact namespace-aware standard `meta.xml` IDs, preserving custom properties and non-meta members; AIFF selective removal remains disabled. BMP removal is limited to the narrow canonical subset, PDF removal remains best-effort DocInfo only, and ZIP/APK/EPUB cleanup is container-only/nonrecursive (APK output is no longer signed or installable; EPUB keeps its required `mimetype` entry). Video, archives other than ZIP, HEIC/HEIF, RAW, broader granular audio removal, broader ODF sanitization, and the Full Strip/Anonymize/Preserve Technical modes are deferred or unwired. Per-field Selective handoff is wired from Metadata Detail for registry-supported stable-ID formats, but there is no general batch mode selector. Office selective removal is available for exact allowlisted standard core/app IDs only; custom and legacy Office properties remain unsupported.
 - **Clean copies**: output is a new file in the user-configured output folder; originals are never mutated.
 - **MVP size cap**: SHA-256 only computed for files ≤ 100MB. ZIP-family processing is bounded by a 50MiB input cap and in-memory limits; device/SAF and stress validation are still pending, so these are safety bounds rather than demonstrated performance guarantees.
 - **Custom fonts**: `pubspec.yaml` font blocks are commented out. Runtime uses system fallbacks (IBM Plex Mono → system mono). Do not assume `Bebas Neue` / `Space Mono` are loaded.
 - **Assets folders** (`assets/{fonts,illustrations,icons,textures}/`) exist but are empty.
 - **State management**: `flutter_bloc` with Cubits for onboarding, viewer, and Settings; `RemoverBloc` handles removal. Mirror the owning feature's existing pattern.
 - **DI**: direct constructors passed into `MetaStripApp`. No service locator yet.
-- **Lints are strict** (`very_good_analysis`); expect line-length, doc-comment, and ordering nits. Run `flutter analyze` before claiming done.
+- **Lints**: only the `flutter_lints` rule set is active. Still match the existing style (doc comments on public APIs, `dart format` 80 columns). Run `flutter analyze` before claiming done.
 
 ## Testing
 
