@@ -160,7 +160,8 @@ const List<FormatCapability> _standardCapabilities = [
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.containerStructure,
     knownLimitations: [
-      'Removal covers JPEG metadata segments handled by the current stripper.',
+      'APPn metadata segments are removed; JFIF, Adobe APP14 and ICC profiles '
+          'are kept.',
     ],
   ),
   FormatCapability(

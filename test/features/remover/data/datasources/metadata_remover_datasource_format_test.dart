@@ -397,6 +397,97 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  group('JPEG marker policy', () {
+    const sos = [0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00];
+    const entropy = [0x12, 0x34];
+
+    Future<List<int>> clean(int marker, List<int> payload) async {
+      final dir = await Directory.systemTemp.createTemp('metastrip_jpg_');
+      addTearDown(() => dir.delete(recursive: true));
+      final input = File('${dir.path}${Platform.pathSeparator}p.jpg');
+      final length = payload.length + 2;
+      await input.writeAsBytes([
+        0xFF, 0xD8, // SOI
+        0xFF, marker, (length >> 8) & 0xFF, length & 0xFF, ...payload,
+        // SOF0: 8-bit, 1x1, 1 component.
+        0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01,
+        0x11, 0x00,
+        ...sos, ...entropy,
+        0xFF, 0xD9, // EOI
+      ]);
+      final output = await MetadataRemoverDatasource().stripMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      );
+      return output.readAsBytes();
+    }
+
+    void expectScanIntact(List<int> out) {
+      final at = _indexOf(out, sos);
+      expect(at, isNonNegative);
+      expect(out.sublist(at, at + sos.length + entropy.length + 2), [
+        ...sos,
+        ...entropy,
+        0xFF,
+        0xD9,
+      ]);
+    }
+
+    void expectKept(List<int> out, int marker, List<int> payload) {
+      final at = _indexOf(out, [0xFF, marker]);
+      expect(at, isNonNegative);
+      expect(out.sublist(at + 4, at + 4 + payload.length), payload);
+    }
+
+    test('drops APP11 JUMBF/C2PA', () async {
+      final out = await clean(0xEB, 'jumb c2pa'.codeUnits);
+      expect(_indexOf(out, [0xFF, 0xEB]), -1);
+      expect(_indexOf(out, 'c2pa'.codeUnits), -1);
+      expectScanIntact(out);
+    });
+
+    test('drops APP3..APP10 and APP15', () async {
+      const markers = [0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEF];
+      for (final marker in markers) {
+        final out = await clean(marker, 'secret'.codeUnits);
+        expect(_indexOf(out, [0xFF, marker]), -1, reason: '$marker');
+        expect(_indexOf(out, 'secret'.codeUnits), -1, reason: '$marker');
+        expectScanIntact(out);
+      }
+    });
+
+    test('keeps APP14 Adobe colour transform', () async {
+      final seg = [...'Adobe'.codeUnits, 0x00, 0x64, 0, 0, 0, 0, 0x02];
+      final out = await clean(0xEE, seg);
+      expectKept(out, 0xEE, seg);
+      expectScanIntact(out);
+    });
+
+    test('drops APP14 without Adobe signature', () async {
+      final out = await clean(0xEE, 'Other-data'.codeUnits);
+      expect(_indexOf(out, [0xFF, 0xEE]), -1);
+      expectScanIntact(out);
+    });
+
+    test('keeps ICC_PROFILE APP2, drops FlashPix APP2', () async {
+      final icc = [...'ICC_PROFILE'.codeUnits, 0x00, 0x01, 0x01, 0x41, 0x42];
+      final kept = await clean(0xE2, icc);
+      expectKept(kept, 0xE2, icc);
+      expectScanIntact(kept);
+
+      final dropped = await clean(0xE2, 'FPXR-flashpix'.codeUnits);
+      expect(_indexOf(dropped, [0xFF, 0xE2]), -1);
+      expectScanIntact(dropped);
+    });
+
+    test('keeps APP0 JFIF', () async {
+      final jfif = [...'JFIF'.codeUnits, 0x00, 1, 1, 0, 0, 1, 0, 1, 0, 0];
+      final out = await clean(0xE0, jfif);
+      expectKept(out, 0xE0, jfif);
+      expectScanIntact(out);
+    });
+  });
 }
 
 Uint8List _epubZip(Map<String, String> files) {

@@ -1673,8 +1673,8 @@ Uint8List _stripJpegBytes(Uint8List bytes) {
       throw const FormatException('Invalid JPEG segment length');
     }
     final segmentEnd = offset + length;
-    const strippedMarkers = {0xE1, 0xE2, 0xEC, 0xED, 0xEE, 0xFE};
-    if (!strippedMarkers.contains(marker)) {
+    final payload = Uint8List.sublistView(bytes, offset + 2, segmentEnd);
+    if (!_shouldDropJpegSegment(marker, payload)) {
       output.add(bytes.sublist(markerStart, segmentEnd));
     }
     offset = segmentEnd;
@@ -1687,6 +1687,30 @@ Uint8List _stripJpegBytes(Uint8List bytes) {
       inScan = inScan && marker == 0xDC;
     }
   }
+}
+
+/// Whether a JPEG segment with [marker] and [payload] (the bytes after the
+/// two-byte length field) is metadata that a clean copy must not carry.
+///
+/// APP0 (JFIF), APP14 with an `Adobe` signature (colour transform) and APP2
+/// with an `ICC_PROFILE ` signature are kept because dropping them changes
+/// how the image renders. Other APP1-APP15 and COM segments are dropped.
+bool _shouldDropJpegSegment(int marker, Uint8List payload) {
+  bool startsWith(List<int> prefix) {
+    if (payload.length < prefix.length) return false;
+    for (var i = 0; i < prefix.length; i++) {
+      if (payload[i] != prefix[i]) return false;
+    }
+    return true;
+  }
+
+  if (marker == 0xEE) return !startsWith('Adobe'.codeUnits);
+  if (marker == 0xE2) {
+    return !startsWith([...'ICC_PROFILE'.codeUnits, 0x00]);
+  }
+  return marker == 0xE1 ||
+      (marker >= 0xE3 && marker <= 0xEF) ||
+      marker == 0xFE;
 }
 
 /// Strips a PNG clean copy from [bytes].
