@@ -326,8 +326,8 @@ _V2Result _parseId3v2(Uint8List bytes, List<MetadataFieldEntity> fields) {
           : _decodeTextFrame(data);
       value = value.trim();
       if (id == 'TCON' || id == 'TCO') value = _resolveGenre(value);
-      if ((id == 'TXXX' || id == 'WXXX') && value.contains(' ')) {
-        value = value.replaceAll(' ', ' ');
+      if ((id == 'TXXX' || id == 'WXXX') && value.contains('\u0000')) {
+        value = value.replaceAll('\u0000', ' ');
       }
       if (value.isNotEmpty) {
         fields.add(
