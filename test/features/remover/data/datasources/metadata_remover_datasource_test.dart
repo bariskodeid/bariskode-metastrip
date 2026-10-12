@@ -671,6 +671,44 @@ void main() {
       );
     });
 
+    test('Info reference into an object stream throws and writes no output',
+        () async {
+      final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+      await input.writeAsString(
+        '%PDF-1.5\n'
+        '5 0 obj\n<< /Type /ObjStm /N 1 /First 4 /Length 30 >>\n'
+        'stream\n7 0 << /Title (Secret) >>\nendstream\nendobj\n'
+        '9 0 obj\n<< /Type /XRef /Size 10 /Info 7 0 R /Length 0 >>\n'
+        'stream\n\nendstream\nendobj\nstartxref\n0\n%%EOF',
+      );
+
+      await expectLater(
+        MetadataRemoverDatasource().stripPdfMetadata(
+          input.path,
+          outputDirectory: dir.path,
+        ),
+        throwsFormatException,
+      );
+      expect(
+        dir.listSync().where((entity) => entity.path.contains('_clean')),
+        isEmpty,
+      );
+    });
+
+    test('Info reached through an xref stream dictionary is blanked',
+        () async {
+      final text = await strip(
+        '%PDF-1.5\n'
+        '7 0 obj\n<< /Title (Secret) /Author (Ada) >>\nendobj\n'
+        '9 0 obj\n<< /Type /XRef /Size 10 /Info 7 0 R /Length 0 >>\n'
+        'stream\n\nendstream\nendobj\nstartxref\n0\n%%EOF',
+      );
+
+      expect(text, contains('<< /Title (      ) /Author (   ) >>'));
+      expect(text, isNot(contains('Secret')));
+      expect(text, isNot(contains('Ada')));
+    });
+
     test('output byte length is unchanged', () async {
       const source = '%PDF-1.4\n'
           '3 0 obj << /Title (Chapter 1) >> endobj\n'

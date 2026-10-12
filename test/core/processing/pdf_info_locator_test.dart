@@ -77,10 +77,11 @@ void main() {
       expect(_slice(text, ranges.single), ' /Title (Inline) ');
     });
 
-    test('skips Info references without a plain-text definition', () {
+    test('fails closed when an Info reference has no plain-text definition',
+        () {
       const text = '%PDF-1.5\ntrailer\n<< /Info 8 0 R >>\n%%EOF';
 
-      expect(locatePdfInfoDictionaries(text), isEmpty);
+      expect(() => locatePdfInfoDictionaries(text), throwsFormatException);
     });
 
     test('fails closed when the Info object is not a dictionary', () {
@@ -109,6 +110,19 @@ void main() {
           '9 0 obj\n<< /Info 7 0 R /Sub << /Type /XRef >> >>\nendobj\n%%EOF';
 
       expect(locatePdfInfoDictionaries(text), isEmpty);
+    });
+
+    test('finds a top-level /Type /XRef that follows a nested one', () {
+      const text = '%PDF-1.5\n'
+          '7 0 obj\n<< /Producer (Acme) >>\nendobj\n'
+          '9 0 obj << /Sub << /Type /XRef >> /Info 7 0 R /Type /XRef >>\n'
+          'endobj\n%%EOF';
+
+      final ranges = locatePdfInfoDictionaries(text);
+
+      expect(ranges.map((range) => _slice(text, range)), [
+        ' /Producer (Acme) ',
+      ]);
     });
 
     test('fails closed on an unterminated trailer dictionary', () {

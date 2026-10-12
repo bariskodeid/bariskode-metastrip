@@ -90,9 +90,11 @@ class PdfDictionaryEntry {
 /// updates redefine it), or an inline `/Info << ... >>` dictionary. The
 /// result is sorted by offset and holds each range once.
 ///
-/// References without a plain-text definition are skipped. Throws a
-/// [FormatException] when a trailer, cross-reference stream, or Info
-/// dictionary is malformed, or when an Info object is not a dictionary.
+/// Throws a [FormatException] when a trailer, cross-reference stream, or
+/// Info dictionary is malformed, when an Info object is not a dictionary, or
+/// when an `/Info` reference has no plain-text definition (for example it
+/// lives in a compressed object stream), so the caller never silently skips
+/// an Info dictionary it cannot clean.
 List<PdfTextRange> locatePdfInfoDictionaries(String latin1Text) {
   final text = latin1Text;
   final references = <PdfObjectRef>{};
@@ -117,7 +119,14 @@ List<PdfTextRange> locatePdfInfoDictionaries(String latin1Text) {
 
   final bodies = findPdfObjectBodiesFor(text, references);
   for (final reference in references) {
-    for (final body in bodies[reference]!) {
+    final definitions = bodies[reference]!;
+    if (definitions.isEmpty) {
+      throw const FormatException(
+        'PDF Info dictionary is not stored as plain text (compressed '
+        'object streams are not supported)',
+      );
+    }
+    for (final body in definitions) {
       final open = _skipWhitespaceAndComments(text, body.start);
       if (!text.startsWith('<<', open)) {
         throw const FormatException('PDF Info object is not a dictionary');
@@ -321,7 +330,10 @@ void _scanXrefStreams(String text, void Function(_PdfDictionary) collect) {
     final dictionary = _scanDictionary(text, open);
     scannedUntil = dictionary.end;
     final isXrefStream = dictionary.entries.any(
-      (entry) => entry.key == 'Type' && entry.valueStart == hit,
+      (entry) =>
+          entry.key == 'Type' &&
+          text.startsWith(name, entry.valueStart) &&
+          entry.valueStart + name.length == entry.valueEnd,
     );
     if (isXrefStream) collect(dictionary);
   }

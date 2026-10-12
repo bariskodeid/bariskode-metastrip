@@ -386,6 +386,7 @@ const List<FormatCapability> _standardCapabilities = [
     knownLimitations: [
       'Removal is best-effort PDF Info cleanup, not comprehensive sanitization.',
       'Only the trailer-referenced Info dictionaries are cleaned.',
+      'Info dictionaries stored in compressed object streams are not supported and are rejected.',
       'Selective removal applies only to supported PDF Info keys.',
     ],
   ),
