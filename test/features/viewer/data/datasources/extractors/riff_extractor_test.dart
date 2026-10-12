@@ -123,6 +123,45 @@ void main() {
       expect(fields.single.label, 'Status');
       expect(fields.single.value, 'Not a valid RIFF file');
     });
+
+    test('INFO value stops at NUL', () async {
+      final bytes = _wavBytes([
+        _infoList({'INAM': 'Title\x00garbage'}),
+      ]);
+
+      final fields = await extractRiff(bytes, extension: 'wav');
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(byLabel['Title']?.value, 'Title');
+    });
+
+    test('id3 chunk is surfaced', () async {
+      final bytes = _wavBytes([
+        _chunk('id3 ', _riffText('ID3 tag payload')),
+      ]);
+
+      final fields = await extractRiff(bytes, extension: 'wav');
+
+      expect(fields.map((field) => field.label), contains('ID3'));
+    });
+
+    test('bext _PMX iXML cart chunks show as presence fields', () async {
+      final bytes = _wavBytes([
+        _chunk('bext', Uint8List.fromList(List<int>.filled(10, 0x41))),
+        _chunk('_PMX', Uint8List.fromList(List<int>.filled(4, 0x42))),
+        _chunk('iXML', Uint8List.fromList(List<int>.filled(6, 0x43))),
+        _chunk('cart', Uint8List.fromList(List<int>.filled(8, 0x44))),
+      ]);
+
+      final fields = await extractRiff(bytes, extension: 'wav');
+      final values = fields.map((field) => field.value).toList();
+
+      expect(values, contains('bext chunk present (10 bytes)'));
+      expect(values, contains('_PMX chunk present (4 bytes)'));
+      expect(values, contains('iXML chunk present (6 bytes)'));
+      expect(values, contains('cart chunk present (8 bytes)'));
+      expect(fields.every((field) => field.id == null), isTrue);
+    });
   });
 }
 

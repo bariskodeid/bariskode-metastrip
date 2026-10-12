@@ -16,10 +16,25 @@ const int _chunkIdLength = 4;
 const int _maxChunks = 512;
 
 /// WAV chunks carrying metadata; dropped by [stripRiff].
-const Set<String> _wavDroppedChunks = {'LIST', 'ID3 ', 'bext'};
+const Set<String> _wavDroppedChunks = {
+  'LIST',
+  'ID3 ',
+  'id3 ',
+  'bext',
+  '_PMX',
+  'iXML',
+  'cart',
+};
 
 /// AIFF chunks carrying metadata; dropped by [stripRiff].
-const Set<String> _aiffDroppedChunks = {'NAME', 'AUTH', '(c) ', 'ANNO', 'ID3 '};
+const Set<String> _aiffDroppedChunks = {
+  'NAME',
+  'AUTH',
+  '(c) ',
+  'ANNO',
+  'COMT',
+  'ID3 ',
+};
 
 /// Strips metadata chunks from RIFF audio containers ([bytes]).
 ///
@@ -30,14 +45,14 @@ const Set<String> _aiffDroppedChunks = {'NAME', 'AUTH', '(c) ', 'ANNO', 'ID3 '};
 /// chunks are walked from offset 12. Each chunk is a 4-byte ASCII id, a
 /// 4-byte little-endian payload size and the payload itself, followed by a
 /// pad byte when the payload size is odd. The `LIST` chunk (the INFO metadata
-/// container), the `ID3 ` chunk and the `bext` broadcast-extension chunk are
-/// dropped; every other chunk (`fmt `, `data`, `fact`, `cue `, `smpl`, ...)
+/// container), the `ID3 `/`id3 ` chunks, and the `bext`, `_PMX`, `iXML` and
+/// `cart` chunks are dropped; every other chunk (`fmt `, `data`, `fact`, `cue `, `smpl`, ...)
 /// is copied verbatim, including its original pad byte. `LIST` is dropped
 /// wholesale: it almost always holds INFO metadata, but a rare `LIST` can
 /// carry audio-related subchunks that would be removed along with it.
 ///
 /// **AIFF path**: the same walk with big-endian sizes. `NAME`, `AUTH`,
-/// `(c) `, `ANNO` and `ID3 ` chunks are dropped; `COMM`, `SSND`, `MARK`,
+/// `(c) `, `ANNO`, `COMT` and `ID3 ` chunks are dropped; `COMM`, `SSND`, `MARK`,
 /// `INST`, ... are kept verbatim.
 ///
 /// The output is rebuilt as the container magic, a new 4-byte container size
@@ -62,7 +77,7 @@ Uint8List stripRiff(Uint8List bytes, {required String extension}) {
   }
 }
 
-/// Removes WAV metadata chunks (`LIST`, `ID3 `, `bext`).
+/// Removes WAV metadata chunks (see [_wavDroppedChunks]).
 Uint8List _stripWav(Uint8List bytes) {
   if (!_asciiAt(bytes, 0, 'RIFF') || !_asciiAt(bytes, 8, 'WAVE')) {
     throw const FormatException('Not a valid WAV file');
@@ -75,7 +90,7 @@ Uint8List _stripWav(Uint8List bytes) {
   );
 }
 
-/// Removes AIFF metadata chunks (`NAME`, `AUTH`, `(c) `, `ANNO`, `ID3 `).
+/// Removes AIFF metadata chunks (see [_aiffDroppedChunks]).
 Uint8List _stripAiff(Uint8List bytes) {
   if (!_asciiAt(bytes, 0, 'FORM') || !_asciiAt(bytes, 8, 'AIFF')) {
     throw const FormatException('Not a valid AIFF file');

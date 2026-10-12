@@ -13,6 +13,14 @@ const Map<String, String> _aiffLabels = {
   '(c) ': 'Copyright',
 };
 
+/// WAV chunks shown as a presence field rather than decoded text.
+const Map<String, String> _wavPresenceChunks = {
+  'bext': 'Broadcast Extension',
+  '_PMX': 'XMP Packet',
+  'iXML': 'iXML Metadata',
+  'cart': 'Cart Chunk',
+};
+
 /// Maximum number of chunks scanned within one container defensively.
 const int _maxChunks = 64;
 
@@ -42,7 +50,7 @@ Future<List<MetadataFieldEntity>> extractRiff(
   }
 }
 
-/// Parses a WAV file (`RIFF`/`WAVE`) and its `LIST`/`ID3`/`bext` chunks.
+/// Parses a WAV file (`RIFF`/`WAVE`) and its `LIST`/`ID3`/`bext`/`_PMX`/`iXML`/`cart` chunks.
 List<MetadataFieldEntity> _extractWav(Uint8List bytes) {
   if (!_asciiAt(bytes, 0, 'RIFF') || !_asciiAt(bytes, 8, 'WAVE')) {
     return [
@@ -65,13 +73,16 @@ List<MetadataFieldEntity> _extractWav(Uint8List bytes) {
     final id = _chunkId(bytes, offset);
     if (id == 'LIST') {
       _parseInfoList(bytes.sublist(dataStart, dataEnd), fields);
-    } else if (id == 'ID3 ') {
+    } else if (id == 'ID3 ' || id == 'id3 ') {
       _addText(fields, 'ID3', bytes.sublist(dataStart, dataEnd));
-    } else if (id == 'bext') {
-      _addText(
-        fields,
-        'Broadcast Extension',
-        bytes.sublist(dataStart, dataEnd),
+    } else if (_wavPresenceChunks.containsKey(id)) {
+      fields.add(
+        MetadataFieldEntity(
+          section: 'Audio RIFF',
+          label: _wavPresenceChunks[id]!,
+          value: '${id.trim()} chunk present ($size bytes)',
+          isPrivacySensitive: true,
+        ),
       );
     }
 
@@ -175,7 +186,9 @@ void _addText(
   Uint8List data, {
   MetadataFieldId? id,
 }) {
-  final value = latin1.decode(data).trim();
+  var end = data.indexOf(0);
+  if (end < 0) end = data.length;
+  final value = latin1.decode(data.sublist(0, end)).trim();
   if (value.isEmpty) return;
   fields.add(
     MetadataFieldEntity(

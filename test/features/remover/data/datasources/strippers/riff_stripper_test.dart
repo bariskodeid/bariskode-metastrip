@@ -187,6 +187,64 @@ void main() {
     });
   });
 
+  group('stripRiff - extra metadata chunks', () {
+    test('drops lowercase id3 chunk', () {
+      final bytes = _wav([
+        ('fmt ', List<int>.filled(16, 0x10)),
+        ('id3 ', [...'TIT2'.codeUnits, ...List<int>.filled(9, 0xAA)]),
+        ('data', List<int>.filled(8, 0x12)),
+      ]);
+
+      final result = stripRiff(bytes, extension: 'wav');
+
+      final chunks = _chunksOf(result, endian: Endian.little);
+      expect(chunks.map((chunk) => chunk.$1), ['fmt ', 'data']);
+      expect(
+        ByteData.sublistView(result).getUint32(4, Endian.little),
+        result.length - 8,
+      );
+    });
+
+    test('drops _PMX iXML cart chunks', () {
+      final bytes = _wav([
+        ('fmt ', List<int>.filled(16, 0x10)),
+        ('_PMX', [...'<x:xmpmeta/>'.codeUnits]),
+        ('iXML', [...'<BWFXML/>'.codeUnits]),
+        ('cart', List<int>.filled(12, 0xCC)),
+        ('data', List<int>.filled(8, 0x12)),
+      ]);
+
+      final result = stripRiff(bytes, extension: 'wav');
+
+      final chunks = _chunksOf(result, endian: Endian.little);
+      expect(chunks.map((chunk) => chunk.$1), ['fmt ', 'data']);
+      expect(
+        ByteData.sublistView(result).getUint32(4, Endian.little),
+        result.length - 8,
+      );
+    });
+
+    test('AIFF drops COMT', () {
+      final bytes = _aiff([
+        ('COMM', List<int>.filled(18, 0x01)),
+        ('COMT', List<int>.filled(7, 0x02)),
+        ('SSND', List<int>.filled(9, 0x03)),
+      ]);
+
+      final result = stripRiff(bytes, extension: 'aiff');
+
+      final chunks = _chunksOf(result, endian: Endian.big);
+      expect(chunks.map((chunk) => chunk.$1), ['COMM', 'SSND']);
+      expect(chunks.last.$2, hasLength(9));
+      expect(
+        ByteData.sublistView(result).getUint32(4, Endian.big),
+        result.length - 8,
+      );
+      // 12 header + COMM (8 + 18) + SSND (8 + 9 + 1 pad).
+      expect(result.length, 12 + 26 + 18);
+    });
+  });
+
   group('stripRiff - extension handling', () {
     test('throws FormatException for an unsupported extension', () {
       final bytes = _wav([

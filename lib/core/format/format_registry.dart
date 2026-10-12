@@ -339,7 +339,7 @@ const List<FormatCapability> _standardCapabilities = [
     outputValidationStrategy: OutputValidationStrategy.signature,
     knownLimitations: [
       'Selective cleanup removes only allowlisted LIST INFO fields; full '
-          'cleanup retains the existing broader WAV metadata cleanup.'
+          'cleanup also drops id3, bext, _PMX, iXML and cart chunks.'
     ],
   ),
   FormatCapability(
@@ -355,7 +355,10 @@ const List<FormatCapability> _standardCapabilities = [
     extractionSizeLimitBytes: AppConstants.maxArchiveAndDocumentSizeBytes,
     removalSizeLimitBytes: _memoryLimit,
     outputValidationStrategy: OutputValidationStrategy.signature,
-    knownLimitations: ['Only understood AIFF metadata chunks are removed.'],
+    knownLimitations: [
+      'Only understood AIFF metadata chunks (NAME, AUTH, (c), ANNO, COMT, '
+          'ID3) are removed.',
+    ],
   ),
   FormatCapability(
     extensions: {'aac', 'm4a', 'wma', 'aif', 'aifc'},
