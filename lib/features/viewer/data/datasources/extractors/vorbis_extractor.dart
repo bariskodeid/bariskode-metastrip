@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:metastrip/core/constants/app_constants.dart';
 import 'package:metastrip/features/viewer/data/datasources/extractors/field_helpers.dart';
 import 'package:metastrip/features/viewer/domain/entities/metadata_field_entity.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
@@ -31,7 +32,7 @@ const int _maxComments = 64;
 /// Extracts Vorbis comments from raw [bytes] for the given [extension].
 ///
 /// Supports FLAC (`flac`) metadata blocks and Ogg streams (`.ogg` and `.opus`,
-/// including a pragmatic substring fallback for the comment header). Returns
+/// with comment packets reassembled across pages). Returns
 /// a single status field when the container is invalid or holds no comments;
 /// this function never throws.
 Future<List<MetadataFieldEntity>> extractVorbis(
@@ -89,13 +90,17 @@ List<MetadataFieldEntity> _extractFlac(Uint8List bytes) {
 
 /// Scans Ogg pages and returns parsed comments from the comment packet.
 ///
-/// Walks `OggS` pages, reconstructs packets from segment lacing values and
-/// looks for the `\x03vorbis` / `OpusTags` comment packets. A conservative
-/// substring fallback handles comment packets spanning pages.
+/// Walks `OggS` pages and concatenates segment data until a lacing value below
+/// 255 ends a packet, so a comment packet spanning several pages is
+/// reassembled. Only packets starting with the `vorbis` / `OpusTags`
+/// markers are buffered, and a reassembled packet larger than
+/// [AppConstants.maxAudioScanBytes] is rejected.
 List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
   const signature = [0x4F, 0x67, 0x67, 0x53]; // 'OggS'
   var offset = 0;
   var foundPage = false;
+  final packet = BytesBuilder(copy: false);
+  var skipping = false; // current packet is not a comment packet
 
   while (offset + 27 <= bytes.length) {
     if (!_startsWith(bytes, signature, offset)) break;
@@ -106,20 +111,45 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
     final tableEnd = tableStart + segmentCount;
     if (tableEnd > bytes.length) break;
 
-    final result = _scanPagePackets(bytes, tableStart, tableEnd);
-    if (result != null) return result;
-
     var cursor = tableEnd;
     for (var i = 0; i < segmentCount; i++) {
-      cursor += bytes[tableStart + i];
+      final lace = bytes[tableStart + i];
+      if (cursor + lace > bytes.length) {
+        cursor = bytes.length + 1;
+        break;
+      }
+      if (!skipping) {
+        packet.add(Uint8List.sublistView(bytes, cursor, cursor + lace));
+        if (packet.length > AppConstants.maxAudioScanBytes) {
+          return [
+            statusField(
+              'Audio Vorbis',
+              'Status',
+              'Unable to parse Vorbis comments',
+            ),
+          ];
+        }
+        if (packet.length >= 8 && !_isCommentPacketStart(packet)) {
+          skipping = true;
+          packet.clear();
+        }
+      }
+      cursor += lace;
+      if (lace < 255) {
+        if (!skipping) {
+          final parsed = _parseCommentPacket(packet.takeBytes());
+          if (parsed != null) return parsed;
+        }
+        skipping = false;
+        packet.clear();
+      }
     }
+    if (cursor > bytes.length) break; // truncated page
     if (cursor <= offset) break; // defensive: no progress
     offset = cursor;
   }
 
   if (foundPage) {
-    final fallback = _findCommentFallback(bytes);
-    if (fallback != null) return fallback;
     return [
       statusField('Audio Vorbis', 'Status', 'No Vorbis comments found'),
     ];
@@ -129,71 +159,22 @@ List<MetadataFieldEntity> _extractOgg(Uint8List bytes) {
   ];
 }
 
-/// Rebuilds packets from one Ogg page and parses a comment packet if present.
-///
-/// Returns the parsed fields when any packet on the page carries a Vorbis or
-/// Opus comment body, otherwise null.
-List<MetadataFieldEntity>? _scanPagePackets(
-  Uint8List bytes,
-  int tableStart,
-  int tableEnd,
-) {
-  var cursor = tableEnd;
-  var packetStart = cursor;
-  for (var i = 0; i < tableEnd - tableStart; i++) {
-    final lace = bytes[tableStart + i];
-    if (cursor + lace > bytes.length) return null;
-    cursor += lace;
-    if (lace < 255) {
-      final packet = bytes.sublist(packetStart, cursor);
-      final parsed = _parseCommentPacket(packet);
-      if (parsed != null) return parsed;
-      packetStart = cursor;
-    }
-  }
-  return null;
+/// Whether the buffered packet prefix is a Vorbis or Opus comment marker.
+bool _isCommentPacketStart(BytesBuilder packet) {
+  final head = packet.toBytes();
+  return (head[0] == 0x03 && _asciiEquals(head, 1, 'vorbis')) ||
+      _asciiEquals(head, 0, 'OpusTags');
 }
 
 /// Parses [packet] when it starts with a Vorbis/Opus comment marker.
 List<MetadataFieldEntity>? _parseCommentPacket(Uint8List packet) {
-  if (packet.length >= 2 &&
+  if (packet.length >= 7 &&
       packet[0] == 0x03 &&
       _asciiEquals(packet, 1, 'vorbis')) {
     return _parseCommentBlock(packet.sublist(7));
   }
   if (packet.length >= 8 && _asciiEquals(packet, 0, 'OpusTags')) {
     return _parseCommentBlock(packet.sublist(8));
-  }
-  return null;
-}
-
-/// Fallback: search for a comment header and parse what follows.
-///
-/// This belt-and-braces scan trades precision for robustness, handling files
-/// whose comment packet spans multiple Ogg pages.
-List<MetadataFieldEntity>? _findCommentFallback(Uint8List bytes) {
-  const vorbisComment = [0x03, 0x76, 0x6F, 0x72, 0x62, 0x69, 0x73];
-  const opusTag = [
-    0x4F,
-    0x70,
-    0x75,
-    0x73,
-    0x54,
-    0x61,
-    0x67,
-    0x73
-  ]; // 'OpusTags'
-  for (var i = 0; i + 8 <= bytes.length; i++) {
-    if (_startsWith(bytes, vorbisComment, i)) {
-      final comment = _parseCommentBlock(
-        bytes.sublist(i + vorbisComment.length),
-      );
-      if (comment != null) return comment;
-    }
-    if (_startsWith(bytes, opusTag, i)) {
-      final comment = _parseCommentBlock(bytes.sublist(i + opusTag.length));
-      if (comment != null) return comment;
-    }
   }
   return null;
 }
@@ -220,15 +201,23 @@ List<MetadataFieldEntity>? _parseCommentBlock(Uint8List data) {
   offset += 4;
 
   final fields = <MetadataFieldEntity>[];
-  void add(String key, String value) {
-    final normalizedKey = MetadataFieldId.normalizeVorbisCommentKey(key);
-    final label = _commentLabels[normalizedKey] ?? normalizedKey;
+  void add(String rawKey, String value) {
+    String label;
+    MetadataFieldId? id;
+    try {
+      final normalizedKey = MetadataFieldId.normalizeVorbisCommentKey(rawKey);
+      label = _commentLabels[normalizedKey] ?? normalizedKey;
+      id = MetadataFieldId.vorbisComment(normalizedKey);
+    } on ArgumentError {
+      // Not removable by stable ID; still shown to the user.
+      label = rawKey;
+    }
     fields.add(
       MetadataFieldEntity(
         section: 'Audio Vorbis',
         label: label,
         value: truncateMetadataValue(value),
-        id: MetadataFieldId.vorbisComment(normalizedKey),
+        id: id,
         isPrivacySensitive: isTextPrivacySensitive(label),
       ),
     );
@@ -243,16 +232,15 @@ List<MetadataFieldEntity>? _parseCommentBlock(Uint8List data) {
     ).getUint32(0, Endian.little);
     offset += 4;
     if (offset + entryLength > data.length) break;
-    final entry = utf8.decode(data.sublist(offset, offset + entryLength));
+    final entry = utf8.decode(
+      data.sublist(offset, offset + entryLength),
+      allowMalformed: true,
+    );
     offset += entryLength;
 
     final equals = entry.indexOf('=');
     if (equals <= 0) continue;
-    final key = MetadataFieldId.normalizeVorbisCommentKey(
-      entry.substring(0, equals),
-    );
-    final value = entry.substring(equals + 1);
-    if (key.isNotEmpty) add(key, value);
+    add(entry.substring(0, equals), entry.substring(equals + 1));
   }
   return fields;
 }

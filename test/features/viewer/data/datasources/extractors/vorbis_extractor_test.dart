@@ -37,12 +37,74 @@ void main() {
       expect(fields.single.label, 'Title');
     });
 
-    test('fails closed on malformed UTF-8 in a FLAC key/value', () async {
-      final bytes = _flacWithRawComment([0xFF, 0x3D, 0x78]);
+    test('malformed UTF-8 comment does not hide others', () async {
+      final bytes = _flacWithRawComments([
+        utf8.encode('TITLE=Fine'),
+        [0x41, 0x52, 0x54, 0x49, 0x53, 0x54, 0x3D, 0xFF, 0xFE],
+        utf8.encode('ALBUM=Also Fine'),
+      ]);
+      final fields = await extractVorbis(bytes, extension: 'flac');
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(fields, hasLength(3));
+      expect(byLabel['Title']?.value, 'Fine');
+      expect(byLabel['Album']?.value, 'Also Fine');
+      expect(byLabel['Artist']?.value, startsWith('�'));
+    });
+
+    test('key with ~ is shown without a removable id', () async {
+      final bytes = _flacWithComment(['TITLE=Fine', 'A~B=value']);
+      final fields = await extractVorbis(bytes, extension: 'flac');
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(fields, hasLength(2));
+      expect(byLabel['Title']?.id, MetadataFieldId.vorbisComment('title'));
+      expect(byLabel['A~B']?.value, 'value');
+      expect(byLabel['A~B']?.id, isNull);
+    });
+
+    test('whitespace-only key is shown without a removable id', () async {
+      final bytes = _flacWithComment(['TITLE=Fine', '  =blank-key']);
       final fields = await extractVorbis(bytes, extension: 'flac');
 
-      expect(fields.single.label, 'Status');
-      expect(fields.single.value, 'Unable to parse Vorbis comments');
+      expect(fields, hasLength(2));
+      expect(fields.last.value, 'blank-key');
+      expect(fields.last.id, isNull);
+      expect(fields.first.id, MetadataFieldId.vorbisComment('title'));
+    });
+
+    test('comment packet spanning three pages is reassembled', () async {
+      final cover = 'C' * 600;
+      final payload = _commentPayload([
+        'TITLE=Spanning',
+        'COVER=$cover',
+        'ARTIST=Tail Artist',
+      ]);
+      final bytes = _oggSpanning(
+        Uint8List.fromList([0x01, ...latin1.encode('vorbis')]),
+        _concat(
+            Uint8List.fromList([0x03, ...latin1.encode('vorbis')]), payload),
+      );
+
+      final fields = await extractVorbis(bytes, extension: 'ogg');
+      final byLabel = {for (final field in fields) field.label: field};
+
+      expect(byLabel['Title']?.value, 'Spanning');
+      expect(byLabel['COVER']?.value, startsWith('CCCC'));
+      expect(byLabel['Artist']?.value, 'Tail Artist');
+    });
+
+    test('Opus tags packet spanning pages is reassembled', () async {
+      final payload = _commentPayload(['TITLE=Opus Span', 'X=${'y' * 600}']);
+      final bytes = _oggSpanning(
+        Uint8List.fromList(latin1.encode('OpusHead') + List.filled(11, 0)),
+        _concat(Uint8List.fromList(latin1.encode('OpusTags')), payload),
+      );
+
+      final fields = await extractVorbis(bytes, extension: 'opus');
+
+      expect(fields.first.value, 'Opus Span');
+      expect(fields, hasLength(2));
     });
 
     test('extracts comments from a minimal Ogg Vorbis page', () async {
@@ -92,14 +154,60 @@ Uint8List _flacWithComment(List<String> entries) {
   return _flacWithPayload(_commentPayload(entries));
 }
 
-Uint8List _flacWithRawComment(List<int> entry) {
+Uint8List _flacWithRawComments(List<List<int>> entries) {
   final builder = BytesBuilder(copy: false)
     ..add(_le32('metastrip-test'.length))
     ..add(latin1.encode('metastrip-test'))
-    ..add(_le32(1))
-    ..add(_le32(entry.length))
-    ..add(entry);
+    ..add(_le32(entries.length));
+  for (final entry in entries) {
+    builder
+      ..add(_le32(entry.length))
+      ..add(entry);
+  }
   return _flacWithPayload(builder.takeBytes());
+}
+
+/// Builds an Ogg stream where [comment] is split over three pages (the
+/// identification packet sits alone on the first page).
+Uint8List _oggSpanning(Uint8List ident, Uint8List comment) {
+  final third = (comment.length / 3).ceil();
+  // Split on 255-byte lacing boundaries so continuation pages are legal.
+  final chunk = ((third + 254) ~/ 255) * 255;
+  final parts = <Uint8List>[];
+  for (var at = 0; at < comment.length; at += chunk) {
+    final end = at + chunk < comment.length ? at + chunk : comment.length;
+    parts.add(Uint8List.sublistView(comment, at, end));
+  }
+  expect(parts.length, greaterThanOrEqualTo(3));
+  final out = BytesBuilder(copy: false)
+    ..add(_oggPage([ident.length], ident, 0x02));
+  for (var i = 0; i < parts.length; i++) {
+    final last = i == parts.length - 1;
+    final lacing = <int>[];
+    var remaining = parts[i].length;
+    while (remaining >= 255) {
+      lacing.add(255);
+      remaining -= 255;
+    }
+    if (last) lacing.add(remaining);
+    out.add(_oggPage(lacing, parts[i], i == 0 ? 0 : 0x01));
+  }
+  return out.takeBytes();
+}
+
+Uint8List _oggPage(List<int> lacing, List<int> data, int headerType) {
+  final builder = BytesBuilder(copy: false)
+    ..add(latin1.encode('OggS'))
+    ..addByte(0)
+    ..addByte(headerType)
+    ..add(Uint8List(8))
+    ..add(_le32(0x1234))
+    ..add(_le32(0))
+    ..add(_le32(0))
+    ..addByte(lacing.length)
+    ..add(lacing)
+    ..add(data);
+  return builder.takeBytes();
 }
 
 Uint8List _flacWithPayload(Uint8List payload) {
