@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:metastrip/features/remover/data/datasources/strippers/ogg_crc.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 const _maxInputBytes = 8 * 1024 * 1024;
@@ -27,7 +28,9 @@ class OggVorbisSelectivePocResult {
 /// This is intentionally not a remover capability: it is not routed through
 /// the registry or datasource. It accepts only one logical stream, version 0
 /// pages whose packets are wholly contained by one page. The comment packet
-/// itself must be a single-page `\x03vorbis` packet. Unsupported continued or
+/// itself must be a single-page `\x03vorbis` packet; its trailing framing
+/// byte (`0x01`) is optional and re-emitted when present. Page CRCs are
+/// checked and rewritten with [oggPageCrc]. Unsupported continued or
 /// cross-page packets, malformed structures, and streams with another serial
 /// fail closed.
 /// The first page must carry BOS and no later page may carry BOS. EOS is
@@ -169,7 +172,7 @@ List<_Page> _parsePages(Uint8List bytes) {
       throw const FormatException('Truncated Ogg page payload');
     }
     final storedCrc = _le32At(bytes, offset + 22);
-    if (_crc(bytes.sublist(offset, end)) != storedCrc) {
+    if (oggPageCrc(Uint8List.sublistView(bytes, offset, end)) != storedCrc) {
       throw const FormatException('Invalid Ogg page CRC');
     }
     pages.add(_Page(
@@ -230,7 +233,8 @@ Uint8List _rewriteComment(
       kept.add(entry);
     }
   }
-  if (offset != packet.length) {
+  final hasFraming = _hasFramingByte(packet, offset);
+  if (!hasFraming && offset != packet.length) {
     throw const FormatException('Trailing Vorbis comment bytes');
   }
   final body = BytesBuilder(copy: false)
@@ -241,16 +245,26 @@ Uint8List _rewriteComment(
       ..add(_le32(entry.length))
       ..add(entry);
   }
+  if (hasFraming) {
+    body.addByte(_vorbisFramingByte);
+  }
   return Uint8List.fromList(
       [...packet.sublist(0, markerLength), ...body.takeBytes()]);
 }
+
+/// Vorbis comment header framing byte (framing bit set).
+const _vorbisFramingByte = 0x01;
+
+/// Whether [packet] ends with exactly one Vorbis framing byte at [offset],
+/// directly after the last comment entry.
+bool _hasFramingByte(Uint8List packet, int offset) =>
+    offset == packet.length - 1 && packet[offset] == _vorbisFramingByte;
 
 Uint8List _writePage(_Page page, List<int> laces, Uint8List payload) {
   final header = Uint8List.fromList(page.header);
   header[26] = laces.length;
   final result = Uint8List.fromList([...header, ...laces, ...payload]);
-  result.fillRange(22, 26, 0);
-  final crc = _crc(result);
+  final crc = oggPageCrc(result);
   ByteData.sublistView(result).setUint32(22, crc, Endian.little);
   return result;
 }
@@ -369,7 +383,7 @@ Set<String> _readKeys(Uint8List packet) {
     final decoded = _decodeUtf8(entry, 'Vorbis comment entry');
     keys.add(_normalize(decoded.substring(0, decoded.indexOf('='))));
   }
-  if (offset != packet.length) {
+  if (offset != packet.length && !_hasFramingByte(packet, offset)) {
     throw const FormatException('Malformed Vorbis comment packet');
   }
   return keys;
@@ -418,18 +432,3 @@ List<int> _le32(int value) =>
 bool _hasPrefix(Uint8List bytes, int offset, List<int> prefix) =>
     offset + prefix.length <= bytes.length &&
     prefix.asMap().entries.every((e) => bytes[offset + e.key] == e.value);
-int _crc(Uint8List page) {
-  var crc = 0;
-  for (var i = 0; i < page.length; i++) {
-    if (i >= 22 && i < 26) {
-      continue;
-    }
-    crc ^= page[i] << 24;
-    for (var bit = 0; bit < 8; bit++) {
-      crc = (crc & 0x80000000) != 0
-          ? (crc << 1 ^ 0x04C11DB7) & 0xFFFFFFFF
-          : (crc << 1) & 0xFFFFFFFF;
-    }
-  }
-  return crc;
-}

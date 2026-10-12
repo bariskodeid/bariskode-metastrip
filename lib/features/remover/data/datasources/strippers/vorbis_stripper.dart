@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:metastrip/features/remover/data/datasources/strippers/flac_validator.dart';
+import 'package:metastrip/features/remover/data/datasources/strippers/ogg_crc.dart';
 import 'package:metastrip/features/remover/domain/entities/metadata_field_id.dart';
 
 /// Length of the `fLaC` magic at the start of a FLAC file.
@@ -23,8 +24,15 @@ const int _oggHeaderLength = 27;
 /// Offset of the CRC field inside the Ogg page header (bytes 22..25).
 const int _oggCrcOffset = 22;
 
-/// Length of the Ogg CRC field within the page header.
-const int _oggCrcFieldLength = 4;
+/// Offset of the header-type flags byte inside the Ogg page header.
+const int _oggHeaderTypeOffset = 5;
+
+/// Header-type flag marking a page whose first packet continues one that
+/// began on the previous page.
+const int _oggContinuedFlag = 0x01;
+
+/// Length of the Vorbis comment header framing byte (Opus has none).
+const int _vorbisFramingLength = 1;
 
 const List<int> _flacMagic = [0x66, 0x4C, 0x61, 0x43]; // 'fLaC'
 const List<int> _oggMagic = [0x4F, 0x67, 0x67, 0x53]; // 'OggS'
@@ -76,27 +84,29 @@ class FlacSelectiveStripResult {
 /// table) and packets are reconstructed from the segment table. A packet
 /// starting with `\x03vorbis` (Vorbis comment header) or `OpusTags` is
 /// rewritten in place: the vendor string is kept but the comment count is
-/// zeroed, and the packet is padded with zero bytes so its length — and
-/// therefore the page length and segment table — stays unchanged. The page
-/// CRC is then recomputed (standard reflected CRC-32, polynomial
-/// `0x04C11DB7`, init 0, no final XOR, stored little-endian) over the header
-/// without the CRC field plus the segment count, table and payload. All
-/// other pages and packets are copied verbatim. When no comment packet is
-/// found within the first 8 pages the original bytes are returned.
+/// zeroed, a Vorbis header keeps its framing bit (`0x01`) right after the
+/// count (Opus has none), and the packet is padded with zero bytes so its
+/// length — and therefore the page length and segment table — stays
+/// unchanged. The page CRC is then recomputed with [oggPageCrc] (Ogg CRC-32:
+/// polynomial `0x04C11DB7`, MSB-first, init 0, no final XOR, over the whole
+/// page with the CRC field zeroed, stored little-endian). All other pages and
+/// packets are copied verbatim. When no comment packet is found within the
+/// first 8 pages the original bytes are returned.
 ///
 /// Known limitations of the Ogg approach: only the first 8 pages are
-/// scanned; only comment packets fully contained in a single page are
-/// rewritten (a comment packet split across pages is left untouched); and
-/// the zero padding after the zeroed count is trailing garbage for strict
-/// parsers that ignore the count field, though parsers honoring the count
-/// stop at zero comments. The common layout (identification header on the
-/// first page, self-contained comment packet on the second) is handled.
+/// scanned; a comment packet that spans pages (for example one carrying
+/// embedded cover art) is rejected with a [FormatException] rather than
+/// rewritten; and the zero padding after the zeroed count is trailing
+/// garbage for strict parsers that ignore the count field, though parsers
+/// honoring the count stop at zero comments. The common layout
+/// (identification header on the first page, self-contained comment packet
+/// on the second) is handled.
 ///
 /// Bytes without a comment block/packet are returned unchanged (the same
 /// instance). Throws [FormatException] for invalid input: a missing `fLaC` /
 /// `OggS` magic, truncated blocks or pages, a FLAC whose only metadata block
-/// is the comment block, a malformed comment packet, or an unsupported
-/// [extension].
+/// is the comment block, a malformed or page-spanning comment packet, or an
+/// unsupported [extension].
 Uint8List stripVorbisComments(Uint8List bytes, {required String extension}) {
   switch (extension.toLowerCase()) {
     case 'flac':
@@ -317,18 +327,33 @@ Uint8List _stripOgg(Uint8List bytes) {
       throw const FormatException('Truncated Ogg page');
     }
 
+    // On a continued page the first fragment ends a packet that began on an
+    // earlier page; it is not a packet start, so it is never a comment
+    // header candidate.
+    var inContinuation =
+        bytes[offset + _oggHeaderTypeOffset] & _oggContinuedFlag != 0;
     var packetStart = tableEnd;
     var packetEnd = tableEnd;
     for (var i = 0; i < segmentCount; i++) {
       packetEnd += bytes[tableStart + i];
       if (bytes[tableStart + i] < 255) {
-        if (_isCommentPacket(bytes, packetStart, packetEnd)) {
+        if (!inContinuation &&
+            _isCommentPacket(bytes, packetStart, packetEnd)) {
           _replaceCommentPacket(output, packetStart, packetEnd);
           modified = true;
           _writeOggPageCrc(output, offset, bodyEnd);
         }
+        inContinuation = false;
         packetStart = packetEnd;
       }
+    }
+    // A trailing run of 255 lacing values means the last packet continues on
+    // the next page. Rewriting it in place is unsupported, so fail closed
+    // rather than leave its comments behind.
+    if (!inContinuation &&
+        packetEnd > packetStart &&
+        _isCommentPacket(bytes, packetStart, packetEnd)) {
+      throw const FormatException('Ogg comment packet spans pages');
     }
 
     offset = bodyEnd;
@@ -351,19 +376,24 @@ bool _isCommentPacket(Uint8List bytes, int start, int end) {
 
 /// Rewrites the comment packet in [output] (offsets [start]..[end]) in place.
 ///
-/// Keeps the marker and vendor string, zeroes the comment count and pads the
-/// rest of the packet with zero bytes so its length is unchanged and the
-/// segment table stays valid.
+/// Keeps the marker and vendor string, zeroes the comment count, writes the
+/// Vorbis framing bit (`0x01`) right after the count for `\x03vorbis`
+/// packets (OpusTags has no framing bit) and pads the rest of the packet with
+/// zero bytes so its length is unchanged and the segment table stays valid.
 void _replaceCommentPacket(Uint8List output, int start, int end) {
   final length = end - start;
-  final markerLength = _startsWith(output, _opusTagMarker, start)
-      ? _opusTagMarker.length
-      : _vorbisCommentMarker.length;
+  final isOpus = _startsWith(output, _opusTagMarker, start);
+  final markerLength =
+      isOpus ? _opusTagMarker.length : _vorbisCommentMarker.length;
+  if (length < markerLength + 4) {
+    throw const FormatException('Truncated Ogg comment packet');
+  }
 
   final view = ByteData.sublistView(output, start, end);
   final vendorLength = view.getUint32(markerLength, Endian.little);
   final countOffset = markerLength + 4 + vendorLength;
-  if (countOffset + 4 > length) {
+  final framingLength = isOpus ? 0 : _vorbisFramingLength;
+  if (countOffset + 4 + framingLength > length) {
     throw const FormatException('Malformed Vorbis comment packet');
   }
 
@@ -386,42 +416,21 @@ void _replaceCommentPacket(Uint8List output, int start, int end) {
     start + markerLength + 4,
   );
   ByteData.sublistView(minimal).setUint32(countOffset, 0, Endian.little);
+  if (!isOpus) {
+    minimal[countOffset + 4] = 0x01;
+  }
   output.setRange(start, end, minimal);
 }
 
 /// Recomputes and writes the CRC of the Ogg page [output] spanning
-/// [pageStart]..[pageEnd], zeroing/overwriting the 4-byte CRC field.
+/// [pageStart]..[pageEnd], overwriting the 4-byte CRC field.
 void _writeOggPageCrc(Uint8List output, int pageStart, int pageEnd) {
-  final crc = _oggPageCrc(output.sublist(pageStart, pageEnd));
+  final crc = oggPageCrc(Uint8List.sublistView(output, pageStart, pageEnd));
   ByteData.sublistView(output).setUint32(
     pageStart + _oggCrcOffset,
     crc,
     Endian.little,
   );
-}
-
-/// Computes the Ogg page CRC over a full [pageBytes] page.
-///
-/// Standard reflected CRC-32: polynomial `0x04C11DB7` (`0xEDB88320` in
-/// reflected form), init 0, no final XOR. Covers every byte of the page
-/// except the CRC field itself: the header up to the CRC (bytes 0..21) plus
-/// the segment count, segment table and payload (bytes 26..end).
-int _oggPageCrc(Uint8List pageBytes) {
-  var crc = 0;
-  void update(int value) {
-    crc ^= value;
-    for (var i = 0; i < 8; i++) {
-      crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
-    }
-  }
-
-  for (var i = 0; i < _oggCrcOffset; i++) {
-    update(pageBytes[i]);
-  }
-  for (var i = _oggCrcOffset + _oggCrcFieldLength; i < pageBytes.length; i++) {
-    update(pageBytes[i]);
-  }
-  return crc;
 }
 
 /// Whether [bytes] starts with [prefix] at [offset].

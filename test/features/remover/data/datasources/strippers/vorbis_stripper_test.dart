@@ -236,14 +236,10 @@ void main() {
         ...'vorbis'.codeUnits,
         ...List<int>.filled(20, 0x01),
       ];
-      final commentPacket = <int>[
-        0x03,
-        ...'vorbis'.codeUnits,
-        ..._vorbisCommentPayload(
-          vendor: 'Xiph.Org',
-          comments: const ['TITLE=Hello', 'ARTIST=World'],
-        ),
-      ];
+      final commentPacket = _vorbisCommentPacket(
+        vendor: 'Xiph.Org',
+        comments: const ['TITLE=Hello', 'ARTIST=World'],
+      );
       final setupPacket = <int>[
         0x05,
         ...'vorbis'.codeUnits,
@@ -278,8 +274,10 @@ void main() {
         ByteData.sublistView(packet).getUint32(countOffset, Endian.little),
         0,
       );
+      expect(packet, hasLength(commentPacket.length));
+      expect(packet[countOffset + 4], 1, reason: 'Vorbis framing bit');
       // Trailing bytes of the preserved-length packet are zero padding.
-      expect(packet.sublist(countOffset + 4), everyElement(0));
+      expect(packet.sublist(countOffset + 5), everyElement(0));
 
       final strippedPage = result.sublist(
         page2Start,
@@ -289,7 +287,7 @@ void main() {
         22,
         Endian.little,
       );
-      expect(storedCrc, _crc(strippedPage));
+      expect(storedCrc, _referencePageCrc(strippedPage));
     });
 
     test('returns the original bytes when no comment packet is found', () {
@@ -322,11 +320,235 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('rewritten Vorbis comment page carries a libogg-valid CRC', () {
+      final page1 = _oggPage(packets: [_vorbisIdPacket], headerType: 0x02);
+      final page2 = _oggPage(
+        packets: [
+          _vorbisCommentPacket(
+            vendor: 'Xiph.Org libVorbis I 20200704 (Reducing Environment)',
+            comments: const ['TITLE=Secret', 'ARTIST=Someone', 'DATE=2026'],
+          ),
+          _vorbisSetupPacket,
+        ],
+        sequence: 1,
+      );
+      final bytes = Uint8List.fromList([...page1, ...page2]);
+
+      final result = stripVorbisComments(bytes, extension: 'ogg');
+
+      expect(result, isNot(bytes));
+      for (final page in _oggPageSpans(result)) {
+        final pageBytes = result.sublist(page.start, page.end);
+        expect(
+          ByteData.sublistView(pageBytes).getUint32(22, Endian.little),
+          _referencePageCrc(pageBytes),
+          reason: 'page at ${page.start} must carry a libogg-valid CRC',
+        );
+      }
+    });
+
+    test('Vorbis comment header keeps framing bit 1 after count', () {
+      final comment = _vorbisCommentPacket(
+        vendor: 'vendor',
+        comments: const ['TITLE=Secret'],
+      );
+      final bytes = Uint8List.fromList([
+        ..._oggPage(packets: [_vorbisIdPacket], headerType: 0x02),
+        ..._oggPage(packets: [comment, _vorbisSetupPacket], sequence: 1),
+      ]);
+
+      final result = stripVorbisComments(bytes, extension: 'ogg');
+
+      final packets = _oggPackets(result, _oggPageSpans(result)[1].start);
+      final packet = packets.first;
+      const countOffset = 7 + 4 + 6;
+      expect(packet, hasLength(comment.length));
+      expect(
+        ByteData.sublistView(packet).getUint32(countOffset, Endian.little),
+        0,
+      );
+      expect(packet[countOffset + 4], 1);
+      expect(packet.sublist(countOffset + 5), everyElement(0));
+      expect(packets[1], _vorbisSetupPacket);
+    });
+
+    test('Opus tags rewrite has no framing byte requirement', () {
+      // No comments and no trailing byte: the packet ends right after the
+      // count, which is valid for OpusTags (it has no framing bit).
+      final bare = _opusTagsPacket(vendor: 'libopus 1.4');
+      final withComments = _opusTagsPacket(
+        vendor: 'libopus 1.4',
+        comments: const ['TITLE=Secret'],
+      );
+      const countOffset = 8 + 4 + 11;
+
+      for (final tags in [bare, withComments]) {
+        final page1 = _oggPage(packets: [_opusHeadPacket], headerType: 0x02);
+        final page2 = _oggPage(packets: [tags], sequence: 1);
+        final bytes = Uint8List.fromList([...page1, ...page2]);
+
+        final result = stripVorbisComments(bytes, extension: 'ogg');
+
+        expect(result, hasLength(bytes.length));
+        final packet = _oggPackets(result, page1.length).single;
+        expect(packet, hasLength(tags.length));
+        expect(
+          ByteData.sublistView(packet).getUint32(countOffset, Endian.little),
+          0,
+        );
+        expect(packet.sublist(countOffset + 4), everyElement(0));
+        final rewrittenPage = result.sublist(page1.length);
+        expect(
+          ByteData.sublistView(rewrittenPage).getUint32(22, Endian.little),
+          _referencePageCrc(rewrittenPage),
+        );
+      }
+    });
+
+    test('Vorbis comment header without room for the framing bit throws', () {
+      // Count present but no trailing framing byte.
+      final comment = <int>[
+        0x03,
+        ...'vorbis'.codeUnits,
+        ..._vorbisCommentPayload(vendor: 'vendor'),
+      ];
+      final bytes = Uint8List.fromList([
+        ..._oggPage(packets: [_vorbisIdPacket], headerType: 0x02),
+        ..._oggPage(packets: [comment], sequence: 1),
+      ]);
+
+      expect(
+        () => stripVorbisComments(bytes, extension: 'ogg'),
+        throwsFormatException,
+      );
+    });
+
+    test('comment packet spanning two pages throws FormatException', () {
+      final comment = _vorbisCommentPacket(
+        vendor: 'vendor',
+        comments: ['METADATA_BLOCK_PICTURE=${'A' * 400}'],
+      );
+      expect(comment.length, greaterThan(255));
+      final first = comment.sublist(0, 255);
+      final rest = comment.sublist(255);
+      final bytes = Uint8List.fromList([
+        ..._oggPage(packets: [_vorbisIdPacket], headerType: 0x02),
+        ..._oggRawPage(laces: const [255], payload: first, sequence: 1),
+        ..._oggRawPage(
+          laces: [rest.length],
+          payload: rest,
+          headerType: 0x01, // continued packet
+          sequence: 2,
+        ),
+      ]);
+
+      expect(
+        () => stripVorbisComments(bytes, extension: 'ogg'),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            'Ogg comment packet spans pages',
+          ),
+        ),
+      );
+    });
+
+    test('comment packet shorter than marker+4 throws FormatException', () {
+      for (final marker in [
+        <int>[0x03, ...'vorbis'.codeUnits],
+        'OpusTags'.codeUnits,
+      ]) {
+        final bytes = Uint8List.fromList([
+          ..._oggPage(packets: [_vorbisIdPacket], headerType: 0x02),
+          ..._oggPage(
+            packets: [
+              <int>[...marker, 0x01, 0x00],
+            ],
+            sequence: 1,
+          ),
+        ]);
+
+        expect(
+          () => stripVorbisComments(bytes, extension: 'ogg'),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'Truncated Ogg comment packet',
+            ),
+          ),
+        );
+      }
+    });
+
+    test('does not treat a continued fragment as a comment packet start', () {
+      // Page 2 ends a setup packet that began on page 1; that fragment
+      // happens to begin with the comment marker but must be left alone.
+      final setup = <int>[
+        0x05,
+        ...'vorbis'.codeUnits,
+        ...List<int>.filled(248, 0x02),
+        // Continued fragment starts here and mimics a comment header.
+        0x03, ...'vorbis'.codeUnits, 0xFF, 0xFF, 0xFF, 0xFF,
+      ];
+      final bytes = Uint8List.fromList([
+        ..._oggRawPage(
+          laces: const [30, 255],
+          payload: [..._vorbisIdPacket, ...setup.sublist(0, 255)],
+          headerType: 0x02,
+        ),
+        ..._oggRawPage(
+          laces: [setup.length - 255],
+          payload: setup.sublist(255),
+          headerType: 0x01,
+          sequence: 1,
+        ),
+      ]);
+
+      final result = stripVorbisComments(bytes, extension: 'ogg');
+
+      expect(identical(result, bytes), isTrue);
+    });
   });
 
   group('disabled Ogg Vorbis selective POC', () {
+    test('accepts and re-emits the Vorbis framing bit', () {
+      final comment = _vorbisCommentPacket(
+        vendor: 'keep-vendor',
+        comments: const ['TITLE=remove', 'ARTIST=keep'],
+      );
+      final first = _oggPage(packets: [_vorbisIdPacket], headerType: 2);
+      final input = Uint8List.fromList([
+        ...first,
+        ..._oggPage(packets: [comment, _vorbisSetupPacket], sequence: 1),
+      ]);
+
+      final result = stripOggVorbisCommentsSelectivePoc(
+        input,
+        selectedKeys: {'TITLE'},
+      );
+
+      expect(result.matchedKeys, {'TITLE'});
+      final packets = _oggPackets(result.bytes, first.length);
+      final rewritten = packets.first;
+      expect(rewritten.last, 1, reason: 'Vorbis framing bit');
+      expect(_commentStrings(rewritten.sublist(0, rewritten.length - 1)), [
+        'ARTIST=keep',
+      ]);
+      expect(packets[1], _vorbisSetupPacket);
+      for (final page in _oggPageSpans(result.bytes)) {
+        final pageBytes = result.bytes.sublist(page.start, page.end);
+        expect(
+          ByteData.sublistView(pageBytes).getUint32(22, Endian.little),
+          _referencePageCrc(pageBytes),
+        );
+      }
+    });
+
     test('uses the Xiph non-reflected CRC known vector', () {
-      expect(_independentOggCrc('123456789'.codeUnits), 0x89A1897F);
+      expect(_referenceCrc32('123456789'.codeUnits), 0x89A1897F);
     });
 
     test('requires BOS on the first page and rejects later BOS', () {
@@ -418,7 +640,7 @@ void main() {
       );
       expect(
         ByteData.sublistView(rewrittenPage).getUint32(22, Endian.little),
-        _xiphCrc(rewrittenPage),
+        _referencePageCrc(rewrittenPage),
       );
     });
 
@@ -627,6 +849,24 @@ List<int> _oggPage({
     laces.addAll(packetLaces);
     payload.addAll(packetBytes);
   }
+  return _oggRawPage(
+    laces: laces,
+    payload: payload,
+    headerType: headerType,
+    sequence: sequence,
+    serial: serial,
+  );
+}
+
+/// Builds an Ogg page from an explicit lacing table, so tests can create
+/// packets that continue onto the next page.
+List<int> _oggRawPage({
+  required List<int> laces,
+  required List<int> payload,
+  int headerType = 0,
+  int sequence = 0,
+  int serial = 0x12345678,
+}) {
   final page = <int>[
     ...'OggS'.codeUnits,
     0x00, // version
@@ -639,12 +879,70 @@ List<int> _oggPage({
     ...laces,
     ...payload,
   ];
-  final crc = _xiphCrc(page);
+  final crc = _referencePageCrc(page);
   page[22] = crc & 0xFF;
   page[23] = (crc >> 8) & 0xFF;
   page[24] = (crc >> 16) & 0xFF;
   page[25] = (crc >> 24) & 0xFF;
   return page;
+}
+
+/// Start/end offsets of every Ogg page in [bytes].
+List<({int start, int end})> _oggPageSpans(Uint8List bytes) {
+  final spans = <({int start, int end})>[];
+  var offset = 0;
+  while (offset < bytes.length) {
+    final segmentCount = bytes[offset + 26];
+    var end = offset + 27 + segmentCount;
+    for (var i = 0; i < segmentCount; i++) {
+      end += bytes[offset + 27 + i];
+    }
+    spans.add((start: offset, end: end));
+    offset = end;
+  }
+  return spans;
+}
+
+/// 30-byte Vorbis identification header stand-in.
+final List<int> _vorbisIdPacket = [
+  0x01,
+  ...'vorbis'.codeUnits,
+  ...List<int>.filled(23, 0x01),
+];
+
+final List<int> _vorbisSetupPacket = [
+  0x05,
+  ...'vorbis'.codeUnits,
+  ...List<int>.filled(10, 0x02),
+];
+
+final List<int> _opusHeadPacket = [
+  ...'OpusHead'.codeUnits,
+  ...List<int>.filled(11, 0x01),
+];
+
+/// A spec-shaped Vorbis comment header, ending with the framing bit.
+List<int> _vorbisCommentPacket({
+  required String vendor,
+  List<String> comments = const [],
+}) {
+  return [
+    0x03,
+    ...'vorbis'.codeUnits,
+    ..._vorbisCommentPayload(vendor: vendor, comments: comments),
+    0x01, // framing bit
+  ];
+}
+
+/// An OpusTags packet; unlike Vorbis it has no framing bit.
+List<int> _opusTagsPacket({
+  required String vendor,
+  List<String> comments = const [],
+}) {
+  return [
+    ...'OpusTags'.codeUnits,
+    ..._vorbisCommentPayload(vendor: vendor, comments: comments),
+  ];
 }
 
 (List<int>, List<int>) _lacePacket(List<int> packet) {
@@ -697,36 +995,33 @@ List<int> _le64(int value) => [
       (value >> 56) & 0xFF,
     ];
 
-/// Test-only page builder checksum. Kept separate from production code and
-/// independently written from the Xiph/Ogg specification.
-int _crc(List<int> page) {
-  var crc = 0;
-  for (var i = 0; i < page.length; i++) {
-    if (i >= 22 && i < 26) continue;
-    crc ^= page[i];
-    for (var bit = 0; bit < 8; bit++) {
-      crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
-    }
-  }
-  return crc;
+/// Test-only Ogg page checksum, written independently of production code
+/// from RFC 3533 / libogg: CRC-32 with polynomial `0x04C11DB7`, processed
+/// MSB-first (non-reflected), initial value 0 and no final XOR, computed over
+/// the whole page with the CRC field (bytes 22..25) set to zero.
+int _referencePageCrc(List<int> page) {
+  final zeroed = List<int>.of(page)..setRange(22, 26, const [0, 0, 0, 0]);
+  return _referenceCrc32(zeroed);
 }
 
-int _xiphCrc(List<int> page) {
-  final covered = <int>[...page.take(22), ...page.skip(26)];
-  return _independentOggCrc(covered);
-}
-
-int _independentOggCrc(List<int> bytes) {
+/// Table-driven MSB-first CRC-32 reference (poly `0x04C11DB7`, init 0, no
+/// reflection, no final XOR). The table is generated here, not shared with
+/// production code, so it acts as an independent oracle.
+int _referenceCrc32(List<int> bytes) {
   var crc = 0;
   for (final byte in bytes) {
-    crc ^= byte << 24;
-    for (var i = 0; i < 8; i++) {
-      if ((crc & 0x80000000) != 0) {
-        crc = ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF;
-      } else {
-        crc = (crc << 1) & 0xFFFFFFFF;
-      }
-    }
+    crc = ((crc << 8) & 0xFFFFFFFF) ^
+        _referenceTable[((crc >> 24) ^ byte) & 0xFF];
   }
   return crc;
 }
+
+final List<int> _referenceTable = List<int>.generate(256, (index) {
+  var value = index << 24;
+  for (var bit = 0; bit < 8; bit++) {
+    value = (value & 0x80000000) != 0
+        ? ((value << 1) ^ 0x04C11DB7) & 0xFFFFFFFF
+        : (value << 1) & 0xFFFFFFFF;
+  }
+  return value;
+});

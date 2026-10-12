@@ -320,6 +320,7 @@ const List<FormatCapability> _standardCapabilities = [
     knownLimitations: [
       'Ogg/Opus cleanup is best effort and scans a bounded page window; '
           'selective removal remains disabled.',
+      'Comment packets spanning multiple pages are rejected.',
     ],
   ),
   FormatCapability(
