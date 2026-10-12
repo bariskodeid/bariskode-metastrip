@@ -75,7 +75,7 @@ void main() {
         0x00,
         0x00,
         0x00,
-        0x00
+        0x00,
       ];
       final plainText = <int>[
         0x21, 0x01, // plain text extension
@@ -87,8 +87,12 @@ void main() {
         ..._subBlock([...'NETSCAPE2.0'.codeUnits]),
         0x00,
       ];
-      final bytes =
-          _gif([...graphicControl, ...plainText, ...netScape, ..._image()]);
+      final bytes = _gif([
+        ...graphicControl,
+        ...plainText,
+        ...netScape,
+        ..._image(),
+      ]);
 
       final result = stripGif(bytes);
 
@@ -117,6 +121,42 @@ void main() {
           ),
         ),
       );
+    });
+    test('strips comment from GIF whose height high byte has bit 7 set', () {
+      final input = _gifWithDescriptor(heightHighByte: 0x80);
+
+      final out = stripGif(input);
+
+      expect(out, _gifWithDescriptor(heightHighByte: 0x80, comment: false));
+    });
+
+    test('keeps local color table and image data', () {
+      final input = _gifWithDescriptor(
+        heightHighByte: 0x00,
+        localColorTable: true,
+      );
+
+      final out = stripGif(input);
+
+      expect(
+        out,
+        _gifWithDescriptor(
+          heightHighByte: 0x00,
+          localColorTable: true,
+          comment: false,
+        ),
+      );
+    });
+
+    test('truncated 9-byte descriptor throws FormatException', () {
+      final input = Uint8List.fromList([
+        ...'GIF89a'.codeUnits,
+        0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+        0x21, 0xFE, 0x03, 0x61, 0x62, 0x63, 0x00, // comment
+        0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, // 9 bytes
+      ]);
+
+      expect(() => stripGif(input), throwsFormatException);
     });
   });
 }
@@ -165,4 +205,23 @@ int _indexOf(Uint8List haystack, List<int> needle) {
     if (matches) return i;
   }
   return -1;
+}
+
+/// Builds a GIF with a 10-byte image descriptor whose height high byte is
+/// [heightHighByte], optionally preceded by a comment extension.
+Uint8List _gifWithDescriptor({
+  required int heightHighByte,
+  bool localColorTable = false,
+  bool comment = true,
+}) {
+  return Uint8List.fromList([
+    ...'GIF89a'.codeUnits,
+    0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, // logical screen descriptor
+    if (comment) ...[0x21, 0xFE, 0x03, 0x61, 0x62, 0x63, 0x00],
+    0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, heightHighByte,
+    localColorTable ? 0x80 : 0x00,
+    if (localColorTable) ...[0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF],
+    0x02, 0x02, 0x4C, 0x01, 0x00, // LZW size + sub-block + terminator
+    0x3B,
+  ]);
 }

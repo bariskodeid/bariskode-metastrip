@@ -131,11 +131,12 @@ bool _isXmpApplication(Uint8List bytes, int offset) {
 /// color table (when present), the LZW minimum code size byte and its
 /// sub-block stream. Throws [FormatException] for truncation.
 int _imageEnd(Uint8List bytes, int offset) {
-  if (offset + 9 > bytes.length) {
+  if (offset + 10 > bytes.length) {
     throw const FormatException('Truncated GIF image descriptor');
   }
-  var cursor = offset + 9;
-  final packed = bytes[offset + 8];
+  // Descriptor: separator, left, top, width, height (2 each), packed byte.
+  var cursor = offset + 10;
+  final packed = bytes[offset + 9];
   if ((packed & 0x80) != 0) {
     cursor += 3 * (1 << ((packed & 0x07) + 1));
   }
