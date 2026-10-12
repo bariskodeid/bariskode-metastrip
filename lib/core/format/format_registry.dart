@@ -385,6 +385,7 @@ const List<FormatCapability> _standardCapabilities = [
     removalCoverage: RemovalCoverage.bestEffort,
     knownLimitations: [
       'Removal is best-effort PDF Info cleanup, not comprehensive sanitization.',
+      'Only the trailer-referenced Info dictionaries are cleaned.',
       'Selective removal applies only to supported PDF Info keys.',
     ],
   ),

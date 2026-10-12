@@ -21,7 +21,8 @@ void main() {
 
     test('blanks packet content while preserving markers and length', () async {
       const payload = '<x:xmpmeta><dc:creator>Ada</dc:creator></x:xmpmeta>';
-      const source = '%PDF-1.4\n/Producer (Acme)\n'
+      const source = '%PDF-1.4\n1 0 obj<</Producer (Acme)>>endobj\n'
+          'trailer<</Info 1 0 R>>\n'
           '$_begin$payload$_end\nTRAILING\n%%EOF';
       await input.writeAsString(source);
 
@@ -90,7 +91,8 @@ void main() {
     test('leaves packets untouched in selective Info removal', () async {
       const payload = '<x:xmpmeta>Keep</x:xmpmeta>';
       await input.writeAsString(
-        '%PDF-1.4\n/Title (Secret)/Author (Ada)\n$_begin$payload$_end\n%%EOF',
+        '%PDF-1.4\n1 0 obj<</Title (Secret)/Author (Ada)>>endobj\n'
+        'trailer<</Info 1 0 R>>\n$_begin$payload$_end\n%%EOF',
       );
 
       final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -107,7 +109,8 @@ void main() {
 
     test('keeps Info-only behavior for a PDF without a packet', () async {
       await input.writeAsString(
-        '%PDF-1.4\n1 0 obj<</Title (Secret)/Author (Alice)>>endobj\n%%EOF',
+        '%PDF-1.4\n1 0 obj<</Title (Secret)/Author (Alice)>>endobj\n'
+        'trailer<</Info 1 0 R>>\n%%EOF',
       );
 
       final output = await MetadataRemoverDatasource().stripPdfMetadata(

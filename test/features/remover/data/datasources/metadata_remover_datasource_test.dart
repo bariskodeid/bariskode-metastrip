@@ -583,7 +583,8 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n1 0 obj<</Title (Secret)/Author (Alice)>>endobj\n%%EOF',
+      '%PDF-1.4\n1 0 obj<</Title (Secret)/Author (Alice)>>endobj\n'
+      'trailer\n<</Info 1 0 R>>\n%%EOF',
     );
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -596,6 +597,155 @@ void main() {
     expect(text, contains('/Author (     )'));
     expect(text, isNot(contains('Secret')));
     expect(text, isNot(contains('Alice')));
+  });
+
+  group('stripPdfMetadata Info scoping', () {
+    late Directory dir;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('metastrip_pdf_scope_');
+    });
+
+    tearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    Future<String> strip(String source) async {
+      final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+      await input.writeAsString(source);
+      final output = await MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+      );
+      return output.readAsString();
+    }
+
+    test('outline /Title is preserved while Info /Title is blanked', () async {
+      final text = await strip(
+        '%PDF-1.4\n'
+        '2 0 obj\n<< /Type /Outlines /First 3 0 R >>\nendobj\n'
+        '3 0 obj << /Title (Chapter 1) /Parent 2 0 R >> endobj\n'
+        '4 0 obj\n<< /Title (Secret) >>\nendobj\n'
+        'trailer\n<< /Size 5 /Info 4 0 R >>\n%%EOF',
+      );
+
+      expect(text, contains('3 0 obj << /Title (Chapter 1) /Parent 2 0 R >>'));
+      expect(text, contains('<< /Title (      ) >>'));
+      expect(text, isNot(contains('Secret')));
+    });
+
+    test(
+        'indirect Info value blanks the referenced string object and keeps '
+        '"12 0 R" intact', () async {
+      final text = await strip(
+        '%PDF-1.4\n'
+        '4 0 obj\n<< /Title 12 0 R /Author (Ada) >>\nendobj\n'
+        '12 0 obj (Secret) endobj\n'
+        'trailer\n<< /Size 13 /Info 4 0 R >>\n%%EOF',
+      );
+
+      expect(text, contains('/Title 12 0 R'));
+      expect(text, contains('12 0 obj (      ) endobj'));
+      expect(text, contains('/Author (   )'));
+      expect(text, isNot(contains('Secret')));
+    });
+
+    test('unresolvable indirect Info value throws FormatException', () async {
+      final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+      await input.writeAsString(
+        '%PDF-1.4\n'
+        '4 0 obj\n<< /Title 12 0 R >>\nendobj\n'
+        'trailer\n<< /Size 13 /Info 4 0 R >>\n%%EOF',
+      );
+
+      await expectLater(
+        MetadataRemoverDatasource().stripPdfMetadata(
+          input.path,
+          outputDirectory: dir.path,
+        ),
+        throwsFormatException,
+      );
+      expect(
+        dir.listSync().where((entity) => entity.path.contains('_clean')),
+        isEmpty,
+      );
+    });
+
+    test('output byte length is unchanged', () async {
+      const source = '%PDF-1.4\n'
+          '3 0 obj << /Title (Chapter 1) >> endobj\n'
+          '4 0 obj\n<< /Title 12 0 R /Producer <414243> /Trapped /True >>\n'
+          'endobj\n'
+          '12 0 obj\n(Secret \\) report)\nendobj\n'
+          'trailer\n<< /Size 13 /Info 4 0 R >>\n%%EOF';
+
+      final text = await strip(source);
+
+      expect(text.length, source.length);
+      expect(text, contains('/Title (Chapter 1)'));
+      expect(text, contains('/Producer <      >'));
+      expect(text, contains('/Trapped /X   '));
+      expect(text, isNot(contains('Secret')));
+    });
+
+    test('indirect Info value that is not a single string throws', () async {
+      final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+      await input.writeAsString(
+        '%PDF-1.4\n'
+        '4 0 obj\n<< /Title 12 0 R >>\nendobj\n'
+        '12 0 obj\n(Secret) (Extra)\nendobj\n'
+        'trailer\n<< /Size 13 /Info 4 0 R >>\n%%EOF',
+      );
+
+      await expectLater(
+        MetadataRemoverDatasource().stripPdfMetadata(
+          input.path,
+          outputDirectory: dir.path,
+        ),
+        throwsFormatException,
+      );
+      expect(
+        dir.listSync().where((entity) => entity.path.contains('_clean')),
+        isEmpty,
+      );
+    });
+
+    test('indirect hex Info value is blanked in every revision', () async {
+      final text = await strip(
+        '%PDF-1.4\n'
+        '4 0 obj\n<< /Author 12 0 R >>\nendobj\n'
+        '12 0 obj <416461> endobj\n'
+        'trailer\n<< /Size 13 /Info 4 0 R >>\n%%EOF\n'
+        '12 0 obj <426561> endobj\n'
+        'trailer\n<< /Size 13 /Prev 9 /Info 4 0 R >>\n%%EOF',
+      );
+
+      expect(text, contains('/Author 12 0 R'));
+      expect('12 0 obj <      > endobj'.allMatches(text), hasLength(2));
+      expect(text, isNot(contains('416461')));
+      expect(text, isNot(contains('426561')));
+    });
+
+    test('selective Info removal leaves unselected indirect values', () async {
+      final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
+      await input.writeAsString(
+        '%PDF-1.4\n'
+        '4 0 obj\n<< /Title 12 0 R /Author 13 0 R >>\nendobj\n'
+        '12 0 obj (Secret) endobj\n'
+        '13 0 obj (Ada) endobj\n'
+        'trailer\n<< /Size 14 /Info 4 0 R >>\n%%EOF',
+      );
+
+      final output = await MetadataRemoverDatasource().stripPdfMetadata(
+        input.path,
+        outputDirectory: dir.path,
+        selectiveLabels: {'Title'},
+      );
+      final text = await output.readAsString();
+
+      expect(text, contains('12 0 obj (      ) endobj'));
+      expect(text, contains('13 0 obj (Ada) endobj'));
+    });
   });
 
   test('stripJpegMetadata removes ICC color profile (APP2) marker', () async {

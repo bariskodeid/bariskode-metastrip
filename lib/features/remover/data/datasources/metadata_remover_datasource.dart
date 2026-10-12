@@ -1892,17 +1892,21 @@ int _pngCrc32(Uint8List bytes, int start, int end) {
 /// original values. Labels use the PDF Info key names surfaced by the
 /// extractor (for example `Title`, `Author`, or `Trapped`).
 ///
-/// The scan is a single linear pass using plain `String.indexOf` searches
-/// with no regular expressions, so hostile input (for example an unterminated
-/// literal packed with backslashes) is walked once instead of triggering the
-/// exponential backtracking of the previous regex search. Output keeps the
-/// input byte length: literal `(...)` values, hex `<...>` values, and value
-/// tokens are replaced with an equal number of spaces while their delimiters
-/// and the `/Key` markers survive.
+/// Only the trailer-referenced Info dictionaries are cleaned: the dictionaries
+/// reachable from `/Info` in any trailer or cross-reference stream (every
+/// revision) are found by `locatePdfInfoDictionaries`, and only their
+/// top-level entries are blanked, so outline titles, annotations, and content
+/// streams keep their bytes. An indirect value such as `/Title 12 0 R` keeps
+/// the reference and blanks the string in every definition of object 12; an
+/// unresolvable or non-string target fails closed with a [FormatException].
 ///
-/// Values inside page content streams that happen to match `/Key (...)` are
-/// blanked too; this is the same best-effort MVP behavior as the previous
-/// implementation and is documented as a known limitation.
+/// All scans are linear `String.indexOf` walks with no regular expressions,
+/// so hostile input (for example an unterminated literal packed with
+/// backslashes) is walked once. Output keeps the input byte length: literal
+/// `(...)` values, hex `<...>` values, and value tokens are replaced with an
+/// equal number of spaces while their delimiters and the `/Key` markers
+/// survive. The plan comes from [findPdfInfoValueMutations], which the
+/// generated-byte validator also uses.
 ///
 /// When [blankXmpPackets] is set, the content of every literal `<?xpacket ...?>`
 /// packet is blanked with the same same-length space fill, after the Info pass
@@ -1919,54 +1923,16 @@ Uint8List _stripPdfInfoBytes(
   }
   final text = latin1.decode(bytes);
   final outBytes = Uint8List.fromList(bytes);
-  final occurrenceBudget = PdfInfoOccurrenceBudget();
-  for (final key in _pdfInfoKeysToBlank(selectiveLabels)) {
-    _blankPdfInfoKey(text, outBytes, key, occurrenceBudget);
-  }
+  applyPdfInfoValueMutations(
+    outBytes,
+    findPdfInfoValueMutations(text, _pdfInfoKeysToBlank(selectiveLabels)),
+  );
   if (blankXmpPackets) {
     for (final range in findPdfXmpPacketRanges(text)) {
       _blankRange(outBytes, range.start, range.end);
     }
   }
   return outBytes;
-}
-
-/// Blanks the value of every `/Key` marker for [key] in [text] within
-/// [outBytes].
-///
-/// Positions align between [text] and [outBytes] because [text] is decoded as
-/// latin-1 (one code unit per byte). Each occurrence is visited once and the
-/// caller's search offset always moves forward, so the whole scan is linear
-/// and never backtracks.
-void _blankPdfInfoKey(
-  String text,
-  Uint8List outBytes,
-  String key,
-  PdfInfoOccurrenceBudget occurrenceBudget,
-) {
-  final marker = '/$key';
-  var searchFrom = 0;
-  while (true) {
-    final pos = text.indexOf(marker, searchFrom);
-    if (pos < 0) break;
-    occurrenceBudget.record();
-    final keyEnd = pos + marker.length;
-    // A name character directly after `/Key` means this slash belongs to a
-    // longer name such as `/TitleFoo`; skip it instead of blanking a suffix.
-    if (keyEnd < text.length && isPdfInfoNameChar(text.codeUnitAt(keyEnd))) {
-      searchFrom = keyEnd + 1;
-      continue;
-    }
-    final range = parsePdfInfoValueRange(text, keyEnd);
-    if (range == null) {
-      throw const FormatException('Malformed PDF Info value');
-    }
-    _blankRange(outBytes, range.start, range.end);
-    if (range.replacementAtStart case final replacement?) {
-      outBytes[range.start] = replacement;
-    }
-    searchFrom = range.nextSearchOffset;
-  }
 }
 
 /// Overwrites [outBytes] in the half-open range `[start, end)` with spaces,

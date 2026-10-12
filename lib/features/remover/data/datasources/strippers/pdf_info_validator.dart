@@ -20,6 +20,10 @@ const pdfInfoValidationKeys = <String>[
 
 /// Verifies the generated mutation made by the bounded PDF Info scrubber.
 ///
+/// The expected bytes are derived from [findPdfInfoValueMutations], the same
+/// trailer-scoped Info plan (including resolved indirect string objects) the
+/// scrubber applies, so any byte outside that plan must be unchanged.
+///
 /// This intentionally does not validate PDF structure, xrefs, streams,
 /// rendering, signatures, or any metadata surface outside the supported Info
 /// key byte patterns. Set [xmpPacketsBlanked] when the scrubber also blanked
@@ -50,81 +54,20 @@ void validateGeneratedPdfInfoMutation(
   }
 
   final inputText = latin1.decode(input);
-  final ranges = <PdfInfoValueRange>[];
-  final replacements = <int, int>{};
-  final occurrenceBudget = PdfInfoOccurrenceBudget();
-  for (final key in keys) {
-    var from = 0;
-    while (true) {
-      final marker = inputText.indexOf('/$key', from);
-      if (marker < 0) break;
-      occurrenceBudget.record();
-      final keyEnd = marker + key.length + 1;
-      if (keyEnd < inputText.length &&
-          isPdfInfoNameChar(inputText.codeUnitAt(keyEnd))) {
-        from = keyEnd + 1;
-        continue;
+  final expected = Uint8List.fromList(input);
+  applyPdfInfoValueMutations(
+    expected,
+    findPdfInfoValueMutations(inputText, keys),
+  );
+  if (xmpPacketsBlanked) {
+    for (final range in findPdfXmpPacketRanges(inputText)) {
+      for (var index = range.start; index < range.end; index++) {
+        expected[index] = 0x20;
       }
-      final range = parsePdfInfoValueRange(inputText, keyEnd);
-      if (range == null) {
-        throw FormatException('Malformed PDF Info value for $key');
-      }
-      ranges.add(range);
-      replacements.removeWhere(
-        (position, _) => position >= range.start && position < range.end,
-      );
-      if (range.replacementAtStart case final replacement?) {
-        replacements[range.start] = replacement;
-      }
-      from = range.nextSearchOffset;
     }
   }
-
-  ranges.sort((left, right) => left.start.compareTo(right.start));
-  final mergedRanges = <PdfInfoValueRange>[];
-  for (final range in ranges) {
-    if (mergedRanges.isEmpty || range.start > mergedRanges.last.end) {
-      mergedRanges.add(range);
-      continue;
-    }
-    final previous = mergedRanges.removeLast();
-    mergedRanges.add(
-      PdfInfoValueRange(
-        previous.start,
-        range.end > previous.end ? range.end : previous.end,
-        range.nextSearchOffset,
-      ),
-    );
-  }
-
-  final xmpRanges = xmpPacketsBlanked
-      ? findPdfXmpPacketRanges(inputText)
-      : const <PdfXmpPacketRange>[];
-
-  var rangeIndex = 0;
-  var xmpIndex = 0;
-  for (var byteIndex = 0; byteIndex < input.length; byteIndex++) {
-    while (rangeIndex < mergedRanges.length &&
-        byteIndex >= mergedRanges[rangeIndex].end) {
-      rangeIndex++;
-    }
-    while (
-        xmpIndex < xmpRanges.length && byteIndex >= xmpRanges[xmpIndex].end) {
-      xmpIndex++;
-    }
-    final isBlankedXmp =
-        xmpIndex < xmpRanges.length && byteIndex >= xmpRanges[xmpIndex].start;
-    if (isBlankedXmp) {
-      if (output[byteIndex] != 0x20) {
-        throw const FormatException('Generated PDF mutation is invalid');
-      }
-      continue;
-    }
-    final isMutable = rangeIndex < mergedRanges.length &&
-        byteIndex >= mergedRanges[rangeIndex].start;
-    final expected =
-        replacements[byteIndex] ?? (isMutable ? 0x20 : input[byteIndex]);
-    if (output[byteIndex] != expected) {
+  for (var index = 0; index < output.length; index++) {
+    if (output[index] != expected[index]) {
       throw const FormatException('Generated PDF mutation is invalid');
     }
   }

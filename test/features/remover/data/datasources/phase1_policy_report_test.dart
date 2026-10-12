@@ -262,7 +262,10 @@ void main() {
     final directory = await Directory.systemTemp.createTemp('phase1_pdf_');
     addTearDown(() => directory.delete(recursive: true));
     final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
-    await input.writeAsString('%PDF-1.4\n/Author (Ada)\n%%EOF');
+    await input.writeAsString(
+      '%PDF-1.4\n1 0 obj<</Author (Ada)>>endobj\n'
+      'trailer<</Info 1 0 R>>\n%%EOF',
+    );
     final repository = RemoverRepositoryImpl();
 
     final result = await repository.stripFile(
@@ -299,7 +302,10 @@ void main() {
     final directory = await Directory.systemTemp.createTemp('phase1_pdf_full_');
     addTearDown(() => directory.delete(recursive: true));
     final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
-    await input.writeAsString('%PDF-1.4\n/Author (Ada)\n%%EOF');
+    await input.writeAsString(
+      '%PDF-1.4\n1 0 obj<</Author (Ada)>>endobj\n'
+      'trailer<</Info 1 0 R>>\n%%EOF',
+    );
 
     final result = await MetadataRemoverDatasource().stripMetadataWithPolicy(
       input.path,
@@ -347,7 +353,10 @@ void main() {
     final directory = await Directory.systemTemp.createTemp('phase1_pdf_bad_');
     addTearDown(() => directory.delete(recursive: true));
     final input = File('${directory.path}${Platform.pathSeparator}doc.pdf');
-    await input.writeAsString('%PDF-1.4\n/Author (unterminated');
+    await input.writeAsString(
+      '%PDF-1.4\n1 0 obj<</Author (unterminated>>endobj\n'
+      'trailer<</Info 1 0 R>>\n%%EOF',
+    );
     final datasource = MetadataRemoverDatasource();
 
     await expectLater(

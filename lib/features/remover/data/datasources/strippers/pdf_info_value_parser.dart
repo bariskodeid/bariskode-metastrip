@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:metastrip/core/processing/pdf_info_locator.dart';
+
 /// Maximum number of PDF Info key candidates processed in one scrub or
 /// generated-byte validation pass.
 const maxPdfInfoValueOccurrences = 4096;
@@ -22,6 +26,7 @@ final class PdfInfoValueRange {
     this.end,
     this.nextSearchOffset, {
     this.replacementAtStart,
+    this.reference,
   });
 
   final int start;
@@ -30,20 +35,36 @@ final class PdfInfoValueRange {
 
   /// Optional byte written at [start] after the rest of the range is blanked.
   final int? replacementAtStart;
+
+  /// The object an indirect `N G R` value points at. When non-null the range
+  /// is empty: the reference itself stays intact and the caller blanks the
+  /// referenced string object instead.
+  final PdfObjectRef? reference;
 }
 
 /// Parses the supported value following a PDF Info key ending at [keyEnd].
 ///
 /// Literal strings use balanced-parenthesis parsing. Backslash escapes consume
 /// the following byte, so escaped parentheses and backslashes do not affect
-/// nesting depth. Hex strings and bare/name tokens retain the scrubber's
-/// narrow existing behavior.
+/// nesting depth. An indirect `N G R` value yields an empty range carrying
+/// its [PdfInfoValueRange.reference]. Hex strings and bare/name tokens retain
+/// the scrubber's narrow existing behavior.
 PdfInfoValueRange? parsePdfInfoValueRange(String text, int keyEnd) {
   var start = keyEnd;
   while (start < text.length && isPdfWhitespace(text.codeUnitAt(start))) {
     start++;
   }
   if (start >= text.length) return null;
+
+  final indirect = parsePdfReferenceAt(text, start);
+  if (indirect != null) {
+    return PdfInfoValueRange(
+      start,
+      start,
+      indirect.end,
+      reference: indirect.ref,
+    );
+  }
 
   final unit = text.codeUnitAt(start);
   if (unit == 0x28) {
@@ -99,6 +120,97 @@ PdfInfoValueRange? parsePdfInfoValueRange(String text, int keyEnd) {
     end++;
   }
   return PdfInfoValueRange(start, end, end);
+}
+
+/// Finds the same-length mutations that blank the [keys] values of every
+/// trailer-referenced Info dictionary in latin-1 decoded [text].
+///
+/// Only top-level entries of the dictionaries returned by
+/// [locatePdfInfoDictionaries] are considered, so a matching `/Key` in an
+/// outline, annotation, content stream, or nested value is left alone. An
+/// indirect `N G R` value keeps the reference intact; instead the literal or
+/// hex string of every definition of the referenced object is blanked.
+///
+/// The stripper and the generated-byte validator both apply this plan, so the
+/// two cannot disagree about which bytes may change. Every Info entry counts
+/// against [maxPdfInfoValueOccurrences]. Throws a [FormatException] when a
+/// selected value is malformed, an indirect value has no plain-text
+/// definition, or a referenced object is not a single string.
+List<PdfInfoValueRange> findPdfInfoValueMutations(
+  String text,
+  List<String> keys,
+) {
+  final occurrenceBudget = PdfInfoOccurrenceBudget();
+  final mutations = <PdfInfoValueRange>[];
+  final references = <PdfObjectRef>{};
+  for (final dictionary in locatePdfInfoDictionaries(text)) {
+    for (final entry in readPdfDictionaryEntries(text, dictionary)) {
+      occurrenceBudget.record();
+      if (!keys.contains(entry.key)) continue;
+      final range = parsePdfInfoValueRange(text, entry.valueStart);
+      if (range == null || range.nextSearchOffset != entry.valueEnd) {
+        throw const FormatException('Malformed PDF Info value');
+      }
+      if (range.reference case final reference?) {
+        references.add(reference);
+      } else {
+        mutations.add(range);
+      }
+    }
+  }
+  if (references.isEmpty) return mutations;
+
+  final bodies = findPdfObjectBodiesFor(text, references);
+  for (final reference in references) {
+    final definitions = bodies[reference]!;
+    if (definitions.isEmpty) {
+      throw const FormatException('Unresolvable indirect PDF Info value');
+    }
+    for (final body in definitions) {
+      mutations.add(_indirectStringRange(text, body));
+    }
+  }
+  return mutations;
+}
+
+/// Applies [mutations] from [findPdfInfoValueMutations] to [bytes] in place,
+/// overwriting each range with spaces and then writing its replacement byte.
+void applyPdfInfoValueMutations(
+  Uint8List bytes,
+  Iterable<PdfInfoValueRange> mutations,
+) {
+  for (final mutation in mutations) {
+    for (var index = mutation.start; index < mutation.end; index++) {
+      bytes[index] = 0x20;
+    }
+    if (mutation.replacementAtStart case final replacement?) {
+      bytes[mutation.start] = replacement;
+    }
+  }
+}
+
+/// The mutable range of the single literal or hex string that forms the
+/// object [body]. Throws a [FormatException] for any other body.
+PdfInfoValueRange _indirectStringRange(String text, PdfTextRange body) {
+  var start = body.start;
+  while (start < body.end && isPdfWhitespace(text.codeUnitAt(start))) {
+    start++;
+  }
+  final isString = start < body.end &&
+      (text.codeUnitAt(start) == 0x28 ||
+          (text.codeUnitAt(start) == 0x3C && !text.startsWith('<<', start)));
+  final range = isString ? parsePdfInfoValueRange(text, start) : null;
+  if (range == null || range.nextSearchOffset > body.end) {
+    throw const FormatException('Indirect PDF Info value is not a string');
+  }
+  var after = range.nextSearchOffset;
+  while (after < body.end && isPdfWhitespace(text.codeUnitAt(after))) {
+    after++;
+  }
+  if (after != body.end) {
+    throw const FormatException('Indirect PDF Info value is not a string');
+  }
+  return range;
 }
 
 /// Whether [unit] is a PDF whitespace byte.

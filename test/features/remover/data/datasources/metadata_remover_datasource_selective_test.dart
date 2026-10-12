@@ -223,7 +223,7 @@ void main() {
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     await input.writeAsString(
       '%PDF-1.4\n1 0 obj<</Title (Secret Report)/Author (Jane Doe)>>'
-      'endobj\n%%EOF',
+      'endobj\ntrailer<</Info 1 0 R>>\n%%EOF',
     );
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -244,7 +244,7 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     const value = r'Outer (Inner \(literal\) (Deep\\Path)) End';
-    await input.writeAsString('%PDF-1.4\n/Title ($value)\n%%EOF');
+    await input.writeAsString(_infoPdf('/Title ($value)'));
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
       input.path,
@@ -253,7 +253,7 @@ void main() {
 
     expect(
       await output.readAsString(),
-      '%PDF-1.4\n/Title (${List.filled(value.length, ' ').join()})\n%%EOF',
+      _infoPdf('/Title (${List.filled(value.length, ' ').join()})'),
     );
   });
 
@@ -264,7 +264,7 @@ void main() {
     const depth = 10000;
     final value =
         '${List.filled(depth, '(').join()}Secret${List.filled(depth, ')').join()}';
-    await input.writeAsString('%PDF-1.4\n/Author ($value)\n%%EOF');
+    await input.writeAsString(_infoPdf('/Author ($value)'));
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
       input.path,
@@ -273,7 +273,7 @@ void main() {
 
     expect(
       await output.readAsString(),
-      '%PDF-1.4\n/Author (${List.filled(value.length, ' ').join()})\n%%EOF',
+      _infoPdf('/Author (${List.filled(value.length, ' ').join()})'),
     );
   });
 
@@ -283,7 +283,7 @@ void main() {
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     await input.writeAsString(
       '%PDF-1.4\n1 0 obj<</Title (Secret Report)/Author (Jane Doe)>>'
-      'endobj\n%%EOF',
+      'endobj\ntrailer<</Info 1 0 R>>\n%%EOF',
     );
 
     await expectLater(
@@ -307,7 +307,7 @@ void main() {
     final backslashes = String.fromCharCodes(List.filled(250, 0x5C));
     final input = File('${dir.path}${Platform.pathSeparator}hostile.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n1 0 obj<</Title ($backslashes>>endobj\n%%EOF',
+      _infoPdf('/Title ($backslashes'),
     );
 
     final stopwatch = Stopwatch()..start();
@@ -332,7 +332,7 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}hostile.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n${List.filled(25000, '/Title (').join()}',
+      _infoPdf(List.filled(25000, '/Title (').join()),
     );
 
     final stopwatch = Stopwatch()..start();
@@ -353,7 +353,7 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}hostile.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n${List.filled(25000, '/Subject <').join()}',
+      _infoPdf(List.filled(25000, '/Subject <').join()),
     );
 
     final stopwatch = Stopwatch()..start();
@@ -375,9 +375,9 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}dense.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n'
-      '${List.filled(maxPdfInfoValueOccurrences + 1, '/Title (x)').join()}'
-      '\n%%EOF',
+      _infoPdf(
+        List.filled(maxPdfInfoValueOccurrences + 1, '/Title (x)').join(),
+      ),
     );
 
     await expectLater(
@@ -399,9 +399,9 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}dense.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n'
-      '${List.filled(maxPdfInfoValueOccurrences + 1, '/TitleFoo (x)').join()}'
-      '\n%%EOF',
+      _infoPdf(
+        List.filled(maxPdfInfoValueOccurrences + 1, '/TitleFoo (x)').join(),
+      ),
     );
 
     await expectLater(
@@ -423,8 +423,10 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n/Title+Private (keep)/Title#46oo (also keep)'
-      '/Title (remove)/Trapped /True\n%%EOF',
+      _infoPdf(
+        '/Title+Private (keep)/Title#46oo (also keep)'
+        '/Title (remove)/Trapped /True',
+      ),
     );
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -446,7 +448,7 @@ void main() {
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     await input.writeAsString(
       '%PDF-1.4\n1 0 obj<</Title (Secret Report)/Trapped /True>>endobj\n'
-      '%%EOF',
+      'trailer<</Info 1 0 R>>\n%%EOF',
     );
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -468,7 +470,8 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}doc.pdf');
     await input.writeAsString(
-      '%PDF-1.4\n1 0 obj<</Author (Jane Doe)/Trapped true>>endobj\n%%EOF',
+      '%PDF-1.4\n1 0 obj<</Author (Jane Doe)/Trapped true>>endobj\n'
+      'trailer<</Info 1 0 R>>\n%%EOF',
     );
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -492,7 +495,7 @@ void main() {
     // hex value `<68656C6C6F>` must also be blanked between its delimiters.
     await input.writeAsString(
       '%PDF-1.4\n1 0 obj<</Title (A \\) B)/Subject <68656C6C6F>>>endobj\n'
-      '%%EOF',
+      'trailer<</Info 1 0 R>>\n%%EOF',
     );
 
     final output = await MetadataRemoverDatasource().stripPdfMetadata(
@@ -726,7 +729,7 @@ void main() {
     final dir = await Directory.systemTemp.createTemp('pdf_unknown_field_');
     addTearDown(() => dir.delete(recursive: true));
     final input = File('${dir.path}${Platform.pathSeparator}report.pdf');
-    await input.writeAsString('%PDF-1.4\n/Title (Keep)\n%%EOF');
+    await input.writeAsString(_infoPdf('/Title (Keep)'));
 
     await expectLater(
       MetadataRemoverDatasource().stripMetadata(
@@ -869,6 +872,10 @@ const _officeCoreXml = '<cp:coreProperties '
     'xmlns:dc="http://purl.org/dc/elements/1.1/">'
     '<dc:creator>Jane</dc:creator><dc:title>Keep me</dc:title>'
     '</cp:coreProperties>';
+
+/// A PDF whose trailer references object 1 holding the Info [entries].
+String _infoPdf(String entries) =>
+    '%PDF-1.4\n1 0 obj<<$entries>>endobj\ntrailer<</Info 1 0 R>>\n%%EOF';
 
 List<int> _pngChunk(String type, List<int> data) {
   final length = ByteData(4)..setUint32(0, data.length);

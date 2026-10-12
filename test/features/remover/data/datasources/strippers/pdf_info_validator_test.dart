@@ -8,12 +8,8 @@ import 'package:metastrip/features/remover/data/datasources/strippers/pdf_info_v
 void main() {
   group('validateGeneratedPdfInfoMutation', () {
     test('accepts only expected literal, hex, and token blanking', () {
-      final input = _bytes(
-        '%PDF-1.4\n/Title (Secret)/Subject <414243>/Trapped /True\n%%EOF',
-      );
-      final output = _bytes(
-        '%PDF-1.4\n/Title (      )/Subject <      >/Trapped /X   \n%%EOF',
-      );
+      final input = _info('/Title (Secret)/Subject <414243>/Trapped /True');
+      final output = _info('/Title (      )/Subject <      >/Trapped /X   ');
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, output),
@@ -22,7 +18,7 @@ void main() {
     });
 
     test('reports selected key already absent', () {
-      final bytes = _bytes('%PDF-1.4\n/Title (Keep)\n%%EOF');
+      final bytes = _info('/Title (Keep)');
 
       expect(
         () => validateGeneratedPdfInfoMutation(
@@ -35,7 +31,7 @@ void main() {
     });
 
     test('rejects malformed requested values', () {
-      final input = _bytes('%PDF-1.4\n/Title (unterminated\n%%EOF');
+      final input = _info('/Title (unterminated');
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, input),
@@ -44,7 +40,7 @@ void main() {
     });
 
     test('rejects corruption outside a recognized value', () {
-      final input = _bytes('%PDF-1.4\n/Author (Ada)\n%%EOF');
+      final input = _info('/Author (Ada)');
       final output = Uint8List.fromList(input);
       output[6] = 0x39;
 
@@ -55,7 +51,7 @@ void main() {
     });
 
     test('rejects an unblanked recognized value', () {
-      final input = _bytes('%PDF-1.4\n/Author (Ada)\n%%EOF');
+      final input = _info('/Author (Ada)');
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, input),
@@ -64,9 +60,8 @@ void main() {
     });
 
     test('does not treat a longer PDF name as a recognized key', () {
-      final input = _bytes(
-        '%PDF-1.4\n/AuthorName (Ada)/Author+Private (Bea)'
-        '/Author#46oo (Cyd)\n%%EOF',
+      final input = _info(
+        '/AuthorName (Ada)/Author+Private (Bea)/Author#46oo (Cyd)',
       );
 
       expect(
@@ -76,13 +71,11 @@ void main() {
     });
 
     test('preserves PDF name boundaries and accepts a name-token value', () {
-      final input = _bytes(
-        '%PDF-1.4\n/Title+Private (keep)/Title#46oo (keep)'
-        '/Title (remove)/Trapped /True\n%%EOF',
+      final input = _info(
+        '/Title+Private (keep)/Title#46oo (keep)/Title (remove)/Trapped /True',
       );
-      final output = _bytes(
-        '%PDF-1.4\n/Title+Private (keep)/Title#46oo (keep)'
-        '/Title (      )/Trapped /X   \n%%EOF',
+      final output = _info(
+        '/Title+Private (keep)/Title#46oo (keep)/Title (      )/Trapped /X   ',
       );
 
       expect(
@@ -92,8 +85,8 @@ void main() {
     });
 
     test('preserves a valid neutral name object for name-token values', () {
-      final input = _bytes('%PDF-1.4\n/Trapped /CustomName>>\n%%EOF');
-      final output = _bytes('%PDF-1.4\n/Trapped /X         >>\n%%EOF');
+      final input = _info('/Trapped /CustomName');
+      final output = _info('/Trapped /X         ');
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, output),
@@ -102,8 +95,8 @@ void main() {
     });
 
     test('rejects blanking the name-token delimiter or neutral name', () {
-      final input = _bytes('%PDF-1.4\n/Trapped /True\n%%EOF');
-      final invalid = _bytes('%PDF-1.4\n/Trapped      \n%%EOF');
+      final input = _info('/Trapped /True');
+      final invalid = _info('/Trapped      ');
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, invalid),
@@ -116,7 +109,7 @@ void main() {
         maxPdfInfoValueOccurrences + 1,
         '/TitleFoo (x)',
       ).join();
-      final input = _bytes('%PDF-1.4\n$markers\n%%EOF');
+      final input = _info(markers);
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, input),
@@ -124,7 +117,7 @@ void main() {
       );
     });
 
-    test('accepts overlapping recognized mutation ranges', () {
+    test('accepts a value that contains another key name', () {
       const value = '/Author (Ada)';
       final input = _literalPdf('Title', value);
       final output = _blankedLiteralPdf('Title', value.length);
@@ -135,7 +128,7 @@ void main() {
       );
     });
 
-    test('later outer mutation suppresses an earlier nested replacement', () {
+    test('blanks a value that contains a name-token key fully', () {
       const value = '/Title /True';
       final input = _literalPdf('Author', value);
       final output = _blankedLiteralPdf('Author', value.length);
@@ -147,8 +140,8 @@ void main() {
     });
 
     test('accepts escaped closing parentheses in literal values', () {
-      final input = _bytes(r'%PDF-1.4\n/Author (Ada\) Smith)\n%%EOF');
-      final output = _bytes(r'%PDF-1.4\n/Author (           )\n%%EOF');
+      final input = _info(r'/Author (Ada\) Smith)');
+      final output = _info('/Author (           )');
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, output),
@@ -196,13 +189,52 @@ void main() {
         maxPdfInfoValueOccurrences + 1,
         '/Title (x)',
       ).join();
-      final input = _bytes('%PDF-1.4\n$markers\n%%EOF');
+      final input = _info(markers);
+      final output = _info(markers.replaceAll('(x)', '( )'));
+
+      expect(
+        () => validateGeneratedPdfInfoMutation(input, output),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects blanking a /Title outside the Info dictionary', () {
+      const template = '%PDF-1.4\n'
+          '3 0 obj << /Title (OUTLINE) >> endobj\n'
+          '4 0 obj << /Title (INFO) >> endobj\n'
+          'trailer\n<< /Info 4 0 R >>\n%%EOF';
+      final input = _bytes(
+        template.replaceAll('OUTLINE', 'Chapter').replaceAll('INFO', 'Secret'),
+      );
       final output = _bytes(
-        '%PDF-1.4\n${markers.replaceAll('(x)', '( )')}\n%%EOF',
+        template.replaceAll('OUTLINE', '       ').replaceAll('INFO', '      '),
       );
 
       expect(
         () => validateGeneratedPdfInfoMutation(input, output),
+        throwsFormatException,
+      );
+    });
+
+    test('accepts a blanked indirect Info string object', () {
+      const template = '%PDF-1.4\n'
+          '4 0 obj << /Title 12 0 R >> endobj\n'
+          '12 0 obj (VALUE) endobj\n'
+          'trailer\n<< /Info 4 0 R >>\n%%EOF';
+      final input = _bytes(template.replaceAll('VALUE', 'Secret'));
+      final output = _bytes(template.replaceAll('VALUE', '      '));
+
+      expect(
+        () => validateGeneratedPdfInfoMutation(input, output),
+        returnsNormally,
+      );
+    });
+
+    test('rejects an unresolvable indirect Info value', () {
+      final input = _info('/Title 12 0 R');
+
+      expect(
+        () => validateGeneratedPdfInfoMutation(input, input),
         throwsFormatException,
       );
     });
@@ -211,8 +243,13 @@ void main() {
 
 Uint8List _bytes(String value) => Uint8List.fromList(latin1.encode(value));
 
-Uint8List _literalPdf(String key, String value) =>
-    _bytes('%PDF-1.4\n/$key ($value)\n%%EOF');
+/// A PDF whose trailer references object 1 holding the Info [entries].
+Uint8List _info(String entries) => _bytes(
+      '%PDF-1.4\n1 0 obj\n<<$entries>>\nendobj\n'
+      'trailer\n<< /Info 1 0 R >>\n%%EOF',
+    );
+
+Uint8List _literalPdf(String key, String value) => _info('/$key ($value)');
 
 Uint8List _blankedLiteralPdf(String key, int valueLength) =>
     _literalPdf(key, _repeat(' ', valueLength));
