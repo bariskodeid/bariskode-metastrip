@@ -56,13 +56,13 @@ Arsip: ZIP, TAR, APK, EPUB
 
 FORMAT YANG DIDUKUNG UNTUK CLEAN COPY REMOVAL
 
-JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP
+JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP, APK, EPUB
 
 BATASAN VERSI SAAT INI
 
-- PDF removal bersifat best-effort untuk DocInfo; XMP dan struktur lanjutan mungkin tetap ada
+- PDF removal bersifat best-effort: mengosongkan Info dictionary dan XMP yang dirujuk trailer; PDF dengan Info di compressed object stream ditolak
 - BMP removal untuk subset kanonik 24/32-bit Windows BITMAPINFOHEADER
-- ZIP cleanup bersifat container-only dan non-recursive
+- ZIP/APK/EPUB cleanup bersifat container-only dan non-recursive; APK hasil cleanup tidak lagi ter-sign dan tidak bisa di-install
 - Selective removal untuk format tertentu menggunakan ID stabil tertentu; properti custom dan legacy Office belum didukung
 - Video dan HEIC/HEIF removal belum didukung pada versi ini
 - Pemrosesan latar belakang dan notifikasi batch belum terhubung
@@ -93,7 +93,7 @@ METADATA GOOGLE PLAY TAMBAHAN
 
 Bahasa: Bahasa Indonesia, English
 Kontak: hello@bariskode.com
-Privacy Policy: https://github.com/bariskodeid/bariskode-metastrip/blob/main/PRIVACY.md
+Privacy Policy: https://github.com/bariskodeid/bariskode-metastrip/blob/main/PRIVACY-POLICY.md
 Website: https://github.com/bariskodeid/bariskode-metastrip
 Kata kunci judul: Metadata Viewer, Metadata Remover, Privacy Cleaner, File Metadata, Clean Copy, Offline Tool
 Kata kunci deskripsi: metadata, viewer, remover, privacy, offline, clean copy, no tracking, no ads, file metadata, photo metadata, exif, pdf metadata, zip metadata

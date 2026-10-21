@@ -69,13 +69,13 @@ Arsip: ZIP, TAR, APK, EPUB
 
 ### Format yang Didukung untuk Clean Copy Removal
 
-JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP
+JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP, APK, EPUB
 
 ### Batasan Versi Saat Ini
 
-- PDF removal bersifat best-effort untuk DocInfo; XMP dan struktur lanjutan mungkin tetap ada
+- PDF removal bersifat best-effort: mengosongkan Info dictionary dan XMP yang dirujuk trailer; PDF dengan Info di compressed object stream ditolak
 - BMP removal untuk subset kanonik 24/32-bit Windows BITMAPINFOHEADER
-- ZIP cleanup bersifat container-only dan non-recursive
+- ZIP/APK/EPUB cleanup bersifat container-only dan non-recursive; APK hasil cleanup tidak lagi ter-sign dan tidak bisa di-install
 - Selective removal untuk format tertentu menggunakan ID stabil tertentu; properti custom dan legacy Office belum didukung
 - Video dan HEIC/HEIF removal belum didukung pada versi ini
 - Pemrosesan latar belakang dan notifikasi batch belum terhubung
@@ -110,7 +110,7 @@ MetaStrip dirancang untuk meminimalkan data yang disimpan:
 
 - **Language:** Bahasa Indonesia, English
 - **Contact email:** hello@bariskode.com
-- **Privacy Policy URL:** https://github.com/bariskodeid/bariskode-metastrip/blob/main/PRIVACY.md
+- **Privacy Policy URL:** https://github.com/bariskodeid/bariskode-metastrip/blob/main/PRIVACY-POLICY.md
 - **Website URL:** https://github.com/bariskodeid/bariskode-metastrip
 - **App icon:** Lihat `android/app/src/main/res/mipmap-*`
 - **Feature graphic:** Disarankan visual "before/after metadata removal"
