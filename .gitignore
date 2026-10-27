@@ -55,3 +55,6 @@ upload-keystore.jks
 
 # Local tool data
 token-optimizer/
+
+# Wrangler (Cloudflare Pages deploy) cache
+.wrangler/

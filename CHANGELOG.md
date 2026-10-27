@@ -23,6 +23,7 @@ Bug-audit fixes (`docs/BUG_AUDIT_2026-10-12.md`). Items marked "manual verificat
 - iOS: the default output folder is `Documents/MetaStrip`, re-derived when an app update or restore moves the app container, so onboarding and the Remover no longer break on the stale path. Manual verification pending: iOS simulator Files visibility and an app update on device.
 - Viewer: PDF trailer Info lookup and string decoding, ID3 (truncated tags, extended header, unsynchronisation, UTF-16 COMM, v1.0, NUL escape), Vorbis (tolerant comments, multi-page packets, a truncation status when the comment packet runs past the 1 MiB read), PNG zTXt/iTXt/eXIf and GIF XMP are now parsed or shown.
 - About and Settings: About links point at real destinations with an Android 11+ `<queries>` entry, onboarding resets cleanly, unwired settings show "Not yet applied", and persisted SAF grants are released. Manual verification pending: About links on device.
+- Viewer EXIF: JPEGs whose Exif APP1 sits behind more than ~4 KB of other segments (APP11 JUMBF/C2PA, large APP2 ICC profiles, an earlier XMP APP1) showed "No EXIF metadata found", because the `exif` package only scans the first 4 KB. The extractor now locates the Exif APP1 itself. Verified on a Galaxy M20 (Android 10) with a C2PA-style JPEG.
 
 ## v0.1.0 (WIP)
 
