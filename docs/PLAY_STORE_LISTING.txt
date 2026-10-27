@@ -77,17 +77,14 @@ MetaStrip dirancang untuk meminimalkan data yang disimpan:
 - Clean copy disimpan di folder yang Anda pilih
 - File asli tidak diubah
 
-WHAT'S NEW
+WHAT'S NEW (1.0.0, versionCode 4)
 
-- CI workflow untuk lint, test, dan build debug APK
-- Release signing checklist untuk Android dan iOS
-- ZIP stress test automation untuk batas 32 MiB aggregate decompressed
-- Zip preflight hardening: ZIP64, encryption, traversal path, excessive entries rejected
-- PDF linear scan replacement untuk menghindari regex hang
-- ODF selective cleanup untuk 10 exact namespace-aware standard IDs
-- Open XML selective cleanup untuk standard core/app properties
-- Output naming collision-safe dengan auto-increment
-- SAF content:// write support untuk output di Android
+<id-ID>
+• Viewer kini membaca EXIF (GPS, kamera, tanggal) pada foto yang menyimpan Content Credentials (C2PA), profil warna besar, atau XMP sebelum EXIF; sebelumnya foto seperti ini tampil "No EXIF metadata found"
+</id-ID>
+<en-US>
+• The Viewer now reads EXIF (GPS, camera, dates) in photos that store Content Credentials (C2PA), a large color profile, or XMP before EXIF; such photos used to show "No EXIF metadata found"
+</en-US>
 
 METADATA GOOGLE PLAY TAMBAHAN
 
