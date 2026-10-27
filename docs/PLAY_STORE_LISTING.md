@@ -1,94 +1,169 @@
 # MetaStrip — Play Store Listing
 
-**App name:** MetaStrip - Metadata Viewer & Remover  
-**Short description:** Lihat dan bersihkan metadata file secara offline. Clean copy, original tetap aman.  
-**Full description:** Lihat bagian di bawah.  
+**App name:** MetaStrip by Baris Kode  
+**Default language:** Indonesian (id) · **Translation:** English (United States, en-US)  
 **Category:** Tools  
 **Tags:** privacy, metadata, file manager, cleaner, security, offline  
 **Content rating:** Everyone  
 **Target audience:** Privacy-conscious users, journalists, photographers, activists, developers, general users
 
----
-
-## Short Description
-
-Lihat dan hapus metadata dari foto, audio, dokumen, dan arsip secara offline. MetaStrip membuat clean copy tanpa mengubah file asli.
+Teks di bawah sama persis dengan yang dipasang di Play Console (Oktober 2026). Full description ditulis sebagai teks polos karena Play tidak merender Markdown.
 
 ---
 
-## Full Description
+## Indonesian (default)
 
-**Strip the invisible. Own your files.**
+### Short description
 
-MetaStrip adalah aplikasi tools untuk melihat metadata file dan membuat salinan bersih tanpa metadata sensitif. Semua pemrosesan terjadi di perangkat Anda. Tidak ada upload ke server, tidak ada iklan, tidak ada tracking.
+Lihat & hapus metadata tersembunyi, offline. Salinan bersih, file asli utuh.
 
-### Mengapa MetaStrip
+### Full description
 
-- **Privasi di perangkat**: semua ekstraksi dan penghapusan metadata dilakukan offline
-- **Original tetap utuh**: MetaStrip hanya membuat clean copy, tidak pernah mengubah file asli
-- **Transparan**: lihat dulu metadata apa yang akan dihapus sebelum memproses
-- **Tidak ada iklan dan tracking**: tidak ada SDK analytics, tidak ada SDK iklan
+```text
+Strip the invisible. Own your files.
 
-### Fitur Utama
+MetaStrip membantu kamu melihat metadata yang tersembunyi di dalam file dan membuat salinan bersih tanpa metadata sensitif. Semua diproses di perangkatmu. Tidak ada upload ke server, tidak ada iklan, tidak ada tracking.
 
-**Viewer**
-- Buka file dari sistem picker dan lihat metadata dalam kelompok yang jelas
-- Lihat metadata filesystem, EXIF, audio tags, properti dokumen, dan entri arsip
+MENGAPA METASTRIP
+- Privasi di perangkat: semua ekstraksi dan penghapusan metadata dilakukan offline
+- File asli tetap utuh: MetaStrip hanya membuat salinan bersih (clean copy) dan tidak pernah mengubah file asli
+- Transparan: lihat dulu metadata apa saja yang akan dihapus sebelum diproses
+- Tanpa iklan dan tracking: tidak ada SDK analytics, tidak ada SDK iklan
+
+FITUR UTAMA
+
+Viewer
+- Buka file lewat system picker dan lihat metadata dalam kelompok yang jelas
+- Lihat info filesystem, EXIF (termasuk lokasi GPS dan detail kamera), tag audio, properti dokumen, dan isi arsip
 - Salin nilai metadata ke clipboard
-- Tandai file atau field tertentu untuk penghapusan selective
+- Tandai file atau field tertentu untuk penghapusan selektif
 
-**Remover**
-- Buat clean copy untuk format yang didukung
-- Penghapusan full cleanup dan selective removal untuk stable-ID metadata yang didukung
-- Proses berurutan dengan progress, log per-file, dan cancel
-- Hasil berupa file baru di folder output Anda; original tetap tidak diubah
-- Nama output collision-safe dengan suffix `_clean`
+Remover
+- Buat salinan bersih untuk format yang didukung
+- Pembersihan penuh, atau hapus hanya field metadata yang kamu pilih
+- Proses banyak file berurutan dengan progress, log per file, dan tombol batal
+- Hasil disimpan sebagai file baru di folder pilihanmu; file asli tidak pernah diubah
+- Nama output aman dari bentrok dengan akhiran _clean
 
-**Selective Removal yang Sudah Terhubung**
-- PNG text chunks: hapus keyword metadata yang Anda pilih
-- PDF DocInfo: aksi selective untuk kunci DocInfo yang didukung
-- FLAC Vorbis comments: hapus comment key yang dipilih
+Penghapusan selektif
+- PNG text chunk: hapus keyword yang kamu pilih
+- PDF DocInfo: hapus kunci DocInfo yang didukung
+- FLAC Vorbis comment: hapus comment key yang dipilih
 - WAV LIST INFO: hapus subchunk INFO yang diizinkan
-- Open XML core/app properties: hapus properti standar yang didukung
-- ODF meta.xml: hapus 10 ID namespace-aware standar yang didukung
+- Properti core/app Office Open XML: hapus properti standar yang didukung
+- ODF meta.xml: hapus 10 field standar yang didukung
 
-**Settings**
-- 7 preset tema + custom theme builder dengan 16 token warna
-- Output folder dipilih sekali dan disinkronkan antar onboarding dan remover
-- Portable JSON export/import untuk memindahkan konfigurasi
-- Reset dua langkah yang menghapus settings dan onboarding state tanpa menghapus clean copy yang sudah dibuat
-- About, version, licenses, dan cache status
+Pengaturan
+- 7 preset tema plus custom theme builder dengan 16 token warna
+- Pilih folder output sekali, dipakai bersama oleh onboarding dan remover
+- Export/import pengaturan dalam format JSON
+- Reset dua langkah yang menghapus pengaturan tanpa menghapus salinan bersih yang sudah dibuat
 
-### Format yang Didukung untuk Ekstraksi Viewer
-
-Gambar: JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC  
-Video: MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV  
-Audio: MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF, AIF, AIFC  
-Dokumen: PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT  
+FORMAT YANG DIDUKUNG - VIEWER
+Gambar: JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC
+Video: MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV
+Audio: MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF, AIF, AIFC
+Dokumen: PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT
 Arsip: ZIP, TAR, APK, EPUB
 
-### Format yang Didukung untuk Clean Copy Removal
-
+FORMAT YANG DIDUKUNG - SALINAN BERSIH
 JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP, APK, EPUB
 
-### Batasan Versi Saat Ini
+BATASAN VERSI SAAT INI
+- Penghapusan PDF bersifat best-effort: mengosongkan Info dictionary dan XMP yang dirujuk trailer; PDF dengan Info di compressed object stream ditolak
+- Penghapusan BMP mendukung subset kanonik 24/32-bit Windows BITMAPINFOHEADER
+- Pembersihan ZIP/APK/EPUB hanya pada level container dan tidak rekursif; APK hasil pembersihan tidak lagi ter-sign dan tidak bisa di-install
+- Penghapusan selektif memakai ID field tertentu; properti custom dan Office lama belum didukung
+- Penghapusan metadata video dan HEIC/HEIF belum didukung di versi ini
+- Pemrosesan di latar belakang dan notifikasi batch belum tersedia
 
-- PDF removal bersifat best-effort: mengosongkan Info dictionary dan XMP yang dirujuk trailer; PDF dengan Info di compressed object stream ditolak
-- BMP removal untuk subset kanonik 24/32-bit Windows BITMAPINFOHEADER
-- ZIP/APK/EPUB cleanup bersifat container-only dan non-recursive; APK hasil cleanup tidak lagi ter-sign dan tidak bisa di-install
-- Selective removal untuk format tertentu menggunakan ID stabil tertentu; properti custom dan legacy Office belum didukung
-- Video dan HEIC/HEIF removal belum didukung pada versi ini
-- Pemrosesan latar belakang dan notifikasi batch belum terhubung
-
-### Komitmen Privasi
-
-MetaStrip dirancang untuk meminimalkan data yang disimpan:
-- Tidak ada server upload
+KOMITMEN PRIVASI
+MetaStrip dirancang untuk menyimpan data seminimal mungkin:
+- Tidak ada upload ke server
 - Tidak ada analytics
 - Tidak ada iklan
-- Metadata file hanya ditampilkan di memori sesaat
-- Clean copy disimpan di folder yang Anda pilih
-- File asli tidak diubah
+- Metadata file hanya ditampilkan sesaat di memori
+- Salinan bersih disimpan di folder pilihanmu
+- File asli tidak pernah diubah
+```
+
+---
+
+## English (United States, en-US)
+
+### Short description
+
+View and remove hidden file metadata offline. Clean copies, originals untouched.
+
+### Full description
+
+```text
+Strip the invisible. Own your files.
+
+MetaStrip lets you see the metadata hidden inside your files and create clean copies without sensitive metadata. Everything is processed on your device. No uploads to a server, no ads, no tracking.
+
+WHY METASTRIP
+- On-device privacy: all metadata extraction and removal happens offline
+- Originals stay intact: MetaStrip only creates clean copies and never modifies the original file
+- Transparent: see exactly which metadata will be removed before processing
+- No ads, no tracking: no analytics SDK, no ads SDK
+
+KEY FEATURES
+
+Viewer
+- Open files with the system picker and browse metadata in clear groups
+- See filesystem info, EXIF (including GPS location and camera details), audio tags, document properties and archive entries
+- Copy metadata values to the clipboard
+- Mark files or specific fields for selective removal
+
+Remover
+- Create clean copies for supported formats
+- Full cleanup, or selective removal of supported metadata fields
+- Sequential batch processing with progress, per-file log and cancel
+- Output is saved as a new file in your chosen folder; the original is never changed
+- Collision-safe output names with a _clean suffix
+
+Selective removal
+- PNG text chunks: remove the keywords you choose
+- PDF DocInfo: remove supported DocInfo keys
+- FLAC Vorbis comments: remove selected comment keys
+- WAV LIST INFO: remove allowed INFO subchunks
+- Office Open XML core/app properties: remove supported standard properties
+- ODF meta.xml: remove 10 supported standard fields
+
+Settings
+- 7 theme presets plus a custom theme builder with 16 color tokens
+- Pick an output folder once, shared by onboarding and the remover
+- Portable JSON export/import for your settings
+- Two-step reset that clears settings without deleting clean copies you already made
+
+SUPPORTED FORMATS - VIEWER
+Images: JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, TIF, HEIC
+Video: MP4, MOV, AVI, MKV, WebM, 3GP, FLV, WMV
+Audio: MP3, FLAC, AAC, OGG, WAV, M4A, Opus, WMA, AIFF, AIF, AIFC
+Documents: PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, RTF, TXT
+Archives: ZIP, TAR, APK, EPUB
+
+SUPPORTED FORMATS - CLEAN COPY
+JPG/JPEG, PNG, PDF, BMP, MP3, FLAC, OGG, Opus, WAV, AIFF, DOCX, XLSX, PPTX, ODT, ODS, ODP, GIF, WebP, ZIP, APK, EPUB
+
+CURRENT LIMITATIONS
+- PDF removal is best-effort: it clears the Info dictionary and the XMP referenced by the trailer; PDFs with Info inside a compressed object stream are rejected
+- BMP removal supports the canonical 24/32-bit Windows BITMAPINFOHEADER subset
+- ZIP/APK/EPUB cleanup is container-only and non-recursive; a cleaned APK is no longer signed and cannot be installed
+- Selective removal uses specific stable field IDs; custom and legacy Office properties are not supported yet
+- Video and HEIC/HEIF removal are not supported in this version
+- Background processing and batch notifications are not available yet
+
+PRIVACY COMMITMENT
+MetaStrip is designed to keep as little data as possible:
+- No server uploads
+- No analytics
+- No ads
+- File metadata is only shown in memory, briefly
+- Clean copies are saved to the folder you choose
+- Original files are never modified
+```
 
 ---
 
@@ -97,9 +172,9 @@ MetaStrip dirancang untuk meminimalkan data yang disimpan:
 Catatan rilis (Play Console "Release notes"), bukan bagian dari full description. Versi saat ini: **1.0.0 (versionCode 4)**. Tempel blok di bawah apa adanya ke Play Console; riwayat lengkap ada di `CHANGELOG.md`.
 
 ```text
-<id-ID>
+<id>
 • Viewer kini membaca EXIF (GPS, kamera, tanggal) pada foto yang menyimpan Content Credentials (C2PA), profil warna besar, atau XMP sebelum EXIF; sebelumnya foto seperti ini tampil "No EXIF metadata found"
-</id-ID>
+</id>
 <en-US>
 • The Viewer now reads EXIF (GPS, camera, dates) in photos that store Content Credentials (C2PA), a large color profile, or XMP before EXIF; such photos used to show "No EXIF metadata found"
 </en-US>
@@ -114,7 +189,8 @@ Catatan rilis (Play Console "Release notes"), bukan bagian dari full description
 - **Privacy Policy URL:** https://metastrip.bariskode.com/privacy
 - **Website URL:** https://metastrip.bariskode.com/
 - **App icon:** Lihat `android/app/src/main/res/mipmap-*`
-- **Feature graphic:** Disarankan visual "before/after metadata removal"
+- **Feature graphic:** `feature-graphic-id-1024x500.png` (default/ID) dan `feature-graphic-en-1024x500.png` (en-US), disimpan di luar repo di `Documents\metastrip-play-assets\screenshots\banner\`
+- **Phone screenshots:** 8 screenshot berframe 1080x1920 per bahasa (`framed-v2\id\`, `framed-v2\en\`), urutan 01-gps sampai 08-themes
 - **Promo text:** Lihat metadata sensitif, lalu buat clean copy secara offline
 - **Title keywords:** Metadata Viewer, Metadata Remover, Privacy Cleaner, File Metadata, Clean Copy, Offline Tool
 - **Description keywords:** metadata, viewer, remover, privacy, offline, clean copy, no tracking, no ads, file metadata, photo metadata, exif, pdf metadata, zip metadata
