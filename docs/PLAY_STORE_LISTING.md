@@ -110,8 +110,8 @@ MetaStrip dirancang untuk meminimalkan data yang disimpan:
 
 - **Language:** Bahasa Indonesia, English
 - **Contact email:** hello@bariskode.com
-- **Privacy Policy URL:** https://github.com/bariskodeid/bariskode-metastrip/blob/main/PRIVACY-POLICY.md
-- **Website URL:** https://github.com/bariskodeid/bariskode-metastrip
+- **Privacy Policy URL:** https://metastrip.bariskode.com/privacy
+- **Website URL:** https://metastrip.bariskode.com/
 - **App icon:** Lihat `android/app/src/main/res/mipmap-*`
 - **Feature graphic:** Disarankan visual "before/after metadata removal"
 - **Promo text:** Lihat metadata sensitif, lalu buat clean copy secara offline

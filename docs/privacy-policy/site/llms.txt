@@ -1,0 +1,23 @@
+# MetaStrip
+
+> MetaStrip - Metadata Viewer & Remover is an Android app (Android 7.0+) that shows the metadata hidden in photos, audio, documents, and archives, and makes clean copies without it. All processing runs on the phone: no account, no server, no internet permission in the release build. The original file is never changed. Made by Baris Kode (PT Baris Kode Solution), Indonesia.
+
+## Key facts
+
+- Viewer: filesystem metadata, EXIF, audio tags, document properties, and archive entries for 40+ extensions (images incl. TIFF and HEIC, video, audio, PDF, Office, ODF, RTF, TXT, ZIP, TAR, APK, EPUB). Values can be copied to the clipboard.
+- Remover (clean copy) formats: JPG/JPEG, PNG, GIF, WebP, BMP, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, MP3, FLAC, OGG, Opus, WAV, AIFF, ZIP, APK, EPUB.
+- Output: a new file named <name>_clean (numbered on collision) in the output folder the user picks; never overwrites. Each output is re-validated after writing.
+- Selective removal by stable field ID: PNG text chunks, PDF DocInfo, FLAC Vorbis comments, WAV LIST INFO, standard Office core/app properties, and standard ODF meta.xml fields.
+- Limits: PDF removal is best-effort (blanks the trailer-referenced Info dictionary and XMP; rejects PDFs with Info in a compressed object stream). BMP limited to canonical 24/32-bit BITMAPINFOHEADER. ZIP/APK/EPUB cleanup is container-only and non-recursive; a cleaned APK is no longer signed. Video and HEIC/HEIF can be viewed, not cleaned. Remover input cap 50 MiB; ZIP-family contents capped at 32 MB decompressed and 2,000 entries.
+- Processing: sequential, with progress, per-file log, and cancel.
+- Settings: 7 theme presets plus a custom theme builder (16 color tokens), JSON settings export/import, two-step reset.
+- Privacy: no backend, no analytics or ad SDKs, no account. Uses the system file picker and Storage Access Framework instead of broad storage permissions. Extracted metadata stays in memory only.
+- Availability: free on Google Play: https://play.google.com/store/apps/details?id=com.bariskode.metastrip
+- Contact: hello@bariskode.com
+
+## Pages
+
+- [Home (Indonesian)](https://metastrip.bariskode.com/): features, how it works, formats, privacy, FAQ
+- [Home (English)](https://metastrip.bariskode.com/en/)
+- [Privacy Policy (Indonesian)](https://metastrip.bariskode.com/privacy)
+- [Privacy Policy (English)](https://metastrip.bariskode.com/en/privacy)

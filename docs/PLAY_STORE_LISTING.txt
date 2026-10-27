@@ -93,8 +93,8 @@ METADATA GOOGLE PLAY TAMBAHAN
 
 Bahasa: Bahasa Indonesia, English
 Kontak: hello@bariskode.com
-Privacy Policy: https://github.com/bariskodeid/bariskode-metastrip/blob/main/PRIVACY-POLICY.md
-Website: https://github.com/bariskodeid/bariskode-metastrip
+Privacy Policy: https://metastrip.bariskode.com/privacy
+Website: https://metastrip.bariskode.com/
 Kata kunci judul: Metadata Viewer, Metadata Remover, Privacy Cleaner, File Metadata, Clean Copy, Offline Tool
 Kata kunci deskripsi: metadata, viewer, remover, privacy, offline, clean copy, no tracking, no ads, file metadata, photo metadata, exif, pdf metadata, zip metadata
 

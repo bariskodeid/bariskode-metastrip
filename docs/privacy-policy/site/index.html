@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetaStrip: Lihat &amp; Hapus Metadata File Secara Offline</title>
+  <meta name="description" content="Lihat dan hapus metadata dari foto, audio, dokumen, dan arsip secara offline. MetaStrip membuat clean copy tanpa mengubah file asli. Tanpa iklan, tanpa tracking.">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="author" content="Baris Kode (PT Baris Kode Solution)">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="canonical" href="https://metastrip.bariskode.com/">
+  <link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/">
+  <link rel="alternate" hreflang="en" href="https://metastrip.bariskode.com/en/">
+  <link rel="alternate" hreflang="x-default" href="https://metastrip.bariskode.com/">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/icon.png" sizes="256x256">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MetaStrip">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:url" content="https://metastrip.bariskode.com/">
+  <meta property="og:title" content="MetaStrip — Hapus yang tak terlihat. Kuasai file Anda.">
+  <meta property="og:description" content="Lihat dan hapus metadata dari foto, audio, dokumen, dan arsip secara offline. MetaStrip membuat clean copy tanpa mengubah file asli. Tanpa iklan, tanpa tracking.">
+  <meta property="og:image" content="https://metastrip.bariskode.com/img/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="MetaStrip: lihat dan hapus metadata foto, audio, dokumen, dan arsip secara offline">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MetaStrip — Hapus yang tak terlihat. Kuasai file Anda.">
+  <meta name="twitter:description" content="Lihat dan hapus metadata dari foto, audio, dokumen, dan arsip secara offline. MetaStrip membuat clean copy tanpa mengubah file asli. Tanpa iklan, tanpa tracking.">
+  <meta name="twitter:image" content="https://metastrip.bariskode.com/img/og-image.jpg">
+  <meta name="twitter:image:alt" content="MetaStrip: lihat dan hapus metadata foto, audio, dokumen, dan arsip secara offline">
+  <link rel="preload" as="image" href="/img/shot-1.webp" imagesrcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" imagesizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" type="image/webp" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/site.css?v=20261027">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://metastrip.bariskode.com/#organization",
+        "name": "Baris Kode",
+        "legalName": "PT Baris Kode Solution",
+        "email": "hello@bariskode.com",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://metastrip.bariskode.com/icon.png",
+          "width": 256,
+          "height": 256
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://metastrip.bariskode.com/#website",
+        "url": "https://metastrip.bariskode.com/",
+        "name": "MetaStrip",
+        "inLanguage": [
+          "id",
+          "en"
+        ],
+        "publisher": {
+          "@id": "https://metastrip.bariskode.com/#organization"
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://metastrip.bariskode.com/#webpage",
+        "url": "https://metastrip.bariskode.com/",
+        "name": "MetaStrip: Lihat & Hapus Metadata File Secara Offline",
+        "description": "Lihat dan hapus metadata dari foto, audio, dokumen, dan arsip secara offline. MetaStrip membuat clean copy tanpa mengubah file asli. Tanpa iklan, tanpa tracking.",
+        "inLanguage": "id",
+        "isPartOf": {
+          "@id": "https://metastrip.bariskode.com/#website"
+        },
+        "about": {
+          "@id": "https://metastrip.bariskode.com/#app"
+        },
+        "primaryImageOfPage": "https://metastrip.bariskode.com/img/og-image.jpg"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://metastrip.bariskode.com/#app",
+        "name": "MetaStrip - Metadata Viewer & Remover",
+        "alternateName": "MetaStrip",
+        "description": "Aplikasi Android untuk melihat metadata file dan membuat clean copy tanpa metadata sensitif, sepenuhnya offline di perangkat.",
+        "operatingSystem": "Android 7.0+",
+        "applicationCategory": "UtilitiesApplication",
+        "image": "https://metastrip.bariskode.com/icon.png",
+        "screenshot": [
+          "https://metastrip.bariskode.com/img/shot-1.webp",
+          "https://metastrip.bariskode.com/img/shot-2.webp",
+          "https://metastrip.bariskode.com/img/shot-3.webp",
+          "https://metastrip.bariskode.com/img/shot-4.webp",
+          "https://metastrip.bariskode.com/img/shot-5.webp"
+        ],
+        "featureList": [
+          "Lihat metadata filesystem, EXIF, tag audio, properti dokumen, dan entri arsip",
+          "Clean copy untuk 21 format; file asli tidak pernah diubah",
+          "Hapus selektif per field untuk PNG, PDF, FLAC, WAV, Office, dan ODF",
+          "Proses berurutan dengan progress, log per file, dan tombol batal",
+          "Salin nilai metadata ke clipboard",
+          "7 preset tema dan custom theme builder",
+          "Export dan import pengaturan dalam JSON",
+          "Offline penuh: tanpa izin internet, tanpa iklan, tanpa analytics"
+        ],
+        "installUrl": "https://play.google.com/store/apps/details?id=com.bariskode.metastrip",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "IDR"
+        },
+        "publisher": {
+          "@id": "https://metastrip.bariskode.com/#organization"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://metastrip.bariskode.com/#faq",
+        "inLanguage": "id",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Apakah file saya diupload ke server?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Tidak. Semua ekstraksi dan penghapusan metadata berjalan di HP Anda. MetaStrip tidak punya server backend, tidak memuat SDK analytics atau iklan, dan versi rilisnya tidak meminta izin internet."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Apakah file asli saya diubah?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Tidak. MetaStrip selalu menulis file baru bernama <nama>_clean di folder output yang Anda pilih. Jika nama itu sudah ada, MetaStrip menambahkan nomor. File asli tidak ditimpa, dipindah, atau dihapus."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Format apa saja yang bisa dibersihkan?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "JPG/JPEG, PNG, GIF, WebP, BMP, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, MP3, FLAC, OGG, Opus, WAV, AIFF, ZIP, APK, dan EPUB. Viewer bisa membaca lebih banyak format, termasuk video, HEIC, TIFF, dan RTF."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Apakah semua metadata pasti terhapus?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "MetaStrip menghapus metadata yang didukung untuk tiap format. Untuk PDF prosesnya best-effort: Info dictionary dan XMP yang dirujuk trailer dikosongkan, dan PDF yang menyimpan Info di compressed object stream ditolak. ZIP, APK, dan EPUB hanya dibersihkan di level container, tidak sampai file di dalamnya. Buka hasilnya di Viewer untuk memeriksa ulang."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Kenapa APK hasil cleanup tidak bisa di-install?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Membersihkan metadata container mengubah isi paket, sehingga tanda tangan APK tidak berlaku lagi. Gunakan APK hasil cleanup untuk diarsipkan atau dibagikan sebagai file, bukan untuk di-install."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Apakah ada batas ukuran file?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Remover menerima file hingga 50 MiB. Untuk ZIP, Office, ODF, APK, dan EPUB, total isi setelah dekompresi dibatasi 32 MB dan maksimal 2.000 entri, supaya proses tetap aman di memori HP."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "HP apa saja yang didukung?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "HP Android 7.0 ke atas."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+      <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1.5 3.3A1.6 1.6 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1.2"/><circle cx="12" cy="7" r="1.2"/><circle cx="16.5" cy="10.5" r="1.2"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></symbol>
+      <symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M19 12.9a10 10 0 0 0-2.3-1.6"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 11 5"/><path d="M12 20h.01"/></symbol>
+      <symbol id="i-file-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><rect x="8.5" y="13" width="7" height="5" rx="1"/><path d="M10 13v-1.5a2 2 0 0 1 4 0V13"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+      <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip-link" href="#main">Langsung ke konten</a>
+
+  <header class="site-header">
+    <nav class="container nav" aria-label="Navigasi utama">
+      <a class="brand" href="/" aria-label="MetaStrip, beranda">
+        <img src="/icon.png" alt="" width="34" height="34">
+        MetaStrip
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Buka menu">
+        <svg aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+      <div class="nav-menu" id="nav-menu">
+        <ul class="nav-links">
+          <li><a href="#fitur">Fitur</a></li>
+          <li><a href="#cara-kerja">Cara kerja</a></li>
+          <li><a href="#format">Format</a></li>
+          <li><a href="#privasi">Privasi</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+        <div class="nav-actions">
+          <div class="lang-switch" aria-label="Bahasa">
+            <span aria-current="true">ID</span>
+            <a href="/en/" hreflang="en" lang="en">EN</a>
+          </div>
+          <a class="btn btn-primary btn-sm" href="#unduh">Dapatkan</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <h1><span class="eyebrow">Metadata viewer &amp; remover offline</span> <span class="h1-main">Hapus yang tak terlihat. <em>Kuasai file Anda.</em></span></h1>
+          <p class="hero-lead">MetaStrip menampilkan metadata tersembunyi di foto, audio, dokumen, dan arsip, lalu membuat salinan bersih tanpa mengubah file asli. Semuanya diproses di HP Anda.</p>
+          <div class="hero-cta">
+            <a class="btn btn-store" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">
+              <svg aria-hidden="true"><use href="#i-phone"/></svg>
+              <span><small>Dapatkan di</small><strong>Google Play</strong></span>
+            </a>
+            <a class="btn btn-ghost-dark" href="#fitur">Lihat fitur</a>
+          </div>
+          <ul class="hero-trust">
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg>Offline penuh</li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg>File asli tidak diubah</li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg>Tanpa iklan &amp; tracking</li>
+          </ul>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="phone phone-back">
+            <img src="/img/shot-4.webp" srcset="/img/shot-4-360.webp 360w, /img/shot-4.webp 540w" sizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" alt="" width="540" height="1170" loading="eager" decoding="async">
+          </div>
+          <div class="phone phone-front">
+            <img src="/img/shot-1.webp" srcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" sizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" alt="" width="540" height="1170" fetchpriority="high" decoding="async">
+          </div>
+          <div class="tag-card tag-before">
+            <small>EXIF · IMG_2041.JPG</small>
+            <dl>
+              <dt>GPS</dt><dd>-6.2088, 106.8456</dd>
+              <dt>Model</dt><dd>Pixel 8 Pro</dd>
+              <dt>DateTime</dt><dd>2026:10:21 08:14</dd>
+            </dl>
+          </div>
+          <div class="tag-card tag-after">
+            <small>Clean copy</small>
+            <p><strong>IMG_2041_clean.JPG</strong><br>Metadata dihapus. File asli utuh.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="fitur" aria-labelledby="fitur-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Fitur</span>
+          <h2 id="fitur-title">Lihat dulu, lalu bersihkan</h2>
+          <p>Foto, dokumen, dan rekaman sering membawa lokasi, nama perangkat, nama penulis, atau riwayat edit. MetaStrip menunjukkan semuanya sebelum Anda membagikan file.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-search"/></svg></div>
+            <h3>Viewer lengkap</h3>
+            <p>Metadata filesystem, EXIF, tag audio, properti dokumen, dan entri arsip, dikelompokkan dengan rapi.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-copy"/></svg></div>
+            <h3>Clean copy, original utuh</h3>
+            <p>Hasil selalu berupa file baru <code>_clean</code> di folder pilihan Anda. Nama yang bentrok diberi nomor, tidak pernah ditimpa.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-sliders"/></svg></div>
+            <h3>Hapus selektif</h3>
+            <p>Pilih field tertentu: text chunk PNG, DocInfo PDF, Vorbis comment FLAC, WAV LIST INFO, serta properti Office dan ODF.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-layers"/></svg></div>
+            <h3>21 format removal</h3>
+            <p>Gambar, PDF, Office, ODF, audio, ZIP, APK, dan EPUB. Viewer membaca lebih dari 40 ekstensi.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-list"/></svg></div>
+            <h3>Proses terkendali</h3>
+            <p>File diproses berurutan dengan progress, log per file, dan tombol batal. Hasil divalidasi ulang setelah ditulis.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-clipboard"/></svg></div>
+            <h3>Salin nilai</h3>
+            <p>Salin nilai metadata ke clipboard untuk dicatat atau dibandingkan.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-palette"/></svg></div>
+            <h3>7 tema + custom</h3>
+            <p>Dark Industrial, Steel Blue, Acid Green, dan lainnya, plus custom theme builder dengan 16 token warna.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-settings"/></svg></div>
+            <h3>Pengaturan portabel</h3>
+            <p>Export dan import pengaturan dalam JSON. Reset dua langkah tanpa menghapus clean copy yang sudah dibuat.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="tampilan" aria-labelledby="tampilan-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Tampilan</span>
+          <h2 id="tampilan-title">Teknis, tegas, tanpa basa-basi</h2>
+          <p>Antarmuka monospace bergaya industrial, dibuat untuk membaca data dengan jelas.</p>
+        </div>
+        <div class="gallery">
+          <ul class="gallery-track" aria-label="Screenshot aplikasi">
+            <li><img src="/img/shot-1.webp" srcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Layar Viewer: tambahkan file untuk diperiksa"></li>
+            <li><img src="/img/shot-2.webp" srcset="/img/shot-2-360.webp 360w, /img/shot-2.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Pengaturan tema dan folder output"></li>
+            <li><img src="/img/shot-3.webp" srcset="/img/shot-3-360.webp 360w, /img/shot-3.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Pengaturan pemrosesan dan maintenance"></li>
+            <li><img src="/img/shot-4.webp" srcset="/img/shot-4-360.webp 360w, /img/shot-4.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Pilihan 7 tema warna"></li>
+            <li><img src="/img/shot-5.webp" srcset="/img/shot-5-360.webp 360w, /img/shot-5.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Custom theme builder"></li>
+          </ul>
+          <div class="gallery-controls">
+            <button class="icon-btn" type="button" data-gallery="prev" aria-label="Screenshot sebelumnya"><svg aria-hidden="true"><use href="#i-left"/></svg></button>
+            <button class="icon-btn" type="button" data-gallery="next" aria-label="Screenshot berikutnya"><svg aria-hidden="true"><use href="#i-right"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="cara-kerja" aria-labelledby="cara-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Cara kerja</span>
+          <h2 id="cara-title">Tiga langkah, tanpa upload</h2>
+          <p>Tanpa akun, tanpa koneksi internet, dan tanpa izin storage yang luas.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <h3>Pilih file</h3>
+            <p>Buka file lewat file picker sistem. MetaStrip hanya membaca file yang Anda pilih sendiri.</p>
+          </li>
+          <li class="step">
+            <h3>Periksa metadata</h3>
+            <p>Lihat apa saja yang tersimpan di file. Bersihkan semua metadata yang didukung, atau pilih field tertentu saja.</p>
+          </li>
+          <li class="step">
+            <h3>Simpan clean copy</h3>
+            <p>MetaStrip menulis file baru ke folder output Anda dan memvalidasinya ulang. File asli tetap seperti semula.</p>
+          </li>
+        </ol>
+        <p class="note">Folder output dipilih sekali saat onboarding dan bisa diganti kapan saja di Settings.</p>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="format" aria-labelledby="format-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Format</span>
+          <h2 id="format-title">Format yang didukung</h2>
+          <p>Viewer membaca lebih banyak format daripada yang bisa dibersihkan. Daftar removal terus bertambah.</p>
+        </div>
+        <div class="formats">
+          <article class="format-card">
+            <h3>Lihat metadata</h3>
+            <p class="format-sub">Viewer, lebih dari 40 ekstensi.</p>
+            <dl class="format-groups">
+              <div>
+                <dt>Gambar</dt>
+                <dd><ul class="chips"><li>JPG</li><li>PNG</li><li>WebP</li><li>GIF</li><li>BMP</li><li>TIFF</li><li>HEIC</li></ul></dd>
+              </div>
+              <div>
+                <dt>Video</dt>
+                <dd><ul class="chips"><li>MP4</li><li>MOV</li><li>AVI</li><li>MKV</li><li>WebM</li><li>3GP</li><li>FLV</li><li>WMV</li></ul></dd>
+              </div>
+              <div>
+                <dt>Audio</dt>
+                <dd><ul class="chips"><li>MP3</li><li>FLAC</li><li>AAC</li><li>OGG</li><li>WAV</li><li>M4A</li><li>Opus</li><li>WMA</li><li>AIFF</li></ul></dd>
+              </div>
+              <div>
+                <dt>Dokumen &amp; arsip</dt>
+                <dd><ul class="chips"><li>PDF</li><li>DOCX</li><li>XLSX</li><li>PPTX</li><li>ODT</li><li>ODS</li><li>ODP</li><li>RTF</li><li>TXT</li><li>ZIP</li><li>TAR</li><li>APK</li><li>EPUB</li></ul></dd>
+              </div>
+            </dl>
+          </article>
+          <article class="format-card format-card-dark">
+            <span class="format-badge">Clean copy</span>
+            <h3>Bersihkan metadata</h3>
+            <p class="format-sub">Remover, 21 format.</p>
+            <dl class="format-groups">
+              <div>
+                <dt>Gambar</dt>
+                <dd><ul class="chips"><li>JPG/JPEG</li><li>PNG</li><li>GIF</li><li>WebP</li><li>BMP</li></ul></dd>
+              </div>
+              <div>
+                <dt>Dokumen</dt>
+                <dd><ul class="chips"><li>PDF</li><li>DOCX</li><li>XLSX</li><li>PPTX</li><li>ODT</li><li>ODS</li><li>ODP</li></ul></dd>
+              </div>
+              <div>
+                <dt>Audio</dt>
+                <dd><ul class="chips"><li>MP3</li><li>FLAC</li><li>OGG</li><li>Opus</li><li>WAV</li><li>AIFF</li></ul></dd>
+              </div>
+              <div>
+                <dt>Arsip</dt>
+                <dd><ul class="chips"><li>ZIP</li><li>APK</li><li>EPUB</li></ul></dd>
+              </div>
+            </dl>
+          </article>
+        </div>
+        <div class="limits">
+          <h3>Batasan versi ini</h3>
+          <ul>
+            <li>PDF bersifat best-effort: Info dictionary dan XMP yang dirujuk trailer dikosongkan; PDF dengan Info di compressed object stream ditolak.</li>
+            <li>BMP terbatas pada subset kanonik 24/32-bit Windows BITMAPINFOHEADER.</li>
+            <li>ZIP, APK, dan EPUB dibersihkan di level container saja, tidak rekursif. APK hasil cleanup tidak lagi ter-sign.</li>
+            <li>Hapus selektif hanya untuk ID metadata standar yang didukung; properti custom dan legacy Office belum didukung.</li>
+            <li>Video dan HEIC/HEIF baru bisa dilihat, belum bisa dibersihkan.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section privacy-band" id="privasi" aria-labelledby="privasi-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Privasi</span>
+          <h2 id="privasi-title">File Anda tidak pernah keluar dari HP</h2>
+          <p>Aplikasi untuk privasi seharusnya tidak mengumpulkan data. MetaStrip dibuat tanpa backend sama sekali.</p>
+        </div>
+        <div class="privacy-grid">
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-wifi-off"/></svg>
+            <h3>Tanpa izin internet</h3>
+            <p>Versi rilis tidak meminta akses internet. Tidak ada upload dan tidak ada server.</p>
+          </div>
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-eye-off"/></svg>
+            <h3>Tanpa iklan &amp; analytics</h3>
+            <p>Tidak ada SDK iklan, analytics, atau pelacak. Tidak perlu akun.</p>
+          </div>
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-folder"/></svg>
+            <h3>Izin minimal</h3>
+            <p>Memakai file picker sistem dan SAF, bukan izin baca seluruh media atau storage.</p>
+          </div>
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-file-lock"/></svg>
+            <h3>Original tidak disentuh</h3>
+            <p>Metadata hanya ditampilkan di memori. File asli tidak diubah, dipindah, atau dihapus.</p>
+          </div>
+        </div>
+        <div class="privacy-links">
+          <a class="btn btn-ghost-dark" href="/privacy">Kebijakan Privasi</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">FAQ</span>
+          <h2 id="faq-title">Pertanyaan yang sering diajukan</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Apakah file saya diupload ke server?</summary>
+            <p>Tidak. Semua ekstraksi dan penghapusan metadata berjalan di HP Anda. MetaStrip tidak punya server backend, tidak memuat SDK analytics atau iklan, dan versi rilisnya tidak meminta izin internet.</p>
+          </details>
+          <details>
+            <summary>Apakah file asli saya diubah?</summary>
+            <p>Tidak. MetaStrip selalu menulis file baru bernama &lt;nama&gt;_clean di folder output yang Anda pilih. Jika nama itu sudah ada, MetaStrip menambahkan nomor. File asli tidak ditimpa, dipindah, atau dihapus.</p>
+          </details>
+          <details>
+            <summary>Format apa saja yang bisa dibersihkan?</summary>
+            <p>JPG/JPEG, PNG, GIF, WebP, BMP, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, MP3, FLAC, OGG, Opus, WAV, AIFF, ZIP, APK, dan EPUB. Viewer bisa membaca lebih banyak format, termasuk video, HEIC, TIFF, dan RTF.</p>
+          </details>
+          <details>
+            <summary>Apakah semua metadata pasti terhapus?</summary>
+            <p>MetaStrip menghapus metadata yang didukung untuk tiap format. Untuk PDF prosesnya best-effort: Info dictionary dan XMP yang dirujuk trailer dikosongkan, dan PDF yang menyimpan Info di compressed object stream ditolak. ZIP, APK, dan EPUB hanya dibersihkan di level container, tidak sampai file di dalamnya. Buka hasilnya di Viewer untuk memeriksa ulang.</p>
+          </details>
+          <details>
+            <summary>Kenapa APK hasil cleanup tidak bisa di-install?</summary>
+            <p>Membersihkan metadata container mengubah isi paket, sehingga tanda tangan APK tidak berlaku lagi. Gunakan APK hasil cleanup untuk diarsipkan atau dibagikan sebagai file, bukan untuk di-install.</p>
+          </details>
+          <details>
+            <summary>Apakah ada batas ukuran file?</summary>
+            <p>Remover menerima file hingga 50 MiB. Untuk ZIP, Office, ODF, APK, dan EPUB, total isi setelah dekompresi dibatasi 32 MB dan maksimal 2.000 entri, supaya proses tetap aman di memori HP.</p>
+          </details>
+          <details>
+            <summary>HP apa saja yang didukung?</summary>
+            <p>HP Android 7.0 ke atas.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="unduh" aria-labelledby="unduh-title">
+      <div class="container">
+        <div class="cta">
+          <div>
+            <h2 id="unduh-title">Bagikan filenya, bukan jejak Anda.</h2>
+            <p>MetaStrip gratis di Google Play. Ada pertanyaan? Hubungi <a href="mailto:hello@bariskode.com?subject=MetaStrip">hello@bariskode.com</a>.</p>
+          </div>
+          <a class="btn btn-store" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">
+            <svg aria-hidden="true"><use href="#i-phone"/></svg>
+            <span><small>Dapatkan di</small><strong>Google Play</strong></span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-about">
+          <a class="brand" href="/"><img src="/icon.png" alt="" width="34" height="34">MetaStrip</a>
+          <p>Lihat dan hapus metadata dari foto, audio, dokumen, dan arsip secara offline, tanpa mengubah file asli.</p>
+        </div>
+        <div>
+          <h2 class="footer-title">Produk</h2>
+          <ul>
+            <li><a href="#fitur">Fitur</a></li>
+            <li><a href="#format">Format</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">Google Play</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2 class="footer-title">Legal &amp; dukungan</h2>
+          <ul>
+            <li><a href="/privacy">Kebijakan Privasi</a></li>
+            <li><a href="mailto:hello@bariskode.com">hello@bariskode.com</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Baris Kode (PT Baris Kode Solution).</p>
+        <p>Google Play adalah merek dagang Google LLC.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/assets/site.js?v=20261027" defer></script>
+</body>
+</html>

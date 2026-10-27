@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kebijakan Privasi — MetaStrip</title>
+  <meta name="description" content="Kebijakan privasi MetaStrip - Metadata Viewer &amp; Remover. Semua file diproses di perangkat Anda. Tanpa server, tanpa analytics, tanpa iklan.">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="canonical" href="https://metastrip.bariskode.com/privacy">
+  <link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/privacy">
+  <link rel="alternate" hreflang="en" href="https://metastrip.bariskode.com/en/privacy">
+  <link rel="alternate" hreflang="x-default" href="https://metastrip.bariskode.com/privacy">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/icon.png" sizes="256x256">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="MetaStrip">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:url" content="https://metastrip.bariskode.com/privacy">
+  <meta property="og:title" content="Kebijakan Privasi — MetaStrip">
+  <meta property="og:description" content="Kebijakan privasi MetaStrip - Metadata Viewer &amp; Remover. Semua file diproses di perangkat Anda. Tanpa server, tanpa analytics, tanpa iklan.">
+  <meta property="og:image" content="https://metastrip.bariskode.com/img/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/assets/site.css?v=20261027">
+</head>
+<body>
+  <a class="skip-link" href="#main">Langsung ke konten</a>
+
+  <header class="site-header">
+    <nav class="container nav" aria-label="Navigasi utama">
+      <a class="brand" href="/" aria-label="MetaStrip, beranda">
+        <img src="/icon.png" alt="" width="34" height="34">
+        MetaStrip
+      </a>
+      <div class="nav-actions nav-legal">
+        <div class="lang-switch" aria-label="Bahasa">
+          <span aria-current="true">ID</span>
+          <a href="/en/privacy" hreflang="en" lang="en">EN</a>
+        </div>
+        <a class="btn btn-primary btn-sm" href="/">Beranda</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="legal">
+    <div class="container">
+      <div class="legal-head">
+        <span class="eyebrow">Legal</span>
+        <h1>Kebijakan Privasi</h1>
+        <div class="legal-meta">
+          <span>Terakhir diperbarui: 10 Agustus 2026</span>
+          <span>Berlaku untuk: MetaStrip - Metadata Viewer &amp; Remover ("Aplikasi")</span>
+        </div>
+      </div>
+
+      <div class="legal-summary">
+        <p><strong>Ringkasan.</strong> MetaStrip dirancang untuk privasi. Semua pemrosesan file terjadi di perangkat Anda. Kami tidak mengumpulkan, menyimpan, atau membagikan data pribadi Anda.</p>
+      </div>
+
+      <section aria-labelledby="s1">
+        <h2 id="s1">1. Data yang Dikumpulkan</h2>
+        <h3>1.1 Data Pribadi</h3>
+        <p>MetaStrip <strong>tidak mengumpulkan data pribadi</strong> seperti nama, email, nomor telepon, atau identitas lain.</p>
+        <h3>1.2 File dan Metadata</h3>
+        <ul>
+          <li>Aplikasi <strong>tidak mengupload</strong> file atau metadata Anda ke server mana pun.</li>
+          <li>File diproses sepenuhnya di memori perangkat untuk ekstraksi dan penghapusan metadata.</li>
+          <li>Hasil pemrosesan disimpan sebagai clean copy di folder output yang <strong>Anda pilih</strong>.</li>
+          <li>File asli <strong>tidak diubah</strong> atau dipindahkan.</li>
+        </ul>
+        <h3>1.3 Data Aplikasi Lokal</h3>
+        <p>MetaStrip menyimpan konfigurasi berikut secara lokal di perangkat Anda melalui SharedPreferences:</p>
+        <ul>
+          <li>Status onboarding (sudah/selesai)</li>
+          <li>Path folder output yang Anda pilih</li>
+          <li>Preferensi tema warna</li>
+          <li>Pengaturan aplikasi lain (format JSON portabel)</li>
+        </ul>
+        <p>Data ini <strong>tidak pernah dikirim ke server</strong>.</p>
+      </section>
+
+      <section aria-labelledby="s2">
+        <h2 id="s2">2. Izin yang Digunakan</h2>
+        <h3>2.1 Android</h3>
+        <ul>
+          <li><strong>System File Picker / SAF (Storage Access Framework)</strong>: untuk memilih file dan folder output secara eksplisit. Tidak memerlukan broad storage permission seperti <code>READ_MEDIA_*</code> atau <code>MANAGE_EXTERNAL_STORAGE</code>.</li>
+          <li>Tidak meminta akses kamera, kontak, lokasi, atau identitas perangkat untuk tujuan ekstraksi metadata.</li>
+        </ul>
+        <h3>2.2 iOS</h3>
+        <ul>
+          <li><strong>File Picker / integrasi aplikasi Files</strong>: untuk memilih file dan menentukan lokasi output.</li>
+          <li>Tidak meminta akses foto perangkat atau library media secara luas.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="s3">
+        <h2 id="s3">3. Bagaimana Data Digunakan</h2>
+        <ul>
+          <li>File yang Anda pilih hanya digunakan untuk:
+            <ul>
+              <li>Ekstraksi metadata untuk ditampilkan di Viewer</li>
+              <li>Penghapusan metadata untuk membuat clean copy di Remover</li>
+            </ul>
+          </li>
+          <li>Metadata yang diekstrak hanya ditampilkan di memori aplikasi, tidak disimpan permanen.</li>
+          <li>Clean copy disimpan di lokasi yang Anda pilih; folder ini dikelola oleh sistem file perangkat Anda.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="s4">
+        <h2 id="s4">4. Berbagi Data</h2>
+        <p>MetaStrip <strong>tidak membagikan data kepada pihak ketiga</strong> karena:</p>
+        <ul>
+          <li>Tidak ada server backend</li>
+          <li>Tidak ada analytics SDK (seperti Firebase Analytics, Google Analytics, dll.)</li>
+          <li>Tidak ada SDK iklan (seperti AdMob, Unity Ads, dll.)</li>
+          <li>Tidak ada integrasi media sosial yang mengirim data</li>
+          <li>Tidak ada layanan cloud pihak ketiga</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="s5">
+        <h2 id="s5">5. Retensi Data</h2>
+        <ul>
+          <li>File asli Anda <strong>tidak pernah disentuh</strong> oleh Aplikasi.</li>
+          <li>Clean copy disimpan di perangkat Anda sesuai kontrol sistem file standar.</li>
+          <li>Konfigurasi aplikasi (SharedPreferences) bertahan di perangkat sampai Anda:
+            <ul>
+              <li>Menghapus Aplikasi</li>
+              <li>Melakukan reset data melalui Settings → Reset All Data</li>
+              <li>Menghapus data aplikasi melalui pengaturan sistem</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="s6">
+        <h2 id="s6">6. Keamanan</h2>
+        <ul>
+          <li>Pemrosesan file terjadi sepenuhnya di perangkat Anda.</li>
+          <li>Tidak ada transmisi data melalui jaringan.</li>
+          <li>File asli dilindungi oleh sistem operasi; Aplikasi hanya membaca file yang Anda pilih secara eksplisit.</li>
+          <li>Clean copy ditulis ke lokasi baru; file asli tidak dimodifikasi.</li>
+          <li>SHA-256 untuk file dihitung on-device untuk file hingga 100 MB (opsional).</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="s7">
+        <h2 id="s7">7. Layanan Pihak Ketiga</h2>
+        <p>MetaStrip <strong>tidak menyertakan SDK pihak ketiga</strong> yang mengumpulkan data. Dependensi utama:</p>
+        <ul>
+          <li>Flutter SDK (framework UI)</li>
+          <li>Dart standard library</li>
+          <li>Package: archive, xml, exif, image, path, mime, crypto, file_picker, file_selector, saf, shared_preferences</li>
+        </ul>
+        <p>Semua package di atas menjalankan kode di perangkat Anda dan tidak mengirim data keluar.</p>
+      </section>
+
+      <section aria-labelledby="s8">
+        <h2 id="s8">8. Hak Pengguna</h2>
+        <p>Anda memiliki kontrol penuh atas:</p>
+        <ul>
+          <li>File mana yang diproses (melalui system picker)</li>
+          <li>Lokasi output clean copy (folder yang Anda pilih)</li>
+          <li>Metadata apa yang ditampilkan dan dihapus</li>
+          <li>Penghapusan semua data aplikasi melalui reset atau uninstall</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="s9">
+        <h2 id="s9">9. Perubahan pada Kebijakan Privasi</h2>
+        <p>Kebijakan ini mungkin diperbarui seiring perkembangan Aplikasi. Perubahan signifikan akan didokumentasikan dengan jelas. Versi terbaru selalu tersedia di halaman ini.</p>
+      </section>
+
+      <section aria-labelledby="s10">
+        <h2 id="s10">10. Kontak</h2>
+        <p>Untuk pertanyaan tentang privasi atau Aplikasi ini, hubungi <a href="mailto:hello@bariskode.com">hello@bariskode.com</a>.</p>
+      </section>
+
+      <section aria-labelledby="s11">
+        <h2 id="s11">Catatan Penting</h2>
+        <ul>
+          <li>Aplikasi ini tidak dirancang untuk anak di bawah 13 tahun.</li>
+          <li>Tidak ada pengumpulan data lokasi, identitas, atau perilaku pengguna.</li>
+          <li>Jika Anda menginstal Aplikasi melalui Google Play, Google menerapkan kebijakan privasinya sendiri yang berada di luar kendali MetaStrip.</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p>© 2026 Baris Kode (PT Baris Kode Solution). <a href="/">Beranda</a> · <a href="mailto:hello@bariskode.com">hello@bariskode.com</a></p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

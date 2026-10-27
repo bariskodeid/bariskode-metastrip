@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetaStrip: View &amp; Remove File Metadata Offline</title>
+  <meta name="description" content="View and remove metadata from photos, audio, documents, and archives offline. MetaStrip makes a clean copy and never changes the original. No ads, no tracking.">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="author" content="Baris Kode (PT Baris Kode Solution)">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="canonical" href="https://metastrip.bariskode.com/en/">
+  <link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/">
+  <link rel="alternate" hreflang="en" href="https://metastrip.bariskode.com/en/">
+  <link rel="alternate" hreflang="x-default" href="https://metastrip.bariskode.com/">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/icon.png" sizes="256x256">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MetaStrip">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="id_ID">
+  <meta property="og:url" content="https://metastrip.bariskode.com/en/">
+  <meta property="og:title" content="MetaStrip — Strip the invisible. Own your files.">
+  <meta property="og:description" content="View and remove metadata from photos, audio, documents, and archives offline. MetaStrip makes a clean copy and never changes the original. No ads, no tracking.">
+  <meta property="og:image" content="https://metastrip.bariskode.com/img/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="MetaStrip: view and remove metadata from photos, audio, documents, and archives offline">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MetaStrip — Strip the invisible. Own your files.">
+  <meta name="twitter:description" content="View and remove metadata from photos, audio, documents, and archives offline. MetaStrip makes a clean copy and never changes the original. No ads, no tracking.">
+  <meta name="twitter:image" content="https://metastrip.bariskode.com/img/og-image.jpg">
+  <meta name="twitter:image:alt" content="MetaStrip: view and remove metadata from photos, audio, documents, and archives offline">
+  <link rel="preload" as="image" href="/img/shot-1.webp" imagesrcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" imagesizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" type="image/webp" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/site.css?v=20261027">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://metastrip.bariskode.com/#organization",
+        "name": "Baris Kode",
+        "legalName": "PT Baris Kode Solution",
+        "email": "hello@bariskode.com",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://metastrip.bariskode.com/icon.png",
+          "width": 256,
+          "height": 256
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://metastrip.bariskode.com/#website",
+        "url": "https://metastrip.bariskode.com/",
+        "name": "MetaStrip",
+        "inLanguage": [
+          "id",
+          "en"
+        ],
+        "publisher": {
+          "@id": "https://metastrip.bariskode.com/#organization"
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://metastrip.bariskode.com/en/#webpage",
+        "url": "https://metastrip.bariskode.com/en/",
+        "name": "MetaStrip: View & Remove File Metadata Offline",
+        "description": "View and remove metadata from photos, audio, documents, and archives offline. MetaStrip makes a clean copy and never changes the original. No ads, no tracking.",
+        "inLanguage": "en",
+        "isPartOf": {
+          "@id": "https://metastrip.bariskode.com/#website"
+        },
+        "about": {
+          "@id": "https://metastrip.bariskode.com/#app"
+        },
+        "primaryImageOfPage": "https://metastrip.bariskode.com/img/og-image.jpg"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://metastrip.bariskode.com/#app",
+        "name": "MetaStrip - Metadata Viewer & Remover",
+        "alternateName": "MetaStrip",
+        "description": "Android app that shows file metadata and makes clean copies without sensitive metadata, entirely offline on the device.",
+        "operatingSystem": "Android 7.0+",
+        "applicationCategory": "UtilitiesApplication",
+        "image": "https://metastrip.bariskode.com/icon.png",
+        "screenshot": [
+          "https://metastrip.bariskode.com/img/shot-1.webp",
+          "https://metastrip.bariskode.com/img/shot-2.webp",
+          "https://metastrip.bariskode.com/img/shot-3.webp",
+          "https://metastrip.bariskode.com/img/shot-4.webp",
+          "https://metastrip.bariskode.com/img/shot-5.webp"
+        ],
+        "featureList": [
+          "View filesystem metadata, EXIF, audio tags, document properties, and archive entries",
+          "Clean copies for 21 formats; the original file is never changed",
+          "Per-field selective removal for PNG, PDF, FLAC, WAV, Office, and ODF",
+          "Sequential processing with progress, a per-file log, and cancel",
+          "Copy metadata values to the clipboard",
+          "7 theme presets and a custom theme builder",
+          "Export and import settings as JSON",
+          "Fully offline: no internet permission, no ads, no analytics"
+        ],
+        "installUrl": "https://play.google.com/store/apps/details?id=com.bariskode.metastrip",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "IDR"
+        },
+        "publisher": {
+          "@id": "https://metastrip.bariskode.com/#organization"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://metastrip.bariskode.com/en/#faq",
+        "inLanguage": "en",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Are my files uploaded to a server?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. All metadata extraction and removal runs on your phone. MetaStrip has no backend server, ships no analytics or ad SDKs, and the release build does not request the internet permission."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does MetaStrip change my original file?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. MetaStrip always writes a new file named <name>_clean to the output folder you chose. If that name is taken, it adds a number. The original is never overwritten, moved, or deleted."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which formats can it clean?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "JPG/JPEG, PNG, GIF, WebP, BMP, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, MP3, FLAC, OGG, Opus, WAV, AIFF, ZIP, APK, and EPUB. The Viewer reads more formats, including video, HEIC, TIFF, and RTF."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is all metadata guaranteed to be removed?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "MetaStrip removes the metadata it supports for each format. PDF removal is best-effort: it blanks the trailer-referenced Info dictionary and XMP, and rejects PDFs that keep Info in a compressed object stream. ZIP, APK, and EPUB are cleaned at the container level only, not the files inside. Open the result in the Viewer to double-check."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why can't I install a cleaned APK?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Cleaning container metadata changes the package contents, so the APK signature no longer verifies. Use a cleaned APK for archiving or sharing as a file, not for installing."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is there a file size limit?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The Remover accepts files up to 50 MiB. For ZIP, Office, ODF, APK, and EPUB, the decompressed contents are capped at 32 MB and 2,000 entries so processing stays safe in phone memory."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which phones are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Android phones running Android 7.0 or later."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+      <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1.5 3.3A1.6 1.6 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1.2"/><circle cx="12" cy="7" r="1.2"/><circle cx="16.5" cy="10.5" r="1.2"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></symbol>
+      <symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M19 12.9a10 10 0 0 0-2.3-1.6"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 11 5"/><path d="M12 20h.01"/></symbol>
+      <symbol id="i-file-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><rect x="8.5" y="13" width="7" height="5" rx="1"/><path d="M10 13v-1.5a2 2 0 0 1 4 0V13"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+      <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <nav class="container nav" aria-label="Main navigation">
+      <a class="brand" href="/en/" aria-label="MetaStrip, home">
+        <img src="/icon.png" alt="" width="34" height="34">
+        MetaStrip
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <svg aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+      <div class="nav-menu" id="nav-menu">
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how-it-works">How it works</a></li>
+          <li><a href="#formats">Formats</a></li>
+          <li><a href="#privacy">Privacy</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+        <div class="nav-actions">
+          <div class="lang-switch" aria-label="Language">
+            <a href="/" hreflang="id" lang="id">ID</a>
+            <span aria-current="true">EN</span>
+          </div>
+          <a class="btn btn-primary btn-sm" href="#download">Get it</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <h1><span class="eyebrow">Offline metadata viewer &amp; remover</span> <span class="h1-main">Strip the invisible. <em>Own your files.</em></span></h1>
+          <p class="hero-lead">MetaStrip shows the hidden metadata in photos, audio, documents, and archives, then makes a clean copy without touching the original. Everything runs on your phone.</p>
+          <div class="hero-cta">
+            <a class="btn btn-store" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">
+              <svg aria-hidden="true"><use href="#i-phone"/></svg>
+              <span><small>Get it on</small><strong>Google Play</strong></span>
+            </a>
+            <a class="btn btn-ghost-dark" href="#features">See features</a>
+          </div>
+          <ul class="hero-trust">
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg>Fully offline</li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg>Originals untouched</li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg>No ads or tracking</li>
+          </ul>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="phone phone-back">
+            <img src="/img/shot-4.webp" srcset="/img/shot-4-360.webp 360w, /img/shot-4.webp 540w" sizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" alt="" width="540" height="1170" loading="eager" decoding="async">
+          </div>
+          <div class="phone phone-front">
+            <img src="/img/shot-1.webp" srcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" sizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" alt="" width="540" height="1170" fetchpriority="high" decoding="async">
+          </div>
+          <div class="tag-card tag-before">
+            <small>EXIF · IMG_2041.JPG</small>
+            <dl>
+              <dt>GPS</dt><dd>-6.2088, 106.8456</dd>
+              <dt>Model</dt><dd>Pixel 8 Pro</dd>
+              <dt>DateTime</dt><dd>2026:10:21 08:14</dd>
+            </dl>
+          </div>
+          <div class="tag-card tag-after">
+            <small>Clean copy</small>
+            <p><strong>IMG_2041_clean.JPG</strong><br>Metadata removed. Original intact.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Features</span>
+          <h2 id="features-title">See it first, then strip it</h2>
+          <p>Photos, documents, and recordings often carry a location, device name, author, or edit history. MetaStrip shows all of it before you share the file.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-search"/></svg></div>
+            <h3>Full viewer</h3>
+            <p>Filesystem metadata, EXIF, audio tags, document properties, and archive entries, neatly grouped.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-copy"/></svg></div>
+            <h3>Clean copy, original intact</h3>
+            <p>The result is always a new <code>_clean</code> file in the folder you choose. Name clashes get a number and are never overwritten.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-sliders"/></svg></div>
+            <h3>Selective removal</h3>
+            <p>Pick specific fields: PNG text chunks, PDF DocInfo, FLAC Vorbis comments, WAV LIST INFO, and Office and ODF properties.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-layers"/></svg></div>
+            <h3>21 removal formats</h3>
+            <p>Images, PDF, Office, ODF, audio, ZIP, APK, and EPUB. The Viewer reads more than 40 extensions.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-list"/></svg></div>
+            <h3>Controlled processing</h3>
+            <p>Files are processed one by one with progress, a per-file log, and a cancel button. Each result is re-validated after writing.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-clipboard"/></svg></div>
+            <h3>Copy values</h3>
+            <p>Copy metadata values to the clipboard to note them down or compare them.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-palette"/></svg></div>
+            <h3>7 themes + custom</h3>
+            <p>Dark Industrial, Steel Blue, Acid Green, and more, plus a custom theme builder with 16 color tokens.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg aria-hidden="true"><use href="#i-settings"/></svg></div>
+            <h3>Portable settings</h3>
+            <p>Export and import settings as JSON. A two-step reset leaves the clean copies you already made in place.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="screens" aria-labelledby="screens-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Screens</span>
+          <h2 id="screens-title">Technical, direct, no fluff</h2>
+          <p>An industrial monospace interface, built to read data clearly.</p>
+        </div>
+        <div class="gallery">
+          <ul class="gallery-track" aria-label="App screenshots">
+            <li><img src="/img/shot-1.webp" srcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Viewer screen: add files to inspect"></li>
+            <li><img src="/img/shot-2.webp" srcset="/img/shot-2-360.webp 360w, /img/shot-2.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Theme and output folder settings"></li>
+            <li><img src="/img/shot-3.webp" srcset="/img/shot-3-360.webp 360w, /img/shot-3.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Processing and maintenance settings"></li>
+            <li><img src="/img/shot-4.webp" srcset="/img/shot-4-360.webp 360w, /img/shot-4.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Choice of 7 color themes"></li>
+            <li><img src="/img/shot-5.webp" srcset="/img/shot-5-360.webp 360w, /img/shot-5.webp 540w" sizes="(max-width: 600px) 72vw, (max-width: 1080px) 31vw, 265px" width="540" height="1170" loading="lazy" decoding="async" alt="Custom theme builder"></li>
+          </ul>
+          <div class="gallery-controls">
+            <button class="icon-btn" type="button" data-gallery="prev" aria-label="Previous screenshot"><svg aria-hidden="true"><use href="#i-left"/></svg></button>
+            <button class="icon-btn" type="button" data-gallery="next" aria-label="Next screenshot"><svg aria-hidden="true"><use href="#i-right"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how-it-works" aria-labelledby="how-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">How it works</span>
+          <h2 id="how-title">Three steps, no uploads</h2>
+          <p>No account, no internet connection, and no broad storage permission.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <h3>Pick a file</h3>
+            <p>Open files through the system file picker. MetaStrip only reads the files you pick yourself.</p>
+          </li>
+          <li class="step">
+            <h3>Inspect the metadata</h3>
+            <p>See what the file carries. Strip all supported metadata, or pick just the fields you want gone.</p>
+          </li>
+          <li class="step">
+            <h3>Save a clean copy</h3>
+            <p>MetaStrip writes a new file to your output folder and re-validates it. The original stays exactly as it was.</p>
+          </li>
+        </ol>
+        <p class="note">You choose the output folder once during onboarding and can change it any time in Settings.</p>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="formats" aria-labelledby="formats-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Formats</span>
+          <h2 id="formats-title">Supported formats</h2>
+          <p>The Viewer reads more formats than the Remover can clean. The removal list keeps growing.</p>
+        </div>
+        <div class="formats">
+          <article class="format-card">
+            <h3>View metadata</h3>
+            <p class="format-sub">Viewer, more than 40 extensions.</p>
+            <dl class="format-groups">
+              <div>
+                <dt>Images</dt>
+                <dd><ul class="chips"><li>JPG</li><li>PNG</li><li>WebP</li><li>GIF</li><li>BMP</li><li>TIFF</li><li>HEIC</li></ul></dd>
+              </div>
+              <div>
+                <dt>Video</dt>
+                <dd><ul class="chips"><li>MP4</li><li>MOV</li><li>AVI</li><li>MKV</li><li>WebM</li><li>3GP</li><li>FLV</li><li>WMV</li></ul></dd>
+              </div>
+              <div>
+                <dt>Audio</dt>
+                <dd><ul class="chips"><li>MP3</li><li>FLAC</li><li>AAC</li><li>OGG</li><li>WAV</li><li>M4A</li><li>Opus</li><li>WMA</li><li>AIFF</li></ul></dd>
+              </div>
+              <div>
+                <dt>Documents &amp; archives</dt>
+                <dd><ul class="chips"><li>PDF</li><li>DOCX</li><li>XLSX</li><li>PPTX</li><li>ODT</li><li>ODS</li><li>ODP</li><li>RTF</li><li>TXT</li><li>ZIP</li><li>TAR</li><li>APK</li><li>EPUB</li></ul></dd>
+              </div>
+            </dl>
+          </article>
+          <article class="format-card format-card-dark">
+            <span class="format-badge">Clean copy</span>
+            <h3>Remove metadata</h3>
+            <p class="format-sub">Remover, 21 formats.</p>
+            <dl class="format-groups">
+              <div>
+                <dt>Images</dt>
+                <dd><ul class="chips"><li>JPG/JPEG</li><li>PNG</li><li>GIF</li><li>WebP</li><li>BMP</li></ul></dd>
+              </div>
+              <div>
+                <dt>Documents</dt>
+                <dd><ul class="chips"><li>PDF</li><li>DOCX</li><li>XLSX</li><li>PPTX</li><li>ODT</li><li>ODS</li><li>ODP</li></ul></dd>
+              </div>
+              <div>
+                <dt>Audio</dt>
+                <dd><ul class="chips"><li>MP3</li><li>FLAC</li><li>OGG</li><li>Opus</li><li>WAV</li><li>AIFF</li></ul></dd>
+              </div>
+              <div>
+                <dt>Archives</dt>
+                <dd><ul class="chips"><li>ZIP</li><li>APK</li><li>EPUB</li></ul></dd>
+              </div>
+            </dl>
+          </article>
+        </div>
+        <div class="limits">
+          <h3>Limits in this version</h3>
+          <ul>
+            <li>PDF removal is best-effort: it blanks the trailer-referenced Info dictionary and XMP; PDFs with Info in a compressed object stream are rejected.</li>
+            <li>BMP is limited to the canonical 24/32-bit Windows BITMAPINFOHEADER subset.</li>
+            <li>ZIP, APK, and EPUB are cleaned at the container level only, not recursively. A cleaned APK is no longer signed.</li>
+            <li>Selective removal covers supported standard metadata IDs only; custom and legacy Office properties are not supported yet.</li>
+            <li>Video and HEIC/HEIF can be viewed but not cleaned yet.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section privacy-band" id="privacy" aria-labelledby="privacy-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Privacy</span>
+          <h2 id="privacy-title">Your files never leave your phone</h2>
+          <p>A privacy tool shouldn't collect data. MetaStrip is built with no backend at all.</p>
+        </div>
+        <div class="privacy-grid">
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-wifi-off"/></svg>
+            <h3>No internet permission</h3>
+            <p>The release build doesn't ask for internet access. No uploads and no servers.</p>
+          </div>
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-eye-off"/></svg>
+            <h3>No ads or analytics</h3>
+            <p>No ad, analytics, or tracking SDKs. No account needed.</p>
+          </div>
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-folder"/></svg>
+            <h3>Minimal permissions</h3>
+            <p>Uses the system file picker and SAF, not permission to read all your media or storage.</p>
+          </div>
+          <div class="privacy-item">
+            <svg aria-hidden="true"><use href="#i-file-lock"/></svg>
+            <h3>Originals untouched</h3>
+            <p>Metadata is only shown in memory. Originals are never changed, moved, or deleted.</p>
+          </div>
+        </div>
+        <div class="privacy-links">
+          <a class="btn btn-ghost-dark" href="/en/privacy">Privacy Policy</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">FAQ</span>
+          <h2 id="faq-title">Frequently asked questions</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Are my files uploaded to a server?</summary>
+            <p>No. All metadata extraction and removal runs on your phone. MetaStrip has no backend server, ships no analytics or ad SDKs, and the release build does not request the internet permission.</p>
+          </details>
+          <details>
+            <summary>Does MetaStrip change my original file?</summary>
+            <p>No. MetaStrip always writes a new file named &lt;name&gt;_clean to the output folder you chose. If that name is taken, it adds a number. The original is never overwritten, moved, or deleted.</p>
+          </details>
+          <details>
+            <summary>Which formats can it clean?</summary>
+            <p>JPG/JPEG, PNG, GIF, WebP, BMP, PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, MP3, FLAC, OGG, Opus, WAV, AIFF, ZIP, APK, and EPUB. The Viewer reads more formats, including video, HEIC, TIFF, and RTF.</p>
+          </details>
+          <details>
+            <summary>Is all metadata guaranteed to be removed?</summary>
+            <p>MetaStrip removes the metadata it supports for each format. PDF removal is best-effort: it blanks the trailer-referenced Info dictionary and XMP, and rejects PDFs that keep Info in a compressed object stream. ZIP, APK, and EPUB are cleaned at the container level only, not the files inside. Open the result in the Viewer to double-check.</p>
+          </details>
+          <details>
+            <summary>Why can't I install a cleaned APK?</summary>
+            <p>Cleaning container metadata changes the package contents, so the APK signature no longer verifies. Use a cleaned APK for archiving or sharing as a file, not for installing.</p>
+          </details>
+          <details>
+            <summary>Is there a file size limit?</summary>
+            <p>The Remover accepts files up to 50 MiB. For ZIP, Office, ODF, APK, and EPUB, the decompressed contents are capped at 32 MB and 2,000 entries so processing stays safe in phone memory.</p>
+          </details>
+          <details>
+            <summary>Which phones are supported?</summary>
+            <p>Android phones running Android 7.0 or later.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="download" aria-labelledby="download-title">
+      <div class="container">
+        <div class="cta">
+          <div>
+            <h2 id="download-title">Share the file, not your trail.</h2>
+            <p>MetaStrip is free on Google Play. Questions? Email <a href="mailto:hello@bariskode.com?subject=MetaStrip">hello@bariskode.com</a>.</p>
+          </div>
+          <a class="btn btn-store" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">
+            <svg aria-hidden="true"><use href="#i-phone"/></svg>
+            <span><small>Get it on</small><strong>Google Play</strong></span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-about">
+          <a class="brand" href="/en/"><img src="/icon.png" alt="" width="34" height="34">MetaStrip</a>
+          <p>View and remove metadata from photos, audio, documents, and archives offline, without changing the original.</p>
+        </div>
+        <div>
+          <h2 class="footer-title">Product</h2>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#formats">Formats</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">Google Play</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2 class="footer-title">Legal &amp; support</h2>
+          <ul>
+            <li><a href="/en/privacy">Privacy Policy</a></li>
+            <li><a href="mailto:hello@bariskode.com">hello@bariskode.com</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Baris Kode (PT Baris Kode Solution).</p>
+        <p>Google Play is a trademark of Google LLC.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/assets/site.js?v=20261027" defer></script>
+</body>
+</html>
