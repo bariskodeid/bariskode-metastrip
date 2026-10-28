@@ -1,7 +1,7 @@
 # Privacy Policy — MetaStrip
 
-**Terakhir diperbarui:** 2026-08-10  
-** Berlaku untuk:** MetaStrip - Metadata Viewer & Remover (selanjutnya disebut "Aplikasi")
+**Terakhir diperbarui:** 2026-10-28  
+**Berlaku untuk:** MetaStrip by Baris Kode (selanjutnya disebut "Aplikasi")
 
 ---
 
