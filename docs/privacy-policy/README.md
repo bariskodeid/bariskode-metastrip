@@ -21,6 +21,7 @@ Situs statis MetaStrip (halaman utama + Privacy Policy), untuk di-host di
 | `site/assets/site.css`, `site/assets/site.js` | Gaya (palet tema Dark Industrial dari `lib/core/theme/app_colors.dart`) + JS kecil (menu mobile, tombol galeri). Hanya font sistem, tanpa request pihak ketiga |
 | `site/img/shot-1..5.webp` | Screenshot app 540x1170, dipakai untuk galeri dan mockup hero. UI app berbahasa Inggris, jadi satu set dipakai untuk ID dan EN |
 | `site/img/shot-*-360.webp` | Varian kecil untuk `srcset` (HP) |
+| `site/img/google-play-badge-{id,en}.svg` | Badge resmi "Dapatkan di / Get it on Google Play" dari Partner Marketing Hub Google (zip "Google Play Badge guidelines", folder `Digital/svg`), juga dipakai `README.md` root. **Jangan diubah** (warna, teks, proporsi); tinggi min. 28px, ruang kosong 1/4 tinggi badge di semua sisi. Ganti dengan unduhan terbaru bila Google memperbarui artwork |
 | `site/img/og-image.jpg` | Gambar preview link 1200x630 (og:image/twitter:image), dari feature graphic `MetaStrip-features.png` |
 | `site/icon.png`, `site/favicon.ico`, `site/apple-touch-icon.png` | Ikon 256, favicon, dan ikon iOS 180 dari paket ikon MetaStrip |
 | `site/robots.txt`, `site/sitemap.xml` | Sitemap dengan hreflang ID/EN/x-default; **perbarui `<lastmod>`** saat isi halaman berubah |
@@ -52,7 +53,8 @@ Setup awal (sekali saja):
 
 ## Link Google Play
 
-Tombol di hero, CTA `#unduh` / `#download`, footer, `installUrl` di JSON-LD,
+Tombol header, badge di hero dan CTA `#unduh` / `#download`, footer,
+`installUrl`/`downloadUrl`/`offers.url` di JSON-LD,
 dan `llms.txt` memakai `https://play.google.com/store/apps/details?id=com.bariskode.metastrip`
 (tanpa parameter `pcampaignid`). Samakan semuanya jika link berubah.
 

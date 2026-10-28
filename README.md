@@ -11,6 +11,14 @@
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey">
 </p>
 
+<p align="center">
+  <a href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip"><img alt="Get it on Google Play" src="docs/privacy-policy/site/img/google-play-badge-en.svg" height="60"></a>
+</p>
+
+<p align="center">
+  <a href="https://metastrip.bariskode.com/">metastrip.bariskode.com</a>
+</p>
+
 MetaStrip is a mobile application for viewing and removing metadata from photos, audio, documents, and archives offline. The app creates clean copies without modifying the original files, keeping your privacy entirely on-device.
 
 ---
@@ -110,7 +118,7 @@ lib/
 
 ```bash
 git clone https://github.com/bariskodeid/bariskode-metastrip.git
-cd metastrip
+cd bariskode-metastrip
 flutter pub get
 ```
 
@@ -154,6 +162,7 @@ flutter test
 ## Project Status
 
 **Current Phase:** Implemented-scope MVP — usable and mostly complete.
+Available on [Google Play](https://play.google.com/store/apps/details?id=com.bariskode.metastrip).
 
 ### Implemented
 - Onboarding + output folder setup
@@ -197,6 +206,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 - [Lucide Icons](https://lucide.dev/) — Icons
 - Flutter BLoC pattern by Felix Angelov
+
+Google Play and the Google Play logo are trademarks of Google LLC.
 
 ---
 

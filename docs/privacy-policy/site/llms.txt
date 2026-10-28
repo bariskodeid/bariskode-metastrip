@@ -1,6 +1,6 @@
 # MetaStrip
 
-> MetaStrip - Metadata Viewer & Remover is an Android app (Android 7.0+) that shows the metadata hidden in photos, audio, documents, and archives, and makes clean copies without it. All processing runs on the phone: no account, no server, no internet permission in the release build. The original file is never changed. Made by Baris Kode (PT Baris Kode Solution), Indonesia.
+> MetaStrip by Baris Kode (MetaStrip) is an Android app (Android 7.0+) that shows the metadata hidden in photos, audio, documents, and archives, and makes clean copies without it. All processing runs on the phone: no account, no server, no internet permission in the release build. The original file is never changed. Made by Baris Kode (PT Baris Kode Solution), Indonesia.
 
 ## Key facts
 

@@ -33,7 +33,7 @@
   <meta name="twitter:image" content="https://metastrip.bariskode.com/img/og-image.jpg">
   <meta name="twitter:image:alt" content="MetaStrip: view and remove metadata from photos, audio, documents, and archives offline">
   <link rel="preload" as="image" href="/img/shot-1.webp" imagesrcset="/img/shot-1-360.webp 360w, /img/shot-1.webp 540w" imagesizes="(max-width: 600px) 180px, (max-width: 1080px) 230px, 260px" type="image/webp" fetchpriority="high">
-  <link rel="stylesheet" href="/assets/site.css?v=20261027">
+  <link rel="stylesheet" href="/assets/site.css?v=20261028">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -44,6 +44,9 @@
         "name": "Baris Kode",
         "legalName": "PT Baris Kode Solution",
         "email": "hello@bariskode.com",
+        "sameAs": [
+          "https://play.google.com/store/apps/dev?id=7606001234931867351"
+        ],
         "logo": {
           "@type": "ImageObject",
           "url": "https://metastrip.bariskode.com/icon.png",
@@ -82,7 +85,7 @@
       {
         "@type": "SoftwareApplication",
         "@id": "https://metastrip.bariskode.com/#app",
-        "name": "MetaStrip - Metadata Viewer & Remover",
+        "name": "MetaStrip by Baris Kode",
         "alternateName": "MetaStrip",
         "description": "Android app that shows file metadata and makes clean copies without sensitive metadata, entirely offline on the device.",
         "operatingSystem": "Android 7.0+",
@@ -106,10 +109,13 @@
           "Fully offline: no internet permission, no ads, no analytics"
         ],
         "installUrl": "https://play.google.com/store/apps/details?id=com.bariskode.metastrip",
+        "downloadUrl": "https://play.google.com/store/apps/details?id=com.bariskode.metastrip",
         "offers": {
           "@type": "Offer",
           "price": "0",
-          "priceCurrency": "IDR"
+          "priceCurrency": "IDR",
+          "availability": "https://schema.org/InStock",
+          "url": "https://play.google.com/store/apps/details?id=com.bariskode.metastrip"
         },
         "publisher": {
           "@id": "https://metastrip.bariskode.com/#organization"
@@ -198,7 +204,6 @@
       <symbol id="i-file-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><rect x="8.5" y="13" width="7" height="5" rx="1"/><path d="M10 13v-1.5a2 2 0 0 1 4 0V13"/></symbol>
       <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
       <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/></symbol>
-      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
       <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
       <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
       <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
@@ -230,7 +235,7 @@
             <a href="/" hreflang="id" lang="id">ID</a>
             <span aria-current="true">EN</span>
           </div>
-          <a class="btn btn-primary btn-sm" href="#download">Get it</a>
+          <a class="btn btn-primary btn-sm" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">Get it</a>
         </div>
       </div>
     </nav>
@@ -243,10 +248,7 @@
           <h1><span class="eyebrow">Offline metadata viewer &amp; remover</span> <span class="h1-main">Strip the invisible. <em>Own your files.</em></span></h1>
           <p class="hero-lead">MetaStrip shows the hidden metadata in photos, audio, documents, and archives, then makes a clean copy without touching the original. Everything runs on your phone.</p>
           <div class="hero-cta">
-            <a class="btn btn-store" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">
-              <svg aria-hidden="true"><use href="#i-phone"/></svg>
-              <span><small>Get it on</small><strong>Google Play</strong></span>
-            </a>
+            <a class="play-badge" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip"><img src="/img/google-play-badge-en.svg" alt="Get it on Google Play" width="189" height="56"></a>
             <a class="btn btn-ghost-dark" href="#features">See features</a>
           </div>
           <ul class="hero-trust">
@@ -526,10 +528,7 @@
             <h2 id="download-title">Share the file, not your trail.</h2>
             <p>MetaStrip is free on Google Play. Questions? Email <a href="mailto:hello@bariskode.com?subject=MetaStrip">hello@bariskode.com</a>.</p>
           </div>
-          <a class="btn btn-store" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip">
-            <svg aria-hidden="true"><use href="#i-phone"/></svg>
-            <span><small>Get it on</small><strong>Google Play</strong></span>
-          </a>
+          <a class="play-badge" href="https://play.google.com/store/apps/details?id=com.bariskode.metastrip"><img src="/img/google-play-badge-en.svg" alt="Get it on Google Play" width="189" height="56"></a>
         </div>
       </div>
     </section>
@@ -561,7 +560,7 @@
       </div>
       <div class="footer-bottom">
         <p>© 2026 Baris Kode (PT Baris Kode Solution).</p>
-        <p>Google Play is a trademark of Google LLC.</p>
+        <p>Google Play and the Google Play logo are trademarks of Google LLC.</p>
       </div>
     </div>
   </footer>

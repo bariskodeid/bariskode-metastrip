@@ -278,38 +278,17 @@ code {
   font-size: 13px;
 }
 
-.btn-store {
-  background: var(--text-on-dark);
-  color: var(--ink);
-  padding: 10px 22px 10px 18px;
-  min-height: 56px;
-  text-align: left;
-  line-height: 1.2;
-  text-transform: none;
-  letter-spacing: 0;
+/* Official Google Play badge: artwork used unmodified, at least 28px tall,
+   with clear space of a quarter of its height on every side. */
+.play-badge {
+  display: inline-flex;
+  flex: none;
+  border-radius: 10px;
 }
 
-.btn-store small {
-  display: block;
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-2);
-}
-
-.btn-store strong {
-  display: block;
-  font-size: 17px;
-}
-
-.btn-store[aria-disabled="true"] {
-  cursor: default;
-}
-
-.btn-store svg {
-  width: 26px;
-  height: 26px;
-  color: var(--rust);
+.play-badge img {
+  width: auto;
+  height: 56px;
 }
 
 /* ---------- Hero ---------- */
@@ -400,6 +379,7 @@ code {
 .hero-cta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 14px;
   margin-top: 32px;
 }
@@ -1364,10 +1344,6 @@ code {
 
   .cta {
     padding: 36px 24px;
-  }
-
-  .cta .btn {
-    width: 100%;
   }
 
   .footer-grid {
