@@ -383,13 +383,6 @@ code {
   margin: 0 0 20px;
 }
 
-/* The eyebrow sits inside the h1 so the keyword phrase is part of it. */
-.hero h1 .eyebrow {
-  display: block;
-  line-height: 1.5;
-  margin-bottom: 18px;
-}
-
 .hero h1 .h1-main {
   display: block;
   font-size: clamp(32px, 4.6vw, 54px);

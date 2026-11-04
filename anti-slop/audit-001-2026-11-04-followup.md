@@ -22,7 +22,7 @@ Versi live (`metastrip.bariskode.com`) disalin ke `docs/privacy-policy/site/`: d
 | 7 | Selesai | Tiga fitur inti tetap kartu; lima fitur pendukung jadi daftar ringkas "Juga ada di aplikasi". |
 | 8 | Selesai | Efek naik dan shadow saat hover di kartu fitur dihapus. |
 | 9 | Selesai | Gradient CTA diganti warna solid (lihat 3). |
-| 10 | Selesai | Eyebrow section dan badge "Clean copy" dihapus; info "hasilnya selalu clean copy" pindah ke subjudul kartu Remover. Eyebrow hero tetap (membawa keyword). |
+| 10 | Selesai | Eyebrow section dan badge "Clean copy" dihapus; info "hasilnya selalu clean copy" pindah ke subjudul kartu Remover. Eyebrow hero ("Metadata viewer & remover offline" beserta kotak penandanya) juga dihapus atas permintaan pemilik; keyword tetap ada di `<title>` dan meta description. |
 | 11 | Sebagian | HP kedua (layar Color Theme) dihapus dari hero; kartu contoh diberi label "Contoh"/"Example" dan digeser agar teks layar Viewer terbaca; galeri diberi caption. **Masih kurang:** screenshot asli layar detail metadata dan hasil clean copy. Aset ini harus diambil dari aplikasi. |
 | 12 | Selesai | Urutan baru: hero, cara kerja, privasi, fitur, tampilan, format, FAQ, unduh. Komposisi divariasikan: cara kerja, privasi, dan FAQ memakai kolom judul di samping isi; fitur, tampilan, dan format tetap judul di tengah. Langkah 01-03 jadi daftar bergaris, bukan kartu. |
 | 13 | Selesai | "Dapatkan" jadi "Unduh gratis" / "Download free"; "Lihat fitur" jadi "Lihat cara kerjanya" / "See how it works". |
