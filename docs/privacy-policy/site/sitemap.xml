@@ -3,7 +3,7 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://metastrip.bariskode.com/</loc>
-    <lastmod>2026-10-28</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/"/>
@@ -12,7 +12,7 @@
   </url>
   <url>
     <loc>https://metastrip.bariskode.com/en/</loc>
-    <lastmod>2026-10-28</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/"/>
@@ -21,7 +21,7 @@
   </url>
   <url>
     <loc>https://metastrip.bariskode.com/privacy</loc>
-    <lastmod>2026-10-28</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/privacy"/>
@@ -30,7 +30,7 @@
   </url>
   <url>
     <loc>https://metastrip.bariskode.com/en/privacy</loc>
-    <lastmod>2026-10-28</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
     <xhtml:link rel="alternate" hreflang="id" href="https://metastrip.bariskode.com/privacy"/>
