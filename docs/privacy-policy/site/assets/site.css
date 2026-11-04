@@ -358,27 +358,6 @@ code {
   padding-bottom: 88px;
 }
 
-.eyebrow {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--amber);
-}
-
-.eyebrow::before {
-  /* Inline, so the marker stays with the first word when the label wraps. */
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  vertical-align: 0.1em;
-  background: currentColor;
-}
-
 .hero h1 {
   margin: 0 0 20px;
 }
@@ -1098,11 +1077,7 @@ code {
 .legal-head h1 {
   font-size: clamp(30px, 4vw, 42px);
   font-weight: 700;
-  margin: 14px 0 12px;
-}
-
-.legal-head .eyebrow {
-  color: var(--rust-ink);
+  margin: 0 0 12px;
 }
 
 .legal-meta {
